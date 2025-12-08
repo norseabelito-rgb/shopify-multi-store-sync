@@ -362,11 +362,6 @@ function dashboardPage() {
       color: #9ca3af;
       margin-bottom: 4px;
     }
-    .product-cell-tags {
-      font-size: 11px;
-      color: #9ca3af;
-      line-height: 1.4;
-    }
 
     .action-main {
       font-size: 11px;
@@ -497,7 +492,7 @@ function dashboardPage() {
     <div id="preview-wrapper" class="preview-container panel">
       <div class="section-heading with-actions" style="padding: 16px;">
         <div>
-          <h2 style="display:flex;align-items:center;gap:8px;">Preview rezultate</h2>
+          <h2 style="display:flex;align-items:center;gap:8px;">Preview modificări</h2>
           <p class="muted">Revizuiește și filtrează modificările înainte de sincronizare.</p>
         </div>
       </div>
@@ -552,7 +547,7 @@ function dashboardPage() {
 
     function appendLog(text) {
       const ts = new Date().toISOString();
-      logEl.textContent = '[' + ts + '] ' + text + '\n' + logEl.textContent;
+      logEl.textContent = '[' + ts + '] ' + text + '\\n' + logEl.textContent;
     }
 
     function setLoading(isLoading, text) {
@@ -599,21 +594,21 @@ function dashboardPage() {
           const card = document.createElement('div');
           card.className = 'store-card';
           const storeLabel = store.store_name || store.store_id;
-          card.innerHTML = `
-            <div class="store-title">${storeLabel}</div>
+          card.innerHTML = \`
+            <div class="store-title">\${storeLabel}</div>
             <button
-              data-store-id="${store.store_id}"
-              data-store-name="${storeLabel}"
+              data-store-id="\${store.store_id}"
+              data-store-name="\${storeLabel}"
               class="btn-preview"
               title="Verifică ce produse vor fi create sau actualizate pentru acest magazin."
             >Verifică schimbările</button>
             <button
-              data-store-id="${store.store_id}"
-              data-store-name="${storeLabel}"
+              data-store-id="\${store.store_id}"
+              data-store-name="\${storeLabel}"
               class="btn-sync"
               title="Aplică în Shopify toate modificările selectate pentru acest magazin."
             >Sincronizează produsele</button>
-          `;
+          \`;
           storesEl.appendChild(card);
         });
 
@@ -694,13 +689,13 @@ function dashboardPage() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        let html = 'Rezultate sync ' + storeId + ':\n';
-        html += 'Processed: ' + (data.processed || 0) + '\n';
+        let html = 'Rezultate sync ' + storeId + ':\\n';
+        html += 'Processed: ' + (data.processed || 0) + '\\n';
         if (Array.isArray(data.results)) {
           data.results.forEach(r => {
             html += '- ' + r.internal_product_id + ' (' + (r.sku || 'fara SKU') + '): ' +
               (r.action || '') + ' -> ' + (r.status || '') +
-              (r.error ? ' (error: ' + r.error + ')' : '') + '\n';
+              (r.error ? ' (error: ' + r.error + ')' : '') + '\\n';
           });
         }
         appendLog(html);
@@ -737,13 +732,12 @@ function dashboardPage() {
 
       const rowsHtml = filtered.map(item => renderRow(item)).join('');
 
-      const tableHtml = `
+      const tableHtml = \`
         <table class="preview-table">
           <thead>
             <tr>
               <th>Poze noi</th>
-              <th>Produs nou</th>
-              <th>Tag-uri noi</th>
+              <th>Produs</th>
               <th>Acțiune</th>
               <th>Valori curente în Shopify</th>
               <th class="checkbox-cell">
@@ -751,9 +745,9 @@ function dashboardPage() {
               </th>
             </tr>
           </thead>
-          <tbody>${rowsHtml}</tbody>
+          <tbody>\${rowsHtml}</tbody>
         </table>
-      `;
+      \`;
 
       previewContainer.innerHTML = tableHtml;
 
@@ -871,40 +865,37 @@ function dashboardPage() {
 
       const checkedAttr = selectedKeys.has(key) ? 'checked' : '';
 
-      return `
+      return \`
         <tr>
           <td>
             <div class="images-cell">
-              <img class="images-main" src="${mainImg || ''}" alt="" referrerpolicy="no-referrer" />
+              <img class="images-main" src="\${mainImg || ''}" alt="" referrerpolicy="no-referrer" />
               <div class="images-thumbs">
-                ${thumbImgs
+                \${thumbImgs
                   .map(u => '<img src="' + u + '" alt="" referrerpolicy="no-referrer" />')
                   .join('')}
               </div>
             </div>
           </td>
           <td>
-            <div class="product-cell-title">${escapeHtml(item.title || item.internal_product_id || '(fără titlu)')}</div>
-            <div class="product-cell-sku">SKU: ${escapeHtml(item.sku || 'fără SKU')}</div>
+            <div class="product-cell-title">\${escapeHtml(item.title || item.internal_product_id || '(fără titlu)')}</div>
+            <div class="product-cell-sku">SKU: \${escapeHtml(item.sku || 'fără SKU')}</div>
           </td>
           <td>
-            <div class="product-cell-tags">${escapeHtml(item.tags_new || '')}</div>
+            <div class="action-main">\${actionTextMain}</div>
+            \${actionTextSecondary ? '<div class="action-secondary">' + actionTextSecondary + '</div>' : ''}
           </td>
-          <td>
-            <div class="action-main">${actionTextMain}</div>
-            ${actionTextSecondary ? '<div class="action-secondary">' + actionTextSecondary + '</div>' : ''}
-          </td>
-          <td>${currentValuesHtml}</td>
+          <td>\${currentValuesHtml}</td>
           <td class="checkbox-cell">
             <input
               type="checkbox"
-              data-key="${key}"
-              ${checkedAttr}
+              data-key="\${key}"
+              \${checkedAttr}
               title="Bifează pentru a include acest produs la sincronizare."
             />
           </td>
         </tr>
-      `;
+      \`;
     }
 
     // tab buttons
