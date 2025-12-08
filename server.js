@@ -90,7 +90,7 @@ function extractDriveFolderId(urlOrId) {
   const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   if (match && match[1]) return match[1];
 
-  // Uneori vine ca .../folders/xyz?resourcekey=... sau ...?id=xyz
+  // Uneori vine ca ...?id=xyz
   const matchIdParam = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (matchIdParam && matchIdParam[1]) return matchIdParam[1];
 
@@ -115,7 +115,7 @@ async function getFirstImageUrlFromDriveFolder(mediaFolderUrl) {
 
   const file = files[0];
 
-  // link de vizualizare directă
+  // link de vizualizare directă (trebuie ca fișierul să fie accesibil public / anyone with link)
   return `https://drive.google.com/uc?export=view&id=${file.id}`;
 }
 
@@ -278,7 +278,6 @@ function buildProductPayload(product, store, psRow, imageUrl) {
   }
 
   const compare_at_price = psRow.compare_at_price || undefined;
-
   const sku = psRow.store_sku || product.master_sku || product.internal_product_id;
 
   // tags: din Product_Store override sau din Products, plus tag-ul scriptului
@@ -293,16 +292,7 @@ function buildProductPayload(product, store, psRow, imageUrl) {
   }
 
   const tags = tagsArray.join(', ');
-
   const status = (psRow.status || 'active').toLowerCase(); // active/draft/archived
-
-  if (imageUrl) {
-    payload.images = [
-      {
-        src: imageUrl
-      }
-    ];
-  }
 
   const payload = {
     title,
@@ -321,6 +311,14 @@ function buildProductPayload(product, store, psRow, imageUrl) {
       }
     ]
   };
+
+  if (imageUrl) {
+    payload.images = [
+      {
+        src: imageUrl
+      }
+    ];
+  }
 
   return payload;
 }
@@ -467,7 +465,7 @@ app.get('/', (req, res) => {
       }
     }
 
-       async function handlePreview(storeId, btn) {
+    async function handlePreview(storeId, btn) {
       try {
         btn.disabled = true;
         appendLog('Preview pentru store ' + storeId + '...');
@@ -508,11 +506,14 @@ app.get('/', (req, res) => {
             if (md.media_folder_id) {
               mediaLine += ' · folderId: ' + md.media_folder_id;
             }
+            if (item.image_url) {
+              mediaLine += ' · <a href="' + item.image_url + '" target="_blank" rel="noopener noreferrer">deschide imagine</a>';
+            }
             if (md.error) {
               mediaLine += ' · error: ' + md.error;
             }
           } else if (item.image_url) {
-            mediaLine = 'Media: ok';
+            mediaLine = 'Media: ok · <a href="' + item.image_url + '" target="_blank" rel="noopener noreferrer">deschide imagine</a>';
           } else {
             mediaLine = 'Media: none';
           }
@@ -667,7 +668,7 @@ app.get('/preview', async (req, res) => {
       const classification = await determinePlannedActionForRow(store, accessToken, product, row);
       const sku = row.store_sku || product.master_sku || product.internal_product_id;
 
-            // prima poză din media_folder_url + debug
+      // prima poză din media_folder_url + debug
       let imageUrl = null;
       let mediaDebug = null;
 
@@ -799,21 +800,21 @@ app.post('/sync', async (req, res) => {
           continue;
         }
 
-       if (plannedAction === 'create') {
-  let imageUrl = null;
-  if (product.media_folder_url) {
-    try {
-      imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
-    } catch (e) {
-      console.error('Error getting image for product during create', internalId, e.message);
-    }
-  }
+        if (plannedAction === 'create') {
+          let imageUrl = null;
+          if (product.media_folder_url) {
+            try {
+              imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+            } catch (e) {
+              console.error('Error getting image for product during create', internalId, e.message);
+            }
+          }
 
-  const payload = buildProductPayload(product, store, row, imageUrl);
-  const created = await createProductInStore(store, accessToken, payload);
-  result.status = 'success';
-  result.shopify_product_id = created.id;
-} else if (plannedAction === 'update') {
+          const payload = buildProductPayload(product, store, row, imageUrl);
+          const created = await createProductInStore(store, accessToken, payload);
+          result.status = 'success';
+          result.shopify_product_id = created.id;
+        } else if (plannedAction === 'update') {
           let productId = classification.existingProductId;
 
           // fallback: dacă nu a găsit prin SKU+tag dar avem handle, încercăm și după handle
