@@ -459,7 +459,7 @@ app.get('/', (req, res) => {
       }
     }
 
-    async function handlePreview(storeId, btn) {
+       async function handlePreview(storeId, btn) {
       try {
         btn.disabled = true;
         appendLog('Preview pentru store ' + storeId + '...');
@@ -488,7 +488,7 @@ app.get('/', (req, res) => {
             img.alt = 'Fără imagine';
           }
 
-                    const content = document.createElement('div');
+          const content = document.createElement('div');
           content.className = 'preview-content';
           const metaSku = item.sku || 'fără SKU';
 
@@ -509,12 +509,12 @@ app.get('/', (req, res) => {
             mediaLine = 'Media: none';
           }
 
-          content.innerHTML = `
-            <div class="preview-title">${item.title || item.internal_product_id || '(fără titlu)'} ${badge(item.plannedAction)}</div>
-            <div class="preview-meta">SKU: ${metaSku}</div>
-            <div class="preview-reason">${item.reason || ''}</div>
-            <div class="preview-reason">${mediaLine}</div>
-          `;
+          content.innerHTML = \`
+            <div class="preview-title">\${item.title || item.internal_product_id || '(fără titlu)'} \${badge(item.plannedAction)}</div>
+            <div class="preview-meta">SKU: \${metaSku}</div>
+            <div class="preview-reason">\${item.reason || ''}</div>
+            <div class="preview-reason">\${mediaLine}</div>
+          \`;
 
           row.appendChild(img);
           row.appendChild(content);
