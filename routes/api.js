@@ -9,7 +9,8 @@ const {
   findProductIdByHandle,
   createProductInStore,
   updateProductInStore,
-  deleteProductInStore
+  deleteProductInStore,
+  getProductByGid
 } = require('../lib/shopify');
 const { buildProductPayload, determinePlannedActionForRow } = require('../lib/mapping');
 
@@ -97,6 +98,7 @@ router.get('/preview', async (req, res) => {
           store_id: storeId,
           sku: row.store_sku || '',
           title: row.title || '',
+          tags: '',
           plannedAction: 'skip',
           reason: 'No product found in Products for this internal_product_id',
           image_url: null
@@ -137,6 +139,35 @@ router.get('/preview', async (req, res) => {
         }
       }
 
+      // construim payloadul final ca să avem titlu + tags EXACT cum vor fi trimise
+      const payloadForPreview = buildProductPayload(product, store, row, imageUrls);
+      const newTitle = payloadForPreview.title;
+      const newTags = payloadForPreview.tags;
+
+      // dacă e update, luăm valorile curente din Shopify pentru comparație
+      let existing = null;
+      if (classification.plannedAction === 'update' && classification.existingProductId) {
+        try {
+          const shopifyProduct = await getProductByGid(
+            store.shopify_domain,
+            accessToken,
+            classification.existingProductId
+          );
+
+          if (shopifyProduct) {
+            existing = {
+              title: shopifyProduct.title || '',
+              tags: shopifyProduct.tags || '',
+              images: Array.isArray(shopifyProduct.images)
+                ? shopifyProduct.images.map((img) => img.src).filter(Boolean)
+                : []
+            };
+          }
+        } catch (e) {
+          console.error('Error fetching existing Shopify product for preview', internalId, e);
+        }
+      }
+
       const previewImageUrl = imageUrl
         ? `/media?src=${encodeURIComponent(imageUrl)}`
         : null;
@@ -145,13 +176,15 @@ router.get('/preview', async (req, res) => {
         internal_product_id: internalId,
         store_id: storeId,
         sku,
-        title: row.title || product.internal_name || '',
+        title: newTitle || row.title || product.internal_name || '',
+        tags: newTags || '',
         plannedAction: classification.plannedAction,
         reason: classification.reason || '',
         image_url: imageUrl,
         preview_image_url: previewImageUrl,
         image_urls: imageUrls,
-        media_debug: mediaDebug
+        media_debug: mediaDebug,
+        existing
       });
     }
 
@@ -171,7 +204,13 @@ router.post('/sync', async (req, res) => {
       throw new Error('Missing GOOGLE_SHEETS_ID env var');
     }
 
-    const { store_id: filterStoreId, internal_product_id: filterProductId } = req.body || {};
+    const {
+      store_id: filterStoreId,
+      internal_product_id: filterProductId,
+      internal_product_ids: filterProductIds
+    } = req.body || {};
+
+    const idsArray = Array.isArray(filterProductIds) ? filterProductIds : null;
 
     const [productsSheet, storesSheet, psSheet] = await Promise.all([
       loadSheet(spreadsheetId, 'Products'),
@@ -200,6 +239,7 @@ router.post('/sync', async (req, res) => {
       if (!validActions.includes(action)) return false;
       if (filterStoreId && r.store_id !== filterStoreId) return false;
       if (filterProductId && r.internal_product_id !== filterProductId) return false;
+      if (idsArray && !idsArray.includes(r.internal_product_id)) return false;
       return true;
     });
 
