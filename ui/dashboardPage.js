@@ -19,6 +19,45 @@ function dashboardPage() {
     h2 { margin-top: 24px; margin-bottom: 8px; }
     p  { margin-top: 4px; margin-bottom: 12px; }
 
+    /* Loading bar */
+    .loading-bar-wrapper {
+      margin: 12px 0 20px 0;
+      display: none;
+    }
+    .loading-bar-wrapper.active {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .loading-label {
+      font-size: 12px;
+      color: #e5e7eb;
+    }
+    .loading-bar {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      height: 6px;
+      border-radius: 999px;
+      background: #111118;
+      overflow: hidden;
+    }
+    .loading-inner {
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:40%;
+      border-radius:999px;
+      background:#2563eb;
+      animation: loadingPulse 1.1s infinite ease-in-out;
+    }
+    @keyframes loadingPulse {
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(40%); }
+      100% { transform: translateX(160%); }
+    }
+
     /* Store list: un singur rand, scrollabil orizontal */
     .stores {
       display:flex;
@@ -43,8 +82,7 @@ function dashboardPage() {
       box-shadow:0 0 0 1px #262635;
       flex:0 0 auto;
     }
-    .store-title { font-weight:600; margin-bottom:4px; }
-    .store-id    { font-size:12px; opacity:0.7; margin-bottom:12px; }
+    .store-title { font-weight:600; margin-bottom:8px; }
 
     button {
       border:none;
@@ -240,6 +278,14 @@ function dashboardPage() {
   <h1>Shopify Multi-Store Sync</h1>
   <p>Tag folosit de script: <code>ADAUGAT CU SCRIPT</code></p>
 
+  <!-- PROGRESS BAR -->
+  <div id="loading-wrapper" class="loading-bar-wrapper">
+    <div id="loading-text" class="loading-label">Se pregătește...</div>
+    <div class="loading-bar">
+      <div class="loading-inner"></div>
+    </div>
+  </div>
+
   <h2>Magazin(e)</h2>
   <div id="stores" class="stores"></div>
 
@@ -268,7 +314,7 @@ function dashboardPage() {
   </div>
 
   <h2>Log</h2>
-  <div id="log">Selectează un magazin și apasă “Preview” sau “Sync”.</div>
+  <div id="log">Selectează un magazin și apasă “Verifică schimbările” sau “Sincronizează produsele”.</div>
 
   <script>
     const logEl = document.getElementById('log');
@@ -279,6 +325,9 @@ function dashboardPage() {
     const tabChangesBtn = document.getElementById('tab-changes');
     const tabNoChangesBtn = document.getElementById('tab-nochanges');
 
+    const loadingWrapper = document.getElementById('loading-wrapper');
+    const loadingTextEl = document.getElementById('loading-text');
+
     let currentPreviewItems = [];
     let currentStoreId = null;
     let currentStoreName = '';
@@ -288,6 +337,17 @@ function dashboardPage() {
     function appendLog(text) {
       const ts = new Date().toISOString();
       logEl.textContent = '[' + ts + '] ' + text + '\\n' + logEl.textContent;
+    }
+
+    function setLoading(isLoading, text) {
+      if (isLoading) {
+        if (text) {
+          loadingTextEl.textContent = text;
+        }
+        loadingWrapper.classList.add('active');
+      } else {
+        loadingWrapper.classList.remove('active');
+      }
     }
 
     function badge(action) {
@@ -325,19 +385,18 @@ function dashboardPage() {
           const storeLabel = store.store_name || store.store_id;
           card.innerHTML = \`
             <div class="store-title">\${storeLabel}</div>
-            <div class="store-id">ID: \${store.store_id} · Domeniu: \${store.shopify_domain}</div>
             <button
               data-store-id="\${store.store_id}"
               data-store-name="\${storeLabel}"
               class="btn-preview"
-              title="Vezi ce produse vor fi create sau actualizate pentru acest magazin."
-            >Preview</button>
+              title="Verifică ce produse vor fi create sau actualizate pentru acest magazin."
+            >Verifică schimbările</button>
             <button
               data-store-id="\${store.store_id}"
               data-store-name="\${storeLabel}"
               class="btn-sync"
               title="Aplică în Shopify toate modificările selectate pentru acest magazin."
-            >Sync</button>
+            >Sincronizează produsele</button>
           \`;
           storesEl.appendChild(card);
         });
@@ -368,7 +427,8 @@ function dashboardPage() {
     async function handlePreview(storeId, storeName, btn) {
       try {
         btn.disabled = true;
-        appendLog('Preview pentru store ' + storeId + '...');
+        setLoading(true, 'Verificăm schimbările pentru magazinul "' + storeName + '"...');
+        appendLog('Preview (verificare schimbări) pentru store ' + storeId + '...');
         const res = await fetch('/preview?store_id=' + encodeURIComponent(storeId));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
@@ -379,8 +439,10 @@ function dashboardPage() {
         tabNoChangesBtn.classList.remove('active');
 
         renderPreviewTable();
+        setLoading(false);
       } catch (err) {
         appendLog('Eroare la preview ' + storeId + ': ' + err.message);
+        setLoading(false, '');
       } finally {
         btn.disabled = false;
       }
@@ -389,7 +451,8 @@ function dashboardPage() {
     async function handleSync(storeId, storeName, btn) {
       try {
         btn.disabled = true;
-        appendLog('Sync pentru store ' + storeId + '...');
+        setLoading(true, 'Sincronizăm produsele selectate pentru magazinul "' + storeName + '"...');
+        appendLog('Sync (sincronizare produse) pentru store ' + storeId + '...');
 
         // trimitem doar item-urile selectate
         const itemsPayload = [];
@@ -425,8 +488,10 @@ function dashboardPage() {
           });
         }
         appendLog(html);
+        setLoading(false);
       } catch (err) {
         appendLog('Eroare la sync ' + storeId + ': ' + err.message);
+        setLoading(false, '');
       } finally {
         btn.disabled = false;
       }
@@ -443,7 +508,7 @@ function dashboardPage() {
           (it.plannedAction === 'update' && it.hasChanges)
         );
       } else {
-        // produse care sunt în sheet dar nu au modificări reale (ex: doar status)
+        // produse care sunt în sheet dar nu au modificări reale
         filtered = items.filter(it =>
           it.plannedAction === 'update' && !it.hasChanges
         );
@@ -619,7 +684,7 @@ function dashboardPage() {
               type="checkbox"
               data-key="\${key}"
               \${checkedAttr}
-              title="Bifează pentru a include acest produs la Sync."
+              title="Bifează pentru a include acest produs la sincronizare."
             />
           </td>
         </tr>
