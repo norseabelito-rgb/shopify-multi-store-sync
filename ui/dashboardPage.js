@@ -8,313 +8,529 @@ function dashboardPage() {
   <meta charset="UTF-8" />
   <title>Shopify Multi-Store Sync</title>
   <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:#0b0b0d;
-      color:#f5f5f5;
-      margin:0;
-      padding:24px;
+    :root {
+      --bg: #05060c;
+      --bg-2: #0a0d16;
+      --panel: rgba(15, 17, 26, 0.92);
+      --panel-strong: rgba(22, 27, 38, 0.9);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #eef2ff;
+      --muted: #9aa4b5;
+      --accent: #5c8bff;
+      --accent-2: #49c7ff;
+      --shadow: 0 20px 80px rgba(0, 0, 0, 0.45);
+      --glow: 0 10px 40px rgba(92, 139, 255, 0.28);
+      --radius: 16px;
     }
-    h1 { margin-bottom: 8px; }
-    h2 { margin-top: 24px; margin-bottom: 8px; }
-    p  { margin-top: 4px; margin-bottom: 12px; }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 32px;
+      font-family: "Inter", "SF Pro Display", "Sora", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px at 20% 20%, rgba(92, 139, 255, 0.08), transparent 45%),
+        radial-gradient(1000px at 80% 10%, rgba(73, 199, 255, 0.07), transparent 40%),
+        linear-gradient(180deg, #06070f, #05060c);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.01em; }
+    h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: -0.01em; }
+    p  { margin: 4px 0 12px; color: var(--muted); }
+    code { padding: 3px 7px; border-radius: 8px; background: rgba(92, 139, 255, 0.12); color: var(--accent); }
+
+    .page-shell {
+      max-width: 1200px;
+      margin: 0 auto 56px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px 4px;
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 10px;
+      color: var(--muted);
+      margin: 0 0 8px;
+    }
+    .subtitle { margin-top: 2px; }
+    .status-pill {
+      background: linear-gradient(135deg, rgba(73, 199, 255, 0.16), rgba(92, 139, 255, 0.14));
+      border: 1px solid rgba(92, 139, 255, 0.28);
+      color: #dce7ff;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      box-shadow: var(--glow);
+    }
+
+    .panel {
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(92, 139, 255, 0.08), transparent 35%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .panel > * { position: relative; z-index: 1; }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .section-heading.with-actions { margin-bottom: 0; }
+    .muted { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
 
     /* Loading bar */
+    .loading-panel {
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+    .loading-panel::before { display: none; }
     .loading-bar-wrapper {
-      margin: 12px 0 20px 0;
       display: none;
+      padding: 18px 20px;
+      gap: 8px;
+      border-radius: calc(var(--radius) - 4px);
+      background: linear-gradient(135deg, rgba(92, 139, 255, 0.05), rgba(73, 199, 255, 0.05));
+      border: 1px solid var(--border-strong);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--glow);
     }
     .loading-bar-wrapper.active {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+    }
+    .loading-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
     }
     .loading-label {
       font-size: 12px;
-      color: #e5e7eb;
+      color: #dce7ff;
+      letter-spacing: 0.01em;
+    }
+    .loading-sub {
+      font-size: 11px;
+      color: var(--muted);
     }
     .loading-bar {
       position: relative;
       width: 100%;
-      max-width: 420px;
-      height: 6px;
+      max-width: 520px;
+      height: 10px;
       border-radius: 999px;
-      background: #111118;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
       overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 30px rgba(0, 0, 0, 0.4);
+    }
+    .loading-bar::after {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 999px;
+      border: 1px solid rgba(92, 139, 255, 0.3);
+      pointer-events: none;
     }
     .loading-inner {
-      position:absolute;
-      left:0;
-      top:0;
-      bottom:0;
-      width:40%;
-      border-radius:999px;
-      background:#2563eb;
-      animation: loadingPulse 1.1s infinite ease-in-out;
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 42%;
+      border-radius: 999px;
+      background: linear-gradient(120deg, rgba(73, 199, 255, 0.9), rgba(92, 139, 255, 0.95), rgba(73, 199, 255, 0.9));
+      background-size: 200% 100%;
+      animation: shimmer 1.6s ease-in-out infinite, slide 1.6s ease-in-out infinite;
+      box-shadow: 0 0 20px rgba(92, 139, 255, 0.35);
     }
-    @keyframes loadingPulse {
-      0%   { transform: translateX(-100%); }
-      50%  { transform: translateX(40%); }
-      100% { transform: translateX(160%); }
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-60%); }
+      50%  { transform: translateX(15%); }
+      100% { transform: translateX(120%); }
     }
 
-    /* Store list: un singur rand, scrollabil orizontal */
+    /* Store list */
     .stores {
-      display:flex;
-      flex-wrap:nowrap;
-      gap:16px;
-      margin-bottom:24px;
-      overflow-x:auto;
-      padding-bottom:8px;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(240px, 1fr);
+      gap: 16px;
+      overflow-x: auto;
+      padding: 6px 4px 10px;
+      margin-top: 4px;
+      scrollbar-width: thin;
     }
-    .stores::-webkit-scrollbar {
-      height:6px;
-    }
+    .stores::-webkit-scrollbar { height: 8px; }
     .stores::-webkit-scrollbar-thumb {
-      background:#374151;
-      border-radius:999px;
+      background: linear-gradient(135deg, rgba(92, 139, 255, 0.5), rgba(73, 199, 255, 0.35));
+      border-radius: 999px;
     }
     .store-card {
-      background:#15151a;
-      border-radius:12px;
-      padding:16px;
-      min-width:220px;
-      box-shadow:0 0 0 1px #262635;
-      flex:0 0 auto;
+      background: linear-gradient(145deg, rgba(22, 27, 38, 0.94), rgba(12, 15, 23, 0.9));
+      border-radius: 14px;
+      padding: 16px;
+      min-width: 220px;
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      box-shadow: var(--glow);
+      transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.2s ease;
     }
-    .store-title { font-weight:600; margin-bottom:8px; }
+    .store-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-strong);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45), var(--glow);
+    }
+    .store-title { font-weight: 600; margin-bottom: 8px; }
 
     button {
-      border:none;
-      border-radius:8px;
-      padding:8px 12px;
-      cursor:pointer;
-      margin-right:8px;
-      margin-top:4px;
-      background:#2563eb;
-      color:white;
-      font-size:13px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 9px 14px;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-top: 6px;
+      background: linear-gradient(130deg, #5c8bff, #49c7ff);
+      color: #0b1020;
+      font-size: 13px;
+      letter-spacing: 0.01em;
+      box-shadow: 0 10px 30px rgba(92, 139, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.18s ease, opacity 0.2s ease;
     }
-    button.secondary { background:#374151; }
-    button:disabled { opacity:0.5; cursor:not-allowed; }
+    button.secondary {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+      color: #dbe4ff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 25px rgba(0, 0, 0, 0.35);
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(92, 139, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      filter: brightness(1.02);
+    }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
 
     #log {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      white-space:pre-wrap;
-      background:#050509;
-      border-radius:12px;
-      padding:16px;
-      max-height:280px;
-      overflow:auto;
-      border:1px solid #262635;
+      white-space: pre-wrap;
+      background: linear-gradient(180deg, rgba(12, 15, 23, 0.92), rgba(8, 10, 17, 0.95));
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      color: #dbe4ff;
     }
 
     .badge {
-      display:inline-block;
-      padding:2px 6px;
-      border-radius:999px;
-      font-size:10px;
-      margin-left:4px;
-      text-transform:uppercase;
-      letter-spacing:0.04em;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      margin-left: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
-    .badge-create { background:#064e3b; color:#a7f3d0; }
-    .badge-update { background:#1f2937; color:#facc15; }
-    .badge-delete { background:#7f1d1d; color:#fecaca; }
-    .badge-skip   { background:#111827; color:#9ca3af; }
+    .badge-create { background: linear-gradient(135deg, #0f5132, #0b3f27); color: #8ef1c4; }
+    .badge-update { background: linear-gradient(135deg, #1f2738, #141a28); color: #f5e36d; }
+    .badge-delete { background: linear-gradient(135deg, #5f1111, #4b0c0c); color: #ffd1d1; }
+    .badge-skip   { background: linear-gradient(135deg, #0f1421, #0b101a); color: #a3adbf; }
 
     .preview-container {
-      background:#050509;
-      border-radius:12px;
-      border:1px solid #262635;
-      overflow:hidden;
+      padding: 0;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .preview-scroll {
+      max-height: 420px;
+      overflow: auto;
     }
 
     table.preview-table {
-      width:100%;
-      border-collapse:collapse;
-      font-size:12px;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      color: #dfe7ff;
+      background: transparent;
     }
     table.preview-table thead {
-      background:#111118;
-      position:sticky;
-      top:0;
-      z-index:1;
+      background: rgba(9, 11, 18, 0.82);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-strong);
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
     }
     table.preview-table th,
     table.preview-table td {
-      padding:10px 12px;
-      vertical-align:top;
-      border-bottom:1px solid #15151f;
+      padding: 12px 14px;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
     table.preview-table th {
-      text-align:left;
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:0.06em;
-      color:#9ca3af;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #aeb8ce;
+    }
+    table.preview-table tbody tr {
+      transition: background 0.2s ease, transform 0.15s ease;
     }
     table.preview-table tbody tr:nth-child(even) {
-      background:#05050d;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    table.preview-table tbody tr:hover {
+      background: linear-gradient(135deg, rgba(92, 139, 255, 0.1), rgba(10, 14, 22, 0.95));
+      transform: translateY(-1px);
     }
 
     .images-cell {
-      display:flex;
-      flex-direction:column;
-      gap:6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
     }
     .images-main {
-      width:56px;
-      height:56px;
-      border-radius:8px;
-      object-fit:cover;
-      background:#1f2937;
-      display:block;
+      width: 62px;
+      height: 62px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #111827;
+      display: block;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
     .images-thumbs {
-      display:flex;
-      gap:4px;
-      flex-wrap:wrap;
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
     }
     .images-thumbs img {
-      width:20px;
-      height:20px;
-      border-radius:4px;
-      object-fit:cover;
-      background:#1f2937;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #111827;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .product-cell-title {
-      font-size:12px;
-      font-weight:600;
-      margin-bottom:2px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
     }
     .product-cell-sku {
-      font-size:11px;
-      color:#9ca3af;
-      margin-bottom:2px;
+      font-size: 11px;
+      color: #9ca3af;
+      margin-bottom: 4px;
     }
     .product-cell-tags {
-      font-size:11px;
-      color:#9ca3af;
+      font-size: 11px;
+      color: #9ca3af;
+      line-height: 1.4;
     }
 
     .action-main {
-      font-size:11px;
-      margin-bottom:4px;
+      font-size: 11px;
+      margin-bottom: 6px;
+      color: #e7ecff;
+      line-height: 1.5;
     }
     .action-secondary {
-      font-size:11px;
-      color:#9ca3af;
+      font-size: 11px;
+      color: var(--muted);
     }
 
     .pill-label {
-      display:inline-block;
-      padding:2px 6px;
-      border-radius:999px;
-      font-size:10px;
-      background:#111827;
-      color:#9ca3af;
-      margin-right:6px;
-      text-transform:uppercase;
-      letter-spacing:0.04em;
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+      color: #cdd7f3;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .current-values {
-      font-size:11px;
-      color:#e5e7eb;
+      font-size: 11px;
+      color: #d9e2ff;
     }
-    .current-values > div {
-      margin-bottom:4px;
-    }
+    .current-values > div { margin-bottom: 6px; }
 
     .checkbox-cell {
-      text-align:center;
-      vertical-align:middle !important;
-      width:32px;
+      text-align: center;
+      vertical-align: middle !important;
+      width: 44px;
     }
 
     .checkbox-cell input[type="checkbox"] {
-      width:14px;
-      height:14px;
-      cursor:pointer;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #5c8bff;
+      filter: drop-shadow(0 0 6px rgba(92, 139, 255, 0.35));
     }
 
     .table-toolbar {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:8px 12px;
-      background:#050509;
-      border-bottom:1px solid #262635;
-      font-size:12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: linear-gradient(90deg, rgba(12, 15, 23, 0.9), rgba(10, 12, 20, 0.92));
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      backdrop-filter: blur(10px);
     }
     .table-toolbar-left {
-      display:flex;
-      align-items:center;
-      gap:12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
     .tab-toggle {
-      display:inline-flex;
-      border-radius:999px;
-      background:#111118;
-      padding:2px;
+      display: inline-flex;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+      padding: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
     .tab-toggle button {
-      background:transparent;
-      color:#9ca3af;
-      border-radius:999px;
-      padding:4px 10px;
-      font-size:11px;
-      margin:0;
+      background: transparent;
+      color: #9ca8c4;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 11px;
+      margin: 0;
+      border: none;
+      box-shadow: none;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
     }
+    .tab-toggle button:hover { color: #dce7ff; }
     .tab-toggle button.active {
-      background:#2563eb;
-      color:white;
+      background: linear-gradient(135deg, #5c8bff, #49c7ff);
+      color: #0b1020;
+      box-shadow: 0 8px 25px rgba(92, 139, 255, 0.35);
+      transform: translateY(-1px);
     }
+    label { color: #c7d2ea; }
+    input[type="checkbox"] { vertical-align: middle; }
   </style>
 </head>
 <body>
-  <h1>Shopify Multi-Store Sync</h1>
-  <p>Tag folosit de script: <code>ADAUGAT CU SCRIPT</code></p>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Operational Control</p>
+        <h1>Shopify Multi-Store Sync</h1>
+        <p class="subtitle">Tag folosit de script: <code>ADAUGAT CU SCRIPT</code></p>
+      </div>
+      <div class="status-pill">Live sync ready</div>
+    </header>
 
-  <!-- PROGRESS BAR -->
-  <div id="loading-wrapper" class="loading-bar-wrapper">
-    <div id="loading-text" class="loading-label">Se pregătește...</div>
-    <div class="loading-bar">
-      <div class="loading-inner"></div>
-    </div>
-  </div>
-
-  <h2>Magazin(e)</h2>
-  <div id="stores" class="stores"></div>
-
-  <h2 style="display:flex;align-items:center;gap:8px;">
-    Preview rezultate
-  </h2>
-  <div id="preview-wrapper" class="preview-container">
-    <div class="table-toolbar">
-      <div class="table-toolbar-left">
-        <span id="preview-summary">Niciun preview încă.</span>
-        <div class="tab-toggle" title="Comută între produsele cu modificări reale și cele fără diferențe reale.">
-          <button id="tab-changes" class="active">Cu modificări</button>
-          <button id="tab-nochanges">Fără modificări reale</button>
+    <!-- PROGRESS BAR -->
+    <div class="panel loading-panel">
+      <div id="loading-wrapper" class="loading-bar-wrapper">
+        <div class="loading-top">
+          <div id="loading-text" class="loading-label">Se pregătește...</div>
+          <div class="loading-sub">Flux animat cu estimare în timp real</div>
+        </div>
+        <div class="loading-bar">
+          <div class="loading-inner"></div>
         </div>
       </div>
-      <div>
-        <label style="font-size:11px;color:#9ca3af;" title="Selectează sau deselectează toate produsele din lista curentă.">
-          <input type="checkbox" id="select-all-checkbox" />
-          Selectează toate
-        </label>
+    </div>
+
+    <div class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>Magazin(e)</h2>
+          <p class="muted">Alege magazinul pentru care verifici sau sincronizezi produsele.</p>
+        </div>
+      </div>
+      <div id="stores" class="stores"></div>
+    </div>
+
+    <div id="preview-wrapper" class="preview-container panel">
+      <div class="section-heading with-actions" style="padding: 16px;">
+        <div>
+          <h2 style="display:flex;align-items:center;gap:8px;">Preview rezultate</h2>
+          <p class="muted">Revizuiește și filtrează modificările înainte de sincronizare.</p>
+        </div>
+      </div>
+      <div class="table-toolbar">
+        <div class="table-toolbar-left">
+          <span id="preview-summary">Niciun preview încă.</span>
+          <div class="tab-toggle" title="Comută între produsele cu modificări reale și cele fără diferențe reale.">
+            <button id="tab-changes" class="active">Cu modificări</button>
+            <button id="tab-nochanges">Fără modificări reale</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#c7d2ea;" title="Selectează sau deselectează toate produsele din lista curentă.">
+            <input type="checkbox" id="select-all-checkbox" />
+            Selectează toate
+          </label>
+        </div>
+      </div>
+      <div id="preview-results" class="preview-scroll">
+        <!-- tabelul se va randa din JS -->
       </div>
     </div>
-    <div id="preview-results" style="max-height:360px;overflow:auto;">
-      <!-- tabelul se va randa din JS -->
+
+    <div class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>Log</h2>
+          <p class="muted">Monitorizează evenimentele și rezultatele recente.</p>
+        </div>
+      </div>
+      <div id="log">Selectează un magazin și apasă “Verifică schimbările” sau “Sincronizează produsele”.</div>
     </div>
   </div>
-
-  <h2>Log</h2>
-  <div id="log">Selectează un magazin și apasă “Verifică schimbările” sau “Sincronizează produsele”.</div>
 
   <script>
     const logEl = document.getElementById('log');
@@ -336,7 +552,7 @@ function dashboardPage() {
 
     function appendLog(text) {
       const ts = new Date().toISOString();
-      logEl.textContent = '[' + ts + '] ' + text + '\\n' + logEl.textContent;
+      logEl.textContent = '[' + ts + '] ' + text + '\n' + logEl.textContent;
     }
 
     function setLoading(isLoading, text) {
@@ -383,21 +599,21 @@ function dashboardPage() {
           const card = document.createElement('div');
           card.className = 'store-card';
           const storeLabel = store.store_name || store.store_id;
-          card.innerHTML = \`
-            <div class="store-title">\${storeLabel}</div>
+          card.innerHTML = `
+            <div class="store-title">${storeLabel}</div>
             <button
-              data-store-id="\${store.store_id}"
-              data-store-name="\${storeLabel}"
+              data-store-id="${store.store_id}"
+              data-store-name="${storeLabel}"
               class="btn-preview"
               title="Verifică ce produse vor fi create sau actualizate pentru acest magazin."
             >Verifică schimbările</button>
             <button
-              data-store-id="\${store.store_id}"
-              data-store-name="\${storeLabel}"
+              data-store-id="${store.store_id}"
+              data-store-name="${storeLabel}"
               class="btn-sync"
               title="Aplică în Shopify toate modificările selectate pentru acest magazin."
             >Sincronizează produsele</button>
-          \`;
+          `;
           storesEl.appendChild(card);
         });
 
@@ -478,13 +694,13 @@ function dashboardPage() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        let html = 'Rezultate sync ' + storeId + ':\\n';
-        html += 'Processed: ' + (data.processed || 0) + '\\n';
+        let html = 'Rezultate sync ' + storeId + ':\n';
+        html += 'Processed: ' + (data.processed || 0) + '\n';
         if (Array.isArray(data.results)) {
           data.results.forEach(r => {
             html += '- ' + r.internal_product_id + ' (' + (r.sku || 'fara SKU') + '): ' +
               (r.action || '') + ' -> ' + (r.status || '') +
-              (r.error ? ' (error: ' + r.error + ')' : '') + '\\n';
+              (r.error ? ' (error: ' + r.error + ')' : '') + '\n';
           });
         }
         appendLog(html);
@@ -521,7 +737,7 @@ function dashboardPage() {
 
       const rowsHtml = filtered.map(item => renderRow(item)).join('');
 
-      const tableHtml = \`
+      const tableHtml = `
         <table class="preview-table">
           <thead>
             <tr>
@@ -535,9 +751,9 @@ function dashboardPage() {
               </th>
             </tr>
           </thead>
-          <tbody>\${rowsHtml}</tbody>
+          <tbody>${rowsHtml}</tbody>
         </table>
-      \`;
+      `;
 
       previewContainer.innerHTML = tableHtml;
 
@@ -655,40 +871,40 @@ function dashboardPage() {
 
       const checkedAttr = selectedKeys.has(key) ? 'checked' : '';
 
-      return \`
+      return `
         <tr>
           <td>
             <div class="images-cell">
-              <img class="images-main" src="\${mainImg || ''}" alt="" referrerpolicy="no-referrer" />
+              <img class="images-main" src="${mainImg || ''}" alt="" referrerpolicy="no-referrer" />
               <div class="images-thumbs">
-                \${thumbImgs
+                ${thumbImgs
                   .map(u => '<img src="' + u + '" alt="" referrerpolicy="no-referrer" />')
                   .join('')}
               </div>
             </div>
           </td>
           <td>
-            <div class="product-cell-title">\${escapeHtml(item.title || item.internal_product_id || '(fără titlu)')}</div>
-            <div class="product-cell-sku">SKU: \${escapeHtml(item.sku || 'fără SKU')}</div>
+            <div class="product-cell-title">${escapeHtml(item.title || item.internal_product_id || '(fără titlu)')}</div>
+            <div class="product-cell-sku">SKU: ${escapeHtml(item.sku || 'fără SKU')}</div>
           </td>
           <td>
-            <div class="product-cell-tags">\${escapeHtml(item.tags_new || '')}</div>
+            <div class="product-cell-tags">${escapeHtml(item.tags_new || '')}</div>
           </td>
           <td>
-            <div class="action-main">\${actionTextMain}</div>
-            \${actionTextSecondary ? '<div class="action-secondary">' + actionTextSecondary + '</div>' : ''}
+            <div class="action-main">${actionTextMain}</div>
+            ${actionTextSecondary ? '<div class="action-secondary">' + actionTextSecondary + '</div>' : ''}
           </td>
-          <td>\${currentValuesHtml}</td>
+          <td>${currentValuesHtml}</td>
           <td class="checkbox-cell">
             <input
               type="checkbox"
-              data-key="\${key}"
-              \${checkedAttr}
+              data-key="${key}"
+              ${checkedAttr}
               title="Bifează pentru a include acest produs la sincronizare."
             />
           </td>
         </tr>
-      \`;
+      `;
     }
 
     // tab buttons
