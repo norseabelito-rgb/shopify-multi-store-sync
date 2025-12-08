@@ -743,7 +743,7 @@ function dashboardPage() {
                 '<span class="store-stat-value">' + draftCount + '</span>' +
               '</div>' +
               '<div class="store-stat">' +
-                '<span class="store-stat-label">Comenzi azi</span>' +
+                '<span class="store-stat-label">Comenzi</span>' +
                 '<span class="store-stat-value">' + todayOrders + '</span>' +
               '</div>' +
             '</div>' +

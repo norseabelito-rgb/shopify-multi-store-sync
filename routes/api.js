@@ -20,6 +20,85 @@ const {
 
 const router = express.Router();
 
+// Helper: ia statistici pentru un magazin Shopify
+async function fetchStoreStats(shopifyDomain, storeId) {
+  // încercăm să luăm token-ul din env după STORE_ID:
+  // ex: store_id = "BF24H" -> SHOPIFY_TOKEN_BF24H
+  const envKey =
+    'SHOPIFY_TOKEN_' + String(storeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  const accessToken = process.env[envKey];
+
+  if (!shopifyDomain || !accessToken) {
+    console.warn(
+      '[fetchStoreStats] Lipsesc shopifyDomain sau token pentru store',
+      storeId,
+      'envKey=',
+      envKey
+    );
+    return {
+      active_products: null,
+      draft_products: null,
+      today_orders: null,
+    };
+  }
+
+  const base = `https://${shopifyDomain}/admin/api/2024-10`;
+  const headers = {
+    'X-Shopify-Access-Token': accessToken,
+    'Content-Type': 'application/json',
+  };
+
+  // începutul zilei curente în UTC (pentru comenzi de azi)
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const todayStart = `${year}-${month}-${day}T00:00:00Z`;
+
+  try {
+    const [activeRes, draftRes, ordersRes] = await Promise.all([
+      fetch(`${base}/products/count.json?status=active`, { headers }),
+      fetch(`${base}/products/count.json?status=draft`, { headers }),
+      fetch(
+        `${base}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
+          todayStart
+        )}`,
+        { headers }
+      ),
+    ]);
+
+    if (!activeRes.ok || !draftRes.ok || !ordersRes.ok) {
+      console.error('[fetchStoreStats] HTTP error for', shopifyDomain, {
+        activeStatus: activeRes.status,
+        draftStatus: draftRes.status,
+        ordersStatus: ordersRes.status,
+      });
+      return {
+        active_products: null,
+        draft_products: null,
+        today_orders: null,
+      };
+    }
+
+    const activeJson = await activeRes.json();
+    const draftJson = await draftRes.json();
+    const ordersJson = await ordersRes.json();
+
+    return {
+      active_products: activeJson.count || 0,
+      draft_products: draftJson.count || 0,
+      today_orders: ordersJson.count || 0,
+    };
+  } catch (err) {
+    console.error('[fetchStoreStats] Exception for', shopifyDomain, err);
+    return {
+      active_products: null,
+      draft_products: null,
+      today_orders: null,
+    };
+  }
+}
+
 // /stores
 router.get('/stores', async (req, res) => {
   try {
@@ -31,18 +110,29 @@ router.get('/stores', async (req, res) => {
     const storesSheet = await loadSheet(spreadsheetId, 'Stores');
     const stores = storesSheet.rows || [];
 
-    const clean = stores.map((s) => ({
-      store_id: s.store_id,
-      store_name: s.store_name,
-      shopify_domain: s.shopify_domain,
-      currency: s.currency,
-      language: s.language,
-    }));
+    const enriched = await Promise.all(
+      stores.map(async (s) => {
+        const stats = await fetchStoreStats(s.shopify_domain, s.store_id);
 
-    res.json(clean);
+        return {
+          store_id: s.store_id,
+          store_name: s.store_name,
+          shopify_domain: s.shopify_domain,
+          currency: s.currency,
+          language: s.language,
+          active_products: stats.active_products,
+          draft_products: stats.draft_products,
+          today_orders: stats.today_orders,
+        };
+      })
+    );
+
+    res.json(enriched);
   } catch (err) {
     console.error('/stores error', err);
-    res.status(500).json({ error: 'Failed to load stores', message: err.message });
+    res
+      .status(500)
+      .json({ error: 'Failed to load stores', message: err.message });
   }
 });
 
