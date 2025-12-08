@@ -266,7 +266,7 @@ async function deleteProductInStore(store, accessToken, productId) {
 
 // ---------- Mapping logic ----------
 
-function buildProductPayload(product, store, psRow) {
+function buildProductPayload(product, store, psRow, imageUrl) {
   const title = psRow.title || product.internal_name || product.master_sku;
   const body_html = psRow.description_html || '';
 
@@ -295,6 +295,14 @@ function buildProductPayload(product, store, psRow) {
   const tags = tagsArray.join(', ');
 
   const status = (psRow.status || 'active').toLowerCase(); // active/draft/archived
+
+  if (imageUrl) {
+    payload.images = [
+      {
+        src: imageUrl
+      }
+    ];
+  }
 
   const payload = {
     title,
@@ -791,12 +799,21 @@ app.post('/sync', async (req, res) => {
           continue;
         }
 
-        if (plannedAction === 'create') {
-          const payload = buildProductPayload(product, store, row);
-          const created = await createProductInStore(store, accessToken, payload);
-          result.status = 'success';
-          result.shopify_product_id = created.id;
-        } else if (plannedAction === 'update') {
+       if (plannedAction === 'create') {
+  let imageUrl = null;
+  if (product.media_folder_url) {
+    try {
+      imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+    } catch (e) {
+      console.error('Error getting image for product during create', internalId, e.message);
+    }
+  }
+
+  const payload = buildProductPayload(product, store, row, imageUrl);
+  const created = await createProductInStore(store, accessToken, payload);
+  result.status = 'success';
+  result.shopify_product_id = created.id;
+} else if (plannedAction === 'update') {
           let productId = classification.existingProductId;
 
           // fallback: dacă nu a găsit prin SKU+tag dar avem handle, încercăm și după handle
