@@ -10,9 +10,13 @@ const PORT = process.env.PORT || 3000;
 // Tag special folosit de script
 const SCRIPT_TAG = 'ADAUGAT CU SCRIPT';
 
-// ---------- Google Sheets helper ----------
+// ---------- Google Auth & Sheets / Drive helpers ----------
 
-async function getSheetsClient() {
+let cachedAuth = null;
+
+async function getGoogleAuth() {
+  if (cachedAuth) return cachedAuth;
+
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY;
 
@@ -24,11 +28,24 @@ async function getSheetsClient() {
     email,
     null,
     key.replace(/\\n/g, '\n'),
-    ['https://www.googleapis.com/auth/spreadsheets']
+    [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive.readonly'
+    ]
   );
 
-  const sheets = google.sheets({ version: 'v4', auth });
-  return sheets;
+  cachedAuth = auth;
+  return auth;
+}
+
+async function getSheetsClient() {
+  const auth = await getGoogleAuth();
+  return google.sheets({ version: 'v4', auth });
+}
+
+async function getDriveClient() {
+  const auth = await getGoogleAuth();
+  return google.drive({ version: 'v3', auth });
 }
 
 async function loadSheet(spreadsheetId, sheetName) {
@@ -55,6 +72,45 @@ async function loadSheet(spreadsheetId, sheetName) {
   });
 
   return { headers, rows: objects };
+}
+
+// ---------- Drive: prima imagine din folder ----------
+
+function extractDriveFolderId(urlOrId) {
+  if (!urlOrId) return null;
+
+  // dacă deja e un ID (fără slash/domeniu)
+  if (!urlOrId.includes('http') && !urlOrId.includes('/')) {
+    return urlOrId;
+  }
+
+  // URL de tip https://drive.google.com/drive/folders/{ID}
+  const match = urlOrId.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) return match[1];
+
+  return null;
+}
+
+async function getFirstImageUrlFromDriveFolder(mediaFolderUrl) {
+  const folderId = extractDriveFolderId(mediaFolderUrl);
+  if (!folderId) return null;
+
+  const drive = await getDriveClient();
+
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
+    orderBy: 'createdTime',
+    pageSize: 1,
+    fields: 'files(id, name)'
+  });
+
+  const files = res.data.files || [];
+  if (!files.length) return null;
+
+  const file = files[0];
+
+  // link de vizualizare directă
+  return `https://drive.google.com/uc?export=view&id=${file.id}`;
 }
 
 // ---------- Shopify helpers ----------
@@ -113,7 +169,7 @@ async function shopifyREST(storeDomain, accessToken, path, method = 'GET', body 
   return res.json();
 }
 
-// găsește produsul după handle (fallback pentru anumite acțiuni)
+// găsește produsul după handle (fallback)
 async function findProductIdByHandle(storeDomain, accessToken, handle) {
   const query = `
     query getProductByHandle($handle: String!) {
@@ -171,6 +227,14 @@ async function findProductIdBySkuAndTag(storeDomain, accessToken, sku, tag) {
   }
 
   return null;
+}
+
+async function getProductByGid(storeDomain, accessToken, gid) {
+  if (!gid) return null;
+  const numericId = gid.split('/').pop();
+  const path = `/products/${numericId}.json`;
+  const res = await shopifyREST(storeDomain, accessToken, path, 'GET');
+  return res.product;
 }
 
 async function createProductInStore(store, accessToken, productData) {
@@ -295,7 +359,9 @@ app.get('/', (req, res) => {
   <title>Shopify Multi-Store Sync</title>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#0b0b0d; color:#f5f5f5; margin:0; padding:24px; }
-    h1 { margin-bottom: 16px; }
+    h1 { margin-bottom: 8px; }
+    h2 { margin-top: 24px; margin-bottom: 8px; }
+    p { margin-top: 4px; margin-bottom: 12px; }
     .stores { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
     .store-card { background:#15151a; border-radius:12px; padding:16px; min-width:260px; box-shadow:0 0 0 1px #262635; }
     .store-title { font-weight:600; margin-bottom:4px; }
@@ -303,26 +369,38 @@ app.get('/', (req, res) => {
     button { border:none; border-radius:8px; padding:8px 12px; cursor:pointer; margin-right:8px; margin-top:4px; background:#2563eb; color:white; font-size:13px; }
     button.secondary { background:#374151; }
     button:disabled { opacity:0.5; cursor:not-allowed; }
-    #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space:pre-wrap; background:#050509; border-radius:12px; padding:16px; max-height:400px; overflow:auto; border:1px solid #262635; }
+    #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space:pre-wrap; background:#050509; border-radius:12px; padding:16px; max-height:280px; overflow:auto; border:1px solid #262635; }
     .badge { display:inline-block; padding:2px 6px; border-radius:999px; font-size:11px; margin-left:4px; }
     .badge-create { background:#064e3b; color:#a7f3d0; }
     .badge-update { background:#1f2937; color:#facc15; }
     .badge-delete { background:#7f1d1d; color:#fecaca; }
     .badge-skip { background:#111827; color:#9ca3af; }
-    .result-row { border-bottom:1px solid #262635; padding:6px 0; }
-    .result-row:last-child { border-bottom:none; }
+    .preview-wrapper { margin-top:12px; display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+    .preview-card { background:#111118; border-radius:12px; padding:10px; display:flex; gap:10px; align-items:flex-start; box-shadow:0 0 0 1px #262635; }
+    .preview-img { width:72px; height:72px; border-radius:8px; object-fit:cover; background:#1f2937; flex-shrink:0; }
+    .preview-content { flex:1; min-width:0; }
+    .preview-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+    .preview-meta { font-size:11px; opacity:0.8; margin-bottom:4px; }
+    .preview-reason { font-size:11px; color:#9ca3af; }
   </style>
 </head>
 <body>
   <h1>Shopify Multi-Store Sync</h1>
   <p>Tag folosit de script: <code>${SCRIPT_TAG}</code></p>
+
+  <h2>Magazin(e)</h2>
   <div id="stores" class="stores"></div>
+
+  <h2>Preview rezultate</h2>
+  <div id="preview-results" class="preview-wrapper"></div>
+
   <h2>Log</h2>
   <div id="log">Selectează un magazin și apasă “Preview” sau “Sync”.</div>
 
   <script>
     const logEl = document.getElementById('log');
     const storesEl = document.getElementById('stores');
+    const previewEl = document.getElementById('preview-results');
 
     function appendLog(text) {
       const ts = new Date().toISOString();
@@ -367,7 +445,7 @@ app.get('/', (req, res) => {
           } else if (btn.classList.contains('btn-sync')) {
             await handleSync(storeId, btn);
           }
-        }, { once: true });
+        });
 
         appendLog('Store-urile au fost încărcate.');
       } catch (err) {
@@ -383,17 +461,44 @@ app.get('/', (req, res) => {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
+        previewEl.innerHTML = '';
+
         if (!Array.isArray(data) || data.length === 0) {
           appendLog('Preview ' + storeId + ': nimic de sincronizat.');
           return;
         }
 
-        let html = 'Preview pentru ' + storeId + ':\\n';
+        let summary = 'Preview pentru ' + storeId + ':\\n';
         data.forEach(item => {
-          html += '- ' + item.internal_product_id + ' (' + (item.sku || 'fara SKU') + '): ' + (item.title || '') + ' ' + '[' + item.plannedAction + ']' + ' - ' + (item.reason || '') + '\\n';
+          const row = document.createElement('div');
+          row.className = 'preview-card';
+
+          const img = document.createElement('img');
+          img.className = 'preview-img';
+          if (item.image_url) {
+            img.src = item.image_url;
+            img.alt = item.title || item.internal_product_id || 'product image';
+          } else {
+            img.alt = 'Fără imagine';
+          }
+
+          const content = document.createElement('div');
+          content.className = 'preview-content';
+          const metaSku = item.sku || 'fără SKU';
+          content.innerHTML = \`
+            <div class="preview-title">\${item.title || item.internal_product_id || '(fără titlu)'} \${badge(item.plannedAction)}</div>
+            <div class="preview-meta">SKU: \${metaSku}</div>
+            <div class="preview-reason">\${item.reason || ''}</div>
+          \`;
+
+          row.appendChild(img);
+          row.appendChild(content);
+          previewEl.appendChild(row);
+
+          summary += '- ' + item.internal_product_id + ' (' + metaSku + '): ' + (item.title || '') + ' [' + item.plannedAction + '] - ' + (item.reason || '') + '\\n';
         });
 
-        appendLog(html);
+        appendLog(summary);
       } catch (err) {
         appendLog('Eroare la preview ' + storeId + ': ' + err.message);
       } finally {
@@ -520,7 +625,8 @@ app.get('/preview', async (req, res) => {
           sku: row.store_sku || '',
           title: row.title || '',
           plannedAction: 'skip',
-          reason: 'No product found in Products for this internal_product_id'
+          reason: 'No product found in Products for this internal_product_id',
+          image_url: null
         });
         continue;
       }
@@ -528,13 +634,24 @@ app.get('/preview', async (req, res) => {
       const classification = await determinePlannedActionForRow(store, accessToken, product, row);
       const sku = row.store_sku || product.master_sku || product.internal_product_id;
 
+      // prima poză din media_folder_url
+      let imageUrl = null;
+      if (product.media_folder_url) {
+        try {
+          imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+        } catch (e) {
+          console.error('Error getting image for product', internalId, e.message);
+        }
+      }
+
       previewResults.push({
         internal_product_id: internalId,
         store_id: storeId,
         sku,
         title: row.title || product.internal_name || '',
         plannedAction: classification.plannedAction,
-        reason: classification.reason || ''
+        reason: classification.reason || '',
+        image_url: imageUrl
       });
     }
 
