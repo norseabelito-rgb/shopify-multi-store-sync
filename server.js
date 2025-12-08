@@ -487,12 +487,13 @@ app.get('/', (req, res) => {
 
           const img = document.createElement('img');
 img.className = 'preview-img';
-
-// unele host-uri sunt mofturoase cu referrer-ul
+// ca să nu trimită referrer la upstream (nu strică)
 img.referrerPolicy = 'no-referrer';
 
-if (item.image_url) {
-  img.src = item.image_url;
+const imgSrc = item.preview_image_url || item.image_url;
+
+if (imgSrc) {
+  img.src = imgSrc;
   img.alt = item.title || item.internal_product_id || 'product image';
 } else {
   img.alt = 'Fără imagine';
@@ -706,6 +707,10 @@ app.get('/preview', async (req, res) => {
         }
       }
 
+            const previewImageUrl = imageUrl
+        ? `/media?src=${encodeURIComponent(imageUrl)}`
+        : null;
+
       previewResults.push({
         internal_product_id: internalId,
         store_id: storeId,
@@ -713,7 +718,10 @@ app.get('/preview', async (req, res) => {
         title: row.title || product.internal_name || '',
         plannedAction: classification.plannedAction,
         reason: classification.reason || '',
+        // direct Drive URL – bun pentru debug / link
         image_url: imageUrl,
+        // URL proxiat prin server – bun pentru <img>
+        preview_image_url: previewImageUrl,
         image_urls: imageUrls,
         media_debug: mediaDebug
       });
@@ -882,6 +890,32 @@ app.post('/sync', async (req, res) => {
       error: 'Sync failed',
       message: err.message || String(err)
     });
+  }
+});
+
+// ---------- Proxy media pentru preview (evită mofturile Google Drive) ----------
+app.get('/media', async (req, res) => {
+  const src = req.query.src;
+  if (!src) {
+    return res.status(400).send('Missing src param');
+  }
+
+  try {
+    const upstream = await fetch(src);
+    if (!upstream.ok) {
+      const text = await upstream.text();
+      res.status(upstream.status).send(text);
+      return;
+    }
+
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    upstream.body.pipe(res);
+  } catch (err) {
+    console.error('Error in /media proxy', err);
+    res.status(500).send('Media proxy error');
   }
 });
 
