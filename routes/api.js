@@ -22,7 +22,6 @@ const router = express.Router();
 
 // Helper: ia statistici (produse active/draft + comenzi azi) pentru un magazin Shopify
 async function fetchStoreStats(storeId, rawDomain) {
-  // curățăm domeniul (să scăpăm de newline / spații)
   const shopifyDomain = String(rawDomain || '').trim();
 
   if (!shopifyDomain) {
@@ -31,6 +30,7 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      _debug: 'NO_DOMAIN',
     };
   }
 
@@ -47,13 +47,14 @@ async function fetchStoreStats(storeId, rawDomain) {
     console.warn(
       '[fetchStoreStats] token lipsă pentru store',
       storeId,
-      ' (ENV key:',
+      '(ENV key:',
       envKey + ')'
     );
     return {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      _debug: 'NO_TOKEN:' + envKey,
     };
   }
 
@@ -83,17 +84,21 @@ async function fetchStoreStats(storeId, rawDomain) {
     ]);
 
     if (!activeRes.ok || !draftRes.ok || !ordersRes.ok) {
-      console.error('[fetchStoreStats] HTTP error', {
-        storeId,
-        domain: shopifyDomain,
+      const info = {
         activeStatus: activeRes.status,
         draftStatus: draftRes.status,
         ordersStatus: ordersRes.status,
+      };
+      console.error('[fetchStoreStats] HTTP error', {
+        storeId,
+        domain: shopifyDomain,
+        ...info,
       });
       return {
         active_products: null,
         draft_products: null,
         today_orders: null,
+        _debug: 'HTTP:' + JSON.stringify(info),
       };
     }
 
@@ -105,6 +110,7 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: activeJson.count ?? 0,
       draft_products: draftJson.count ?? 0,
       today_orders: ordersJson.count ?? 0,
+      _debug: null,
     };
   } catch (err) {
     console.error('[fetchStoreStats] Exception pentru store', storeId, err);
@@ -112,6 +118,7 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      _debug: 'EX:' + String(err.message || err),
     };
   }
 }
@@ -142,6 +149,7 @@ router.get('/stores', async (req, res) => {
           active_products: stats.active_products,
           draft_products: stats.draft_products,
           today_orders: stats.today_orders,
+          _debug: stats._debug || null,
         };
       })
     );
