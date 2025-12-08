@@ -194,9 +194,7 @@ function dashboardPage() {
       100% { transform: translateX(120%); }
     }
 
-    /* STORE LIST
-       - grid pe mai multe rânduri, fără scroll orizontal
-    */
+    /* STORE LIST */
 
     .stores {
       display: grid;
@@ -272,8 +270,6 @@ function dashboardPage() {
       margin-top: 4px;
     }
 
-    /* BUTTONS (mai mici, mai puțin glowy) */
-
     button {
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
@@ -312,8 +308,6 @@ function dashboardPage() {
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
     }
 
-    /* LOG */
-
     #log {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       white-space: pre-wrap;
@@ -343,8 +337,6 @@ function dashboardPage() {
     .badge-update { background: #1f2738; color: #f5e36d; }
     .badge-delete { background: #5f1111; color: #ffd1d1; }
     .badge-skip   { background: #0f1421; color: #a3adbf; }
-
-    /* PREVIEW SECTION */
 
     .preview-container {
       padding: 0;
@@ -401,8 +393,6 @@ function dashboardPage() {
       color: #0b1020;
       box-shadow: 0 8px 20px rgba(92, 139, 255, 0.35);
     }
-
-    /* TABLE */
 
     table.preview-table {
       width: 100%;
@@ -641,8 +631,6 @@ function dashboardPage() {
     var loadingStartTime = 0;
     var loadingTotalMs = 0;
 
-    // Utils
-
     function appendLog(text) {
       var ts = new Date().toISOString();
       logEl.textContent = '[' + ts + '] ' + text + '\\n' + logEl.textContent;
@@ -651,7 +639,7 @@ function dashboardPage() {
     function escapeHtml(str) {
       return String(str || '')
         .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
+        .replace(/<//g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
@@ -671,7 +659,6 @@ function dashboardPage() {
     }
 
     // Loading cu ETA
-
     function setLoading(isLoading, text, kind) {
       if (isLoading) {
         if (text) {
@@ -692,7 +679,7 @@ function dashboardPage() {
 
         if (kind) {
           loadingStartTime = Date.now();
-          loadingTotalMs = kind === 'sync' ? 90000 : 30000; // ~90s sync, ~30s preview
+          loadingTotalMs = kind === 'sync' ? 90000 : 30000;
 
           if (loadingInterval) {
             clearInterval(loadingInterval);
@@ -724,8 +711,7 @@ function dashboardPage() {
       }
     }
 
-    // Load stores
-
+    // Load stores (numai desenează cardurile + stats)
     async function loadStores() {
       try {
         var res = await fetch('/stores');
@@ -780,32 +766,32 @@ function dashboardPage() {
           storesEl.appendChild(card);
         });
 
-        storesEl.addEventListener('click', async function (e) {
-          var btn = e.target;
-          if (!(btn instanceof HTMLButtonElement)) return;
-
-          var storeId = btn.getAttribute('data-store-id');
-          var storeName = btn.getAttribute('data-store-name') || storeId;
-          if (!storeId) return;
-
-          currentStoreId = storeId;
-          currentStoreName = storeName;
-
-          if (btn.classList.contains('btn-preview')) {
-            await handlePreview(storeId, storeName, btn);
-          } else if (btn.classList.contains('btn-sync')) {
-            await handleSync(storeId, storeName, btn);
-          }
-        });
-
-        appendLog('Store-urile au fost încărcate.');
+        appendLog('Store-urile au fost încărcate / actualizate.');
       } catch (err) {
         appendLog('Eroare la loadStores: ' + err.message);
       }
     }
 
-    // Preview
+    // Delegare click pe containerul de store-uri (o singură dată)
+    storesEl.addEventListener('click', async function (e) {
+      var btn = e.target;
+      if (!(btn instanceof HTMLButtonElement)) return;
 
+      var storeId = btn.getAttribute('data-store-id');
+      var storeName = btn.getAttribute('data-store-name') || storeId;
+      if (!storeId) return;
+
+      currentStoreId = storeId;
+      currentStoreName = storeName;
+
+      if (btn.classList.contains('btn-preview')) {
+        await handlePreview(storeId, storeName, btn);
+      } else if (btn.classList.contains('btn-sync')) {
+        await handleSync(storeId, storeName, btn);
+      }
+    });
+
+    // Preview
     async function handlePreview(storeId, storeName, btn) {
       try {
         btn.disabled = true;
@@ -836,7 +822,6 @@ function dashboardPage() {
     }
 
     // Sync
-
     async function handleSync(storeId, storeName, btn) {
       try {
         btn.disabled = true;
@@ -893,7 +878,6 @@ function dashboardPage() {
     }
 
     // Preview table
-
     function renderPreviewTable() {
       var items = currentPreviewItems || [];
       var filtered;
@@ -962,7 +946,6 @@ function dashboardPage() {
       var thumbImgs = (item.preview_image_urls || []).slice(1, 4);
       var existingThumbs = (item.existing && item.existing.preview_images) || [];
 
-      // Acțiune
       var actionTextMain = '';
       var actionTextSecondary = '';
 
@@ -980,7 +963,6 @@ function dashboardPage() {
         actionTextMain = badge('skip') + ' Intrare ignorată (skip).';
       }
 
-      // Valori curente Shopify
       var currentValuesHtml = '';
 
       if (item.plannedAction === 'create') {
@@ -1128,8 +1110,9 @@ function dashboardPage() {
       renderPreviewTable();
     });
 
-    // Init
+    // Init + auto-refresh stores la 30s
     loadStores();
+    setInterval(loadStores, 30000);
   </script>
 </body>
 </html>
