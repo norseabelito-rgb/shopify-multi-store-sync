@@ -79,14 +79,20 @@ async function loadSheet(spreadsheetId, sheetName) {
 function extractDriveFolderId(urlOrId) {
   if (!urlOrId) return null;
 
-  // dacă deja e un ID (fără slash/domeniu)
-  if (!urlOrId.includes('http') && !urlOrId.includes('/')) {
-    return urlOrId;
+  const trimmed = urlOrId.trim();
+
+  // Dacă pare deja ID (nu conține http și nici slashuri)
+  if (!trimmed.includes('http') && !trimmed.includes('/')) {
+    return trimmed;
   }
 
   // URL de tip https://drive.google.com/drive/folders/{ID}
-  const match = urlOrId.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   if (match && match[1]) return match[1];
+
+  // Uneori vine ca .../folders/xyz?resourcekey=... sau ...?id=xyz
+  const matchIdParam = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (matchIdParam && matchIdParam[1]) return matchIdParam[1];
 
   return null;
 }
@@ -482,14 +488,33 @@ app.get('/', (req, res) => {
             img.alt = 'Fără imagine';
           }
 
-          const content = document.createElement('div');
+                    const content = document.createElement('div');
           content.className = 'preview-content';
           const metaSku = item.sku || 'fără SKU';
-          content.innerHTML = \`
-            <div class="preview-title">\${item.title || item.internal_product_id || '(fără titlu)'} \${badge(item.plannedAction)}</div>
-            <div class="preview-meta">SKU: \${metaSku}</div>
-            <div class="preview-reason">\${item.reason || ''}</div>
-          \`;
+
+          let mediaLine = '';
+          if (item.media_debug) {
+            const md = item.media_debug;
+            const st = md.status || 'unknown';
+            mediaLine = 'Media: ' + st;
+            if (md.media_folder_id) {
+              mediaLine += ' · folderId: ' + md.media_folder_id;
+            }
+            if (md.error) {
+              mediaLine += ' · error: ' + md.error;
+            }
+          } else if (item.image_url) {
+            mediaLine = 'Media: ok';
+          } else {
+            mediaLine = 'Media: none';
+          }
+
+          content.innerHTML = `
+            <div class="preview-title">${item.title || item.internal_product_id || '(fără titlu)'} ${badge(item.plannedAction)}</div>
+            <div class="preview-meta">SKU: ${metaSku}</div>
+            <div class="preview-reason">${item.reason || ''}</div>
+            <div class="preview-reason">${mediaLine}</div>
+          `;
 
           row.appendChild(img);
           row.appendChild(content);
@@ -634,13 +659,29 @@ app.get('/preview', async (req, res) => {
       const classification = await determinePlannedActionForRow(store, accessToken, product, row);
       const sku = row.store_sku || product.master_sku || product.internal_product_id;
 
-      // prima poză din media_folder_url
+            // prima poză din media_folder_url + debug
       let imageUrl = null;
+      let mediaDebug = null;
+
       if (product.media_folder_url) {
+        const folderId = extractDriveFolderId(product.media_folder_url);
+        mediaDebug = {
+          media_folder_url: product.media_folder_url,
+          media_folder_id: folderId || null,
+          status: 'pending'
+        };
+
         try {
           imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+          if (imageUrl) {
+            mediaDebug.status = 'ok';
+          } else {
+            mediaDebug.status = 'no_images_found';
+          }
         } catch (e) {
           console.error('Error getting image for product', internalId, e.message);
+          mediaDebug.status = 'error';
+          mediaDebug.error = e.message;
         }
       }
 
@@ -651,7 +692,8 @@ app.get('/preview', async (req, res) => {
         title: row.title || product.internal_name || '',
         plannedAction: classification.plannedAction,
         reason: classification.reason || '',
-        image_url: imageUrl
+        image_url: imageUrl,
+        media_debug: mediaDebug
       });
     }
 
