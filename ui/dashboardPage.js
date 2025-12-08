@@ -194,34 +194,25 @@ function dashboardPage() {
       100% { transform: translateX(120%); }
     }
 
-    /* STORE LIST */
+    /* STORE LIST
+       - grid pe mai multe rânduri, fără scroll orizontal
+    */
 
     .stores {
       display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(220px, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 14px;
-      overflow-x: auto;
-      padding: 6px 2px 10px;
       margin-top: 6px;
-      scrollbar-width: thin;
-    }
-
-    .stores::-webkit-scrollbar {
-      height: 6px;
-    }
-
-    .stores::-webkit-scrollbar-thumb {
-      background: #262b3a;
-      border-radius: 999px;
     }
 
     .store-card {
       background: linear-gradient(145deg, rgba(22, 27, 38, 0.95), rgba(10, 14, 24, 0.95));
       border-radius: 12px;
-      padding: 14px 14px 12px;
+      padding: 14px 14px 10px;
       border: 1px solid var(--border);
-      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.18s ease;
     }
 
@@ -231,10 +222,54 @@ function dashboardPage() {
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
     }
 
+    .store-header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
     .store-title {
       font-size: 14px;
       font-weight: 600;
-      margin-bottom: 6px;
+    }
+
+    .store-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .store-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .store-stat {
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .store-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .store-stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e4ecff;
+    }
+
+    .store-actions {
+      margin-top: 4px;
     }
 
     /* BUTTONS (mai mici, mai puțin glowy) */
@@ -701,23 +736,47 @@ function dashboardPage() {
         data.forEach(function (store) {
           var card = document.createElement('div');
           card.className = 'store-card';
+
           var storeLabel = store.store_name || store.store_id;
+          var activeCount = (store.active_products != null ? String(store.active_products) : '–');
+          var draftCount = (store.draft_products != null ? String(store.draft_products) : '–');
+          var todayOrders = (store.today_orders != null ? String(store.today_orders) : '–');
 
-          card.innerHTML =
-            '<div class="store-title">' + escapeHtml(storeLabel) + '</div>' +
-            '<button ' +
-              'data-store-id="' + escapeHtml(store.store_id) + '" ' +
-              'data-store-name="' + escapeHtml(storeLabel) + '" ' +
-              'class="btn-preview" ' +
-              'title="Verifică ce produse vor fi create sau actualizate pentru acest magazin."' +
-            '>Verifică schimbările</button>' +
-            '<button ' +
-              'data-store-id="' + escapeHtml(store.store_id) + '" ' +
-              'data-store-name="' + escapeHtml(storeLabel) + '" ' +
-              'class="btn-sync secondary" ' +
-              'title="Aplică în Shopify toate modificările selectate pentru acest magazin."' +
-            '>Sincronizează produsele</button>';
+          var html =
+            '<div class="store-header">' +
+              '<div class="store-title">' + escapeHtml(storeLabel) + '</div>' +
+              '<div class="store-sub">ID: ' + escapeHtml(store.store_id || '') + '</div>' +
+            '</div>' +
+            '<div class="store-stats">' +
+              '<div class="store-stat">' +
+                '<span class="store-stat-label">Active</span>' +
+                '<span class="store-stat-value">' + activeCount + '</span>' +
+              '</div>' +
+              '<div class="store-stat">' +
+                '<span class="store-stat-label">Draft</span>' +
+                '<span class="store-stat-value">' + draftCount + '</span>' +
+              '</div>' +
+              '<div class="store-stat">' +
+                '<span class="store-stat-label">Comenzi azi</span>' +
+                '<span class="store-stat-value">' + todayOrders + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="store-actions">' +
+              '<button ' +
+                'data-store-id="' + escapeHtml(store.store_id) + '" ' +
+                'data-store-name="' + escapeHtml(storeLabel) + '" ' +
+                'class="btn-preview" ' +
+                'title="Verifică ce produse vor fi create sau actualizate pentru acest magazin."' +
+              '>Verifică schimbările</button>' +
+              '<button ' +
+                'data-store-id="' + escapeHtml(store.store_id) + '" ' +
+                'data-store-name="' + escapeHtml(storeLabel) + '" ' +
+                'class="btn-sync secondary" ' +
+                'title="Aplică în Shopify toate modificările selectate pentru acest magazin."' +
+              '>Sincronizează produsele</button>' +
+            '</div>';
 
+          card.innerHTML = html;
           storesEl.appendChild(card);
         });
 
