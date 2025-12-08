@@ -74,7 +74,7 @@ async function loadSheet(spreadsheetId, sheetName) {
   return { headers, rows: objects };
 }
 
-// ---------- Drive: prima imagine din folder ----------
+// ---------- Drive: imagini din folder ----------
 
 function extractDriveFolderId(urlOrId) {
   if (!urlOrId) return null;
@@ -97,26 +97,30 @@ function extractDriveFolderId(urlOrId) {
   return null;
 }
 
-async function getFirstImageUrlFromDriveFolder(mediaFolderUrl) {
+// întoarce un array de URL-uri (max maxFiles) pentru imagini din folder
+async function getImageUrlsFromDriveFolder(mediaFolderUrl, maxFiles = 10) {
   const folderId = extractDriveFolderId(mediaFolderUrl);
-  if (!folderId) return null;
+  if (!folderId) return [];
 
   const drive = await getDriveClient();
 
   const res = await drive.files.list({
     q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
     orderBy: 'createdTime',
-    pageSize: 1,
+    pageSize: maxFiles,
     fields: 'files(id, name)'
   });
 
   const files = res.data.files || [];
-  if (!files.length) return null;
+  if (!files.length) return [];
 
-  const file = files[0];
+  return files.map((file) => `https://drive.google.com/uc?export=view&id=${file.id}`);
+}
 
-  // link de vizualizare directă (trebuie ca fișierul să fie accesibil public / anyone with link)
-  return `https://drive.google.com/uc?export=view&id=${file.id}`;
+// compat, dacă vrem doar prima imagine
+async function getFirstImageUrlFromDriveFolder(mediaFolderUrl) {
+  const urls = await getImageUrlsFromDriveFolder(mediaFolderUrl, 1);
+  return urls[0] || null;
 }
 
 // ---------- Shopify helpers ----------
@@ -266,7 +270,7 @@ async function deleteProductInStore(store, accessToken, productId) {
 
 // ---------- Mapping logic ----------
 
-function buildProductPayload(product, store, psRow, imageUrl) {
+function buildProductPayload(product, store, psRow, imageUrls = []) {
   const title = psRow.title || product.internal_name || product.master_sku;
   const body_html = psRow.description_html || '';
 
@@ -284,7 +288,7 @@ function buildProductPayload(product, store, psRow, imageUrl) {
   const baseTagsString = psRow.tags_override || product.tags || '';
   const tagsArray = baseTagsString
     .split(',')
-    .map(t => t.trim())
+    .map((t) => t.trim())
     .filter(Boolean);
 
   if (!tagsArray.includes(SCRIPT_TAG)) {
@@ -312,12 +316,8 @@ function buildProductPayload(product, store, psRow, imageUrl) {
     ]
   };
 
-  if (imageUrl) {
-    payload.images = [
-      {
-        src: imageUrl
-      }
-    ];
+  if (Array.isArray(imageUrls) && imageUrls.length) {
+    payload.images = imageUrls.map((u) => ({ src: u }));
   }
 
   return payload;
@@ -503,6 +503,9 @@ app.get('/', (req, res) => {
             const md = item.media_debug;
             const st = md.status || 'unknown';
             mediaLine = 'Media: ' + st;
+            if (typeof md.count === 'number') {
+              mediaLine += ' · count: ' + md.count;
+            }
             if (md.media_folder_id) {
               mediaLine += ' · folderId: ' + md.media_folder_id;
             }
@@ -588,7 +591,7 @@ app.get('/stores', async (req, res) => {
     const storesSheet = await loadSheet(spreadsheetId, 'Stores');
     const stores = storesSheet.rows || [];
 
-    const clean = stores.map(s => ({
+    const clean = stores.map((s) => ({
       store_id: s.store_id,
       store_name: s.store_name,
       shopify_domain: s.shopify_domain,
@@ -628,11 +631,11 @@ app.get('/preview', async (req, res) => {
     const productStoreRows = psSheet.rows;
 
     const productsById = {};
-    products.forEach(p => {
+    products.forEach((p) => {
       productsById[p.internal_product_id] = p;
     });
 
-    const store = stores.find(s => s.store_id === storeId);
+    const store = stores.find((s) => s.store_id === storeId);
     if (!store) {
       throw new Error(`No store found with store_id=${storeId}`);
     }
@@ -641,7 +644,7 @@ app.get('/preview', async (req, res) => {
 
     const validActions = ['create', 'update', 'delete'];
 
-    const rowsForStore = productStoreRows.filter(r => {
+    const rowsForStore = productStoreRows.filter((r) => {
       const action = (r.sync_action || '').toLowerCase();
       if (!validActions.includes(action)) return false;
       return r.store_id === storeId;
@@ -668,27 +671,32 @@ app.get('/preview', async (req, res) => {
       const classification = await determinePlannedActionForRow(store, accessToken, product, row);
       const sku = row.store_sku || product.master_sku || product.internal_product_id;
 
-      // prima poză din media_folder_url + debug
+      // toate pozele din media_folder_url + debug
       let imageUrl = null;
       let mediaDebug = null;
+      let imageUrls = [];
 
       if (product.media_folder_url) {
         const folderId = extractDriveFolderId(product.media_folder_url);
         mediaDebug = {
           media_folder_url: product.media_folder_url,
           media_folder_id: folderId || null,
-          status: 'pending'
+          status: 'pending',
+          count: 0
         };
 
         try {
-          imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+          imageUrls = await getImageUrlsFromDriveFolder(product.media_folder_url, 10);
+          imageUrl = imageUrls[0] || null;
+          mediaDebug.count = imageUrls.length;
+
           if (imageUrl) {
             mediaDebug.status = 'ok';
           } else {
             mediaDebug.status = 'no_images_found';
           }
         } catch (e) {
-          console.error('Error getting image for product', internalId, e.message);
+          console.error('Error getting images for product', internalId, e.message);
           mediaDebug.status = 'error';
           mediaDebug.error = e.message;
         }
@@ -702,6 +710,7 @@ app.get('/preview', async (req, res) => {
         plannedAction: classification.plannedAction,
         reason: classification.reason || '',
         image_url: imageUrl,
+        image_urls: imageUrls,
         media_debug: mediaDebug
       });
     }
@@ -735,18 +744,18 @@ app.post('/sync', async (req, res) => {
     const productStoreRows = psSheet.rows;
 
     const productsById = {};
-    products.forEach(p => {
+    products.forEach((p) => {
       productsById[p.internal_product_id] = p;
     });
 
     const storesById = {};
-    stores.forEach(s => {
+    stores.forEach((s) => {
       storesById[s.store_id] = s;
     });
 
     const validActions = ['create', 'update', 'delete'];
 
-    const toProcess = productStoreRows.filter(r => {
+    const toProcess = productStoreRows.filter((r) => {
       const action = (r.sync_action || '').toLowerCase();
       if (!validActions.includes(action)) return false;
       if (filterStoreId && r.store_id !== filterStoreId) return false;
@@ -801,16 +810,16 @@ app.post('/sync', async (req, res) => {
         }
 
         if (plannedAction === 'create') {
-          let imageUrl = null;
+          let imageUrls = [];
           if (product.media_folder_url) {
             try {
-              imageUrl = await getFirstImageUrlFromDriveFolder(product.media_folder_url);
+              imageUrls = await getImageUrlsFromDriveFolder(product.media_folder_url, 10);
             } catch (e) {
-              console.error('Error getting image for product during create', internalId, e.message);
+              console.error('Error getting images for product during create', internalId, e.message);
             }
           }
 
-          const payload = buildProductPayload(product, store, row, imageUrl);
+          const payload = buildProductPayload(product, store, row, imageUrls);
           const created = await createProductInStore(store, accessToken, payload);
           result.status = 'success';
           result.shopify_product_id = created.id;
@@ -849,7 +858,6 @@ app.post('/sync', async (req, res) => {
             result.status = 'success';
           }
         }
-
       } catch (err) {
         console.error('Error syncing row', row, err);
         result.status = 'error';
