@@ -161,7 +161,10 @@ router.get('/preview', async (req, res) => {
           const newPayload = buildProductPayload(product, store, row, imageUrls);
 
           const diff = diffProduct(existing, newPayload);
-          hasChanges = diff.hasChanges;
+
+          // AICI e modificarea importantă:
+          // - pentru UI folosim doar schimbări "reale" (exclude doar-status)
+          hasChanges = diff.hasRealChanges;
           changedFields = diff.changedFields;
 
           existingSummary = {
@@ -381,7 +384,7 @@ router.post('/sync', async (req, res) => {
       } catch (err) {
         console.error('Error syncing row', row, err);
         result.status = 'error';
-        result.error = err.message || String(err);
+        result.error = err.message;
       }
 
       results.push(result);
