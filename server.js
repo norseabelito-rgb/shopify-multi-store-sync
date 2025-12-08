@@ -1,17 +1,14 @@
+// server.js
 const express = require('express');
-
-const dashboardRouter = require('./routes/dashboard');
 const apiRouter = require('./routes/api');
+const dashboardRouter = require('./routes/dashboard');
 
 const app = express();
-app.use(express.json());
-
 const PORT = process.env.PORT || 3000;
 
-// rute UI
-app.use('/', dashboardRouter);
+app.use(express.json());
 
-// rute API
+app.use('/', dashboardRouter);
 app.use('/', apiRouter);
 
 app.listen(PORT, () => {

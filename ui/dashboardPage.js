@@ -1,5 +1,6 @@
 // ui/dashboardPage.js
-function renderDashboard(scriptTag) {
+
+function getDashboardPageHtml(SCRIPT_TAG) {
   return `
 <!DOCTYPE html>
 <html lang="ro">
@@ -12,24 +13,8 @@ function renderDashboard(scriptTag) {
     h2 { margin-top: 24px; margin-bottom: 8px; }
     p { margin-top: 4px; margin-bottom: 12px; }
 
-    /* Store cards – o singură linie, scroll orizontal dacă nu încap */
-    .stores {
-      display:flex;
-      flex-wrap:nowrap;
-      gap:16px;
-      margin-bottom:24px;
-      overflow-x:auto;
-      padding-bottom:8px;
-    }
-    .store-card {
-      background:#15151a;
-      border-radius:12px;
-      padding:16px;
-      min-width:220px;
-      max-width:260px;
-      box-shadow:0 0 0 1px #262635;
-      flex:0 0 220px;
-    }
+    .stores { display:flex; flex-wrap:nowrap; gap:16px; margin-bottom:24px; overflow-x:auto; padding-bottom:8px; }
+    .store-card { background:#15151a; border-radius:12px; padding:16px; min-width:220px; box-shadow:0 0 0 1px #262635; flex:0 0 auto; }
     .store-title { font-weight:600; margin-bottom:4px; }
     .store-id { font-size:12px; opacity:0.7; margin-bottom:12px; }
 
@@ -37,16 +22,7 @@ function renderDashboard(scriptTag) {
     button.secondary { background:#374151; }
     button:disabled { opacity:0.5; cursor:not-allowed; }
 
-    #log {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      white-space:pre-wrap;
-      background:#050509;
-      border-radius:12px;
-      padding:16px;
-      max-height:280px;
-      overflow:auto;
-      border:1px solid #262635;
-    }
+    #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space:pre-wrap; background:#050509; border-radius:12px; padding:16px; max-height:280px; overflow:auto; border:1px solid #262635; margin-top:24px; }
 
     .badge { display:inline-block; padding:2px 6px; border-radius:999px; font-size:11px; margin-left:4px; }
     .badge-create { background:#064e3b; color:#a7f3d0; }
@@ -54,107 +30,54 @@ function renderDashboard(scriptTag) {
     .badge-delete { background:#7f1d1d; color:#fecaca; }
     .badge-skip { background:#111827; color:#9ca3af; }
 
-    .preview-wrapper { margin-top:12px; }
+    .preview-tabs { display:flex; gap:8px; margin-bottom:8px; }
+    .preview-tab { background:#111827; color:#e5e7eb; border-radius:999px; padding:6px 12px; font-size:12px; border:none; cursor:pointer; }
+    .preview-tab.active { background:#2563eb; color:#f9fafb; }
 
-    /* Tabel preview */
-    .preview-table {
-      width:100%;
-      border-collapse:collapse;
-      font-size:12px;
-      background:#111118;
-      border-radius:12px;
-      overflow:hidden;
-    }
-    .preview-table thead {
-      background:#181824;
-      position:sticky;
-      top:0;
-      z-index:1;
-    }
-    .preview-table th,
-    .preview-table td {
-      padding:8px 10px;
-      border-bottom:1px solid #262635;
-      vertical-align:middle; /* centrare verticală pentru toate celulele */
-    }
-    .preview-table th {
-      text-align:left;
-      font-weight:600;
-      font-size:12px;
-      color:#e5e7eb;
-      white-space:nowrap;
-    }
-    .preview-table tbody tr:last-child td {
-      border-bottom:none;
-    }
+    .preview-table-wrapper { margin-top:12px; overflow-x:auto; }
+    table.preview-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .preview-table thead { background:#050509; position:sticky; top:0; z-index:2; }
+    .preview-table th, .preview-table td { padding:10px 8px; border-bottom:1px solid #262635; vertical-align:top; }
+    .preview-table th { text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; color:#9ca3af; }
+    .preview-row:nth-child(even) { background:#0f1015; }
+    .preview-row:nth-child(odd) { background:#101016; }
 
-    .col-images { width:240px; }
-    .col-checkbox { width:48px; text-align:center; }
+    .img-main { width:64px; height:64px; border-radius:8px; object-fit:cover; background:#1f2937; display:block; margin-bottom:4px; }
+    .img-thumbs { display:flex; gap:4px; flex-wrap:wrap; }
+    .img-thumb { width:28px; height:28px; border-radius:6px; object-fit:cover; background:#1f2937; }
 
-    .preview-img-main {
-      width:52px;
-      height:52px;
-      border-radius:8px;
-      object-fit:cover;
-      background:#1f2937;
-      display:block;
-    }
+    .product-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+    .product-sku { font-size:11px; color:#9ca3af; margin-bottom:4px; }
+    .product-tags { font-size:11px; color:#d1fae5; }
 
-    .thumbs {
-      display:flex;
-      flex-wrap:wrap;
-      gap:4px;
-      margin-top:4px;
-    }
-    .thumb {
-      width:32px;
-      height:32px;
-      border-radius:4px;
-      object-fit:cover;
-      background:#1f2937;
-      display:block;
-    }
+    .existing-title { font-size:13px; font-weight:600; margin-bottom:2px; }
+    .existing-tags { font-size:11px; color:#9ca3af; margin-bottom:4px; }
+    .existing-imgs { display:flex; gap:4px; flex-wrap:wrap; }
+    .existing-thumb { width:28px; height:28px; border-radius:6px; object-fit:cover; background:#1f2937; }
 
-    .preview-title { font-size:13px; font-weight:600; margin-bottom:2px; }
-    .preview-meta { font-size:11px; opacity:0.8; margin-bottom:2px; }
-    .preview-tags { font-size:11px; color:#9ca3af; }
+    .action-pill { display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; text-transform:uppercase; }
+    .action-pill.create { background:#064e3b; color:#a7f3d0; }
+    .action-pill.update { background:#1f2937; color:#facc15; }
+    .action-pill.delete { background:#7f1d1d; color:#fecaca; }
 
-    .current-title { font-size:12px; font-weight:500; margin-bottom:2px; }
-    .current-tags { font-size:11px; color:#9ca3af; }
+    .checkbox-cell { text-align:center; vertical-align:middle; }
+    .checkbox-cell input[type="checkbox"] { width:16px; height:16px; cursor:pointer; }
 
-    .checkbox-cell {
-      text-align:center;
-      vertical-align:middle;
-    }
-    .checkbox-cell input[type="checkbox"] {
-      transform:scale(1.1);
-      cursor:pointer;
-    }
-
-    .action-pill {
-      display:inline-flex;
-      align-items:center;
-      padding:2px 8px;
-      border-radius:999px;
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:0.03em;
-    }
-    .action-create { background:#064e3b; color:#a7f3d0; }
-    .action-update { background:#1f2937; color:#facc15; }
-    .action-delete { background:#7f1d1d; color:#fecaca; }
-    .action-skip { background:#111827; color:#9ca3af; }
+    .dimmed { opacity:0.45; }
   </style>
 </head>
 <body>
   <h1>Shopify Multi-Store Sync</h1>
-  <p>Tag folosit de script: <code>${scriptTag}</code></p>
+  <p>Tag folosit de script: <code>${SCRIPT_TAG}</code></p>
 
   <h2>Magazin(e)</h2>
   <div id="stores" class="stores"></div>
 
-  <h2>Preview rezultate</h2>
-  <div id="preview-results" class="preview-wrapper"></div>
+  <h2 style="display:flex;align-items:center;gap:8px;">
+    Preview rezultate
+    <span id="no-change-count" style="font-size:11px;color:#9ca3af;"></span>
+  </h2>
+  <div id="preview-results"></div>
 
   <h2>Log</h2>
   <div id="log">Selectează un magazin și apasă “Preview” sau “Sync”.</div>
@@ -163,32 +86,26 @@ function renderDashboard(scriptTag) {
     const logEl = document.getElementById('log');
     const storesEl = document.getElementById('stores');
     const previewEl = document.getElementById('preview-results');
+    const noChangeCountEl = document.getElementById('no-change-count');
 
-    let currentPreview = [];
-    let selectedIds = new Set();
+    let currentPreviewData = [];
+    let selectedKeys = new Set();
 
     function appendLog(text) {
       const ts = new Date().toISOString();
       logEl.textContent = '[' + ts + '] ' + text + '\\n' + logEl.textContent;
     }
 
-    function badge(action) {
+    function actionPill(action) {
       const a = (action || '').toLowerCase();
-      if (a === 'create') return '<span class="badge badge-create">create</span>';
-      if (a === 'update') return '<span class="badge badge-update">update</span>';
-      if (a === 'delete') return '<span class="badge badge-delete">delete</span>';
-      if (a === 'skip') return '<span class="badge badge-skip">skip</span>';
+      if (a === 'create') return '<span class="action-pill create">CREATE</span>';
+      if (a === 'update') return '<span class="action-pill update">UPDATE</span>';
+      if (a === 'delete') return '<span class="action-pill delete">DELETE</span>';
       return '';
     }
 
-    function actionPill(action) {
-      const a = (action || '').toLowerCase();
-      let cls = 'action-skip';
-      let label = a || 'skip';
-      if (a === 'create') cls = 'action-create';
-      else if (a === 'update') cls = 'action-update';
-      else if (a === 'delete') cls = 'action-delete';
-      return '<span class="action-pill ' + cls + '">' + label + '</span>';
+    function productKey(item) {
+      return (item.store_id || '') + '::' + (item.internal_product_id || '');
     }
 
     async function loadStores() {
@@ -196,6 +113,7 @@ function renderDashboard(scriptTag) {
         const res = await fetch('/stores');
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
+
         storesEl.innerHTML = '';
         data.forEach(store => {
           const card = document.createElement('div');
@@ -203,18 +121,12 @@ function renderDashboard(scriptTag) {
           card.innerHTML = \`
             <div class="store-title">\${store.store_name || store.store_id}</div>
             <div class="store-id">ID: \${store.store_id} · Domeniu: \${store.shopify_domain}</div>
-            <button
-              data-store-id="\${store.store_id}"
-              class="btn-preview"
-              title="Arată ce produse vor fi create, actualizate sau șterse, fără să trimiți nimic în Shopify."
-            >
+            <button data-store-id="\${store.store_id}" class="btn-preview"
+              title="Generează o listă de produse care vor fi create, actualizate sau șterse în acest magazin.">
               Preview
             </button>
-            <button
-              data-store-id="\${store.store_id}"
-              class="btn-sync"
-              title="Trimite în Shopify DOAR produsele bifate în tabelul de mai jos."
-            >
+            <button data-store-id="\${store.store_id}" class="btn-sync"
+              title="Trimite în Shopify modificările selectate pentru acest magazin.">
               Sync
             </button>
           \`;
@@ -240,181 +152,259 @@ function renderDashboard(scriptTag) {
       }
     }
 
-    function renderPreviewTable(data) {
-      currentPreview = Array.isArray(data) ? data : [];
-      selectedIds = new Set(currentPreview.map(item => item.internal_product_id));
+    function renderPreview(data) {
+      currentPreviewData = Array.isArray(data) ? data : [];
+      selectedKeys = new Set();
 
-      if (!currentPreview.length) {
-        previewEl.innerHTML = '<div style="font-size:13px; opacity:0.8;">Nimic de sincronizat pentru acest magazin.</div>';
-        return;
-      }
+      const withChanges = currentPreviewData.filter(i => i.hasChanges !== false);
+      const noChanges = currentPreviewData.filter(i => i.hasChanges === false);
 
-      previewEl.innerHTML = '';
+      noChangeCountEl.textContent = noChanges.length
+        ? '(Produse fără modificări reale: ' + noChanges.length + ')'
+        : '';
+
+      previewEl.innerHTML = \`
+        <div class="preview-tabs">
+          <button class="preview-tab active" data-view="changes"
+            title="Arată doar produsele la care există modificări reale față de ce e în Shopify.">
+            Cu modificări
+          </button>
+          <button class="preview-tab" data-view="nochanges"
+            title="Arată produsele din sheet care nu schimbă nimic față de valorile actuale din Shopify.">
+            Fără modificări
+          </button>
+        </div>
+        <div class="preview-table-wrapper" id="preview-table-container"></div>
+      \`;
+
+      const container = document.getElementById('preview-table-container');
+      renderPreviewTableInto(container, withChanges, { enableSelection: true });
+
+      const tabs = previewEl.querySelectorAll('.preview-tab');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const view = tab.dataset.view;
+          if (view === 'changes') {
+            renderPreviewTableInto(container, withChanges, { enableSelection: true });
+          } else {
+            renderPreviewTableInto(container, noChanges, { enableSelection: false });
+          }
+        });
+      });
+    }
+
+    function renderPreviewTableInto(container, rows, options) {
+      const enableSelection = options && options.enableSelection;
+      const rowsSafe = Array.isArray(rows) ? rows : [];
+
       const table = document.createElement('table');
       table.className = 'preview-table';
 
       const thead = document.createElement('thead');
-      thead.innerHTML = \`
-        <tr>
-          <th class="col-images">Poze noi</th>
-          <th>Produs nou</th>
-          <th>Tag-uri noi</th>
-          <th>Acțiune</th>
-          <th>Valori curente în Shopify</th>
-          <th class="checkbox-cell col-checkbox">
-            <input
-              id="select-all"
-              type="checkbox"
-              checked
-              title="Bifează sau debifează toate produsele din listă."
-            />
-          </th>
-        </tr>
-      \`;
-      table.appendChild(thead);
+      const headRow = document.createElement('tr');
+
+      const thImg = document.createElement('th');
+      thImg.textContent = 'Poze noi';
+
+      const thProd = document.createElement('th');
+      thProd.textContent = 'Produs nou';
+
+      const thTags = document.createElement('th');
+      thTags.textContent = 'Tag-uri noi';
+
+      const thAction = document.createElement('th');
+      thAction.textContent = 'Acțiune';
+
+      const thExisting = document.createElement('th');
+      thExisting.textContent = 'Valori curente în Shopify';
+
+      const thSelect = document.createElement('th');
+      thSelect.style.textAlign = 'center';
+
+      if (enableSelection) {
+        const selectAll = document.createElement('input');
+        selectAll.type = 'checkbox';
+        selectAll.title = 'Selectează sau deselectează toate produsele din listă pentru sincronizare.';
+        selectAll.addEventListener('change', () => {
+          selectedKeys.clear();
+          if (selectAll.checked) {
+            rowsSafe.forEach(item => {
+              const key = productKey(item);
+              selectedKeys.add(key);
+            });
+          }
+          renderPreviewTableInto(container, rowsSafe, { enableSelection: true });
+        });
+        thSelect.appendChild(selectAll);
+      }
+
+      headRow.appendChild(thImg);
+      headRow.appendChild(thProd);
+      headRow.appendChild(thTags);
+      headRow.appendChild(thAction);
+      headRow.appendChild(thExisting);
+      headRow.appendChild(thSelect);
+      thead.appendChild(headRow);
 
       const tbody = document.createElement('tbody');
 
-      currentPreview.forEach((item) => {
+      rowsSafe.forEach(item => {
         const tr = document.createElement('tr');
-        const internalId = item.internal_product_id;
+        tr.className = 'preview-row';
 
-        // col: poze noi
+        const key = productKey(item);
+        const isSelected = selectedKeys.has(key);
+
+        if (enableSelection && !isSelected) {
+          tr.classList.add('dimmed');
+        }
+
         const tdImg = document.createElement('td');
-        tdImg.className = 'col-images';
-        const mainSrc = (item.image_urls && item.image_urls[0]) || item.image_url || null;
-        if (mainSrc) {
-          const mainImg = document.createElement('img');
-          mainImg.className = 'preview-img-main';
-          mainImg.referrerPolicy = 'no-referrer';
-          mainImg.src = item.preview_image_url || ('/media?src=' + encodeURIComponent(mainSrc));
-          mainImg.alt = item.title || internalId || 'product image';
-          tdImg.appendChild(mainImg);
+        const imgs = Array.isArray(item.preview_image_urls) ? item.preview_image_urls : [];
+        if (imgs.length) {
+          const main = document.createElement('img');
+          main.className = 'img-main';
+          main.src = imgs[0];
+          main.alt = item.title || item.internal_product_id || 'product image';
+          main.referrerPolicy = 'no-referrer';
+          tdImg.appendChild(main);
+
+          if (imgs.length > 1) {
+            const thumbsWrap = document.createElement('div');
+            thumbsWrap.className = 'img-thumbs';
+            imgs.slice(1).forEach(u => {
+              const t = document.createElement('img');
+              t.className = 'img-thumb';
+              t.src = u;
+              t.alt = 'thumb';
+              t.referrerPolicy = 'no-referrer';
+              thumbsWrap.appendChild(t);
+            });
+            tdImg.appendChild(thumbsWrap);
+          }
         } else {
           tdImg.textContent = '—';
         }
 
-        if (item.image_urls && item.image_urls.length > 1) {
-          const thumbs = document.createElement('div');
-          thumbs.className = 'thumbs';
-          item.image_urls.slice(1).forEach((url) => {
-            const t = document.createElement('img');
-            t.className = 'thumb';
-            t.referrerPolicy = 'no-referrer';
-            t.src = '/media?src=' + encodeURIComponent(url); // proxy și pentru thumb-uri
-            t.alt = 'thumb';
-            thumbs.appendChild(t);
-          });
-          tdImg.appendChild(thumbs);
-        }
+        const tdProd = document.createElement('td');
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'product-title';
+        titleDiv.textContent = item.title || item.internal_product_id || '(fără titlu)';
 
-        // col: titlu + SKU
-        const tdTitle = document.createElement('td');
-        tdTitle.innerHTML = \`
-          <div class="preview-title">\${item.title || item.internal_product_id || '(fără titlu)'}</div>
-          <div class="preview-meta">SKU: \${item.sku || 'fără SKU'}</div>
-        \`;
+        const skuDiv = document.createElement('div');
+        skuDiv.className = 'product-sku';
+        skuDiv.textContent = 'SKU: ' + (item.sku || 'fără SKU');
 
-        // col: tag-uri noi
+        const tagsNew = document.createElement('div');
+        tagsNew.className = 'product-tags';
+        tagsNew.textContent = item.tags_new || '';
+
+        tdProd.appendChild(titleDiv);
+        tdProd.appendChild(skuDiv);
+        if (item.tags_new) tdProd.appendChild(tagsNew);
+
         const tdTags = document.createElement('td');
-        tdTags.innerHTML = \`
-          <div class="preview-tags">\${item.tags || '—'}</div>
-        \`;
+        tdTags.textContent = item.tags_new || '—';
 
-        // col: create / update / delete
         const tdAction = document.createElement('td');
-        tdAction.innerHTML = actionPill(item.plannedAction) + ' ' + (badge(item.plannedAction) || '');
+        const act = (item.plannedAction || '').toLowerCase();
+        let actionText = '';
 
-        // col: valori curente în Shopify
-        const tdCurrent = document.createElement('td');
-        if (item.existing && item.existing.title) {
-          const ex = item.existing;
-          let html = '<div class="current-title">' + ex.title + '</div>';
-          html += '<div class="current-tags">' + (ex.tags || '—') + '</div>';
-          tdCurrent.innerHTML = html;
-
-          if (ex.images && ex.images.length) {
-            const thumbs = document.createElement('div');
-            thumbs.className = 'thumbs';
-            ex.images.forEach((url) => {
-              const t = document.createElement('img');
-              t.className = 'thumb';
-              t.referrerPolicy = 'no-referrer';
-              t.src = '/media?src=' + encodeURIComponent(url); // proxy și aici
-              t.alt = 'shopify image';
-              thumbs.appendChild(t);
-            });
-            tdCurrent.appendChild(thumbs);
-          }
-        } else {
-          tdCurrent.innerHTML = '<span style="font-size:11px; opacity:0.8;">(nu există produs sau este create)</span>';
+        if (act === 'create') {
+          actionText = 'Produs nou. Se va crea de la 0.';
+        } else if (act === 'update') {
+          const fields = Array.isArray(item.changed_fields) && item.changed_fields.length
+            ? item.changed_fields.join(', ')
+            : 'datele produsului';
+          const existingSku = item.existing && item.existing.sku
+            ? item.existing.sku
+            : (item.sku || 'fără SKU');
+          actionText = 'Produs existent (SKU – ' + existingSku +
+                       '). Se actualizează: ' + fields + '.';
+        } else if (act === 'delete') {
+          const existingSku = item.existing && item.existing.sku
+            ? item.existing.sku
+            : (item.sku || 'fără SKU');
+          actionText = 'Produs existent (SKU – ' + existingSku +
+                       '). Se va șterge din Shopify.';
         }
 
-        // col: checkbox aprobare
-        const tdCheck = document.createElement('td');
-        tdCheck.className = 'checkbox-cell col-checkbox';
-        const chk = document.createElement('input');
-        chk.type = 'checkbox';
-        chk.checked = true;
-        chk.dataset.internalId = internalId;
-        chk.title = 'Include acest produs în sincronizare.';
-        chk.addEventListener('change', () => {
-          if (chk.checked) {
-            selectedIds.add(internalId);
-          } else {
-            selectedIds.delete(internalId);
+        tdAction.innerHTML =
+          actionPill(item.plannedAction) +
+          (actionText
+            ? '<div style="margin-top:4px;font-size:11px;color:#9ca3af;">' + actionText + '</div>'
+            : '');
+
+        const tdExisting = document.createElement('td');
+        const ex = item.existing || {};
+        if (item.plannedAction === 'create' && !ex.title) {
+          tdExisting.innerHTML = '<span style="font-size:11px;color:#9ca3af;">(nu există produs sau este creat nou)</span>';
+        } else if (!ex || !ex.title) {
+          tdExisting.innerHTML = '<span style="font-size:11px;color:#9ca3af;">(nu s-au putut încărca valorile curente)</span>';
+        } else {
+          const t = document.createElement('div');
+          t.className = 'existing-title';
+          t.textContent = ex.title || '';
+
+          const tags = document.createElement('div');
+          tags.className = 'existing-tags';
+          tags.textContent = ex.tags || '';
+
+          tdExisting.appendChild(t);
+          tdExisting.appendChild(tags);
+
+          if (Array.isArray(ex.preview_images) && ex.preview_images.length) {
+            const wrap = document.createElement('div');
+            wrap.className = 'existing-imgs';
+            ex.preview_images.forEach(u => {
+              const img = document.createElement('img');
+              img.className = 'existing-thumb';
+              img.src = u;
+              img.alt = 'img veche';
+              img.referrerPolicy = 'no-referrer';
+              wrap.appendChild(img);
+            });
+            tdExisting.appendChild(wrap);
           }
-          syncSelectAllCheckboxState();
-        });
-        tdCheck.appendChild(chk);
+        }
+
+        const tdCheck = document.createElement('td');
+        tdCheck.className = 'checkbox-cell';
+        if (enableSelection) {
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = isSelected;
+          cb.title = 'Include acest produs în lista de modificări trimise către Shopify.';
+          cb.addEventListener('change', () => {
+            if (cb.checked) {
+              selectedKeys.add(key);
+            } else {
+              selectedKeys.delete(key);
+            }
+            renderPreviewTableInto(container, rowsSafe, { enableSelection: true });
+          });
+          tdCheck.appendChild(cb);
+        } else {
+          tdCheck.textContent = '—';
+        }
 
         tr.appendChild(tdImg);
-        tr.appendChild(tdTitle);
+        tr.appendChild(tdProd);
         tr.appendChild(tdTags);
         tr.appendChild(tdAction);
-        tr.appendChild(tdCurrent);
+        tr.appendChild(tdExisting);
         tr.appendChild(tdCheck);
+
         tbody.appendChild(tr);
       });
 
+      table.appendChild(thead);
       table.appendChild(tbody);
-      previewEl.appendChild(table);
 
-      const selectAll = document.getElementById('select-all');
-      if (selectAll) {
-        selectAll.addEventListener('change', () => {
-          const checked = selectAll.checked;
-          selectedIds = new Set();
-          tbody.querySelectorAll('input[type="checkbox"][data-internal-id]').forEach((chk) => {
-            chk.checked = checked;
-            if (checked) {
-              selectedIds.add(chk.dataset.internalId);
-            }
-          });
-        });
-      }
-    }
-
-    function syncSelectAllCheckboxState() {
-      const selectAll = document.getElementById('select-all');
-      if (!selectAll) return;
-      if (!currentPreview.length) {
-        selectAll.checked = false;
-        selectAll.indeterminate = false;
-        return;
-      }
-      const total = currentPreview.length;
-      const selected = selectedIds.size;
-      if (selected === 0) {
-        selectAll.checked = false;
-        selectAll.indeterminate = false;
-      } else if (selected === total) {
-        selectAll.checked = true;
-        selectAll.indeterminate = false;
-      } else {
-        selectAll.checked = false;
-        selectAll.indeterminate = true;
-      }
+      container.innerHTML = '';
+      container.appendChild(table);
     }
 
     async function handlePreview(storeId, btn) {
@@ -426,20 +416,19 @@ function renderDashboard(scriptTag) {
         const data = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-          renderPreviewTable([]);
+          previewEl.innerHTML = '';
           appendLog('Preview ' + storeId + ': nimic de sincronizat.');
           return;
         }
 
-        renderPreviewTable(data);
+        renderPreview(data);
 
         let summary = 'Preview pentru ' + storeId + ':\\n';
         data.forEach(item => {
           summary += '- ' + item.internal_product_id + ' (' + (item.sku || 'fără SKU') + '): ' +
-                     (item.title || '') + ' [' + (item.plannedAction || '') + '] - ' +
-                     (item.reason || '') + '\\n';
+            (item.title || '') + ' [' + item.plannedAction + '] - ' +
+            (item.reason || '') + (item.hasChanges === false ? ' (fără modificări reale)' : '') + '\\n';
         });
-
         appendLog(summary);
       } catch (err) {
         appendLog('Eroare la preview ' + storeId + ': ' + err.message);
@@ -453,19 +442,30 @@ function renderDashboard(scriptTag) {
         btn.disabled = true;
         appendLog('Sync pentru store ' + storeId + '...');
 
-        const idsArray = Array.from(selectedIds);
-        if (!idsArray.length) {
-          appendLog('Nu ai selectat niciun produs pentru sync.');
-          return;
-        }
+        const itemsToSend = [];
+        currentPreviewData.forEach(item => {
+          const key = productKey(item);
+          if (selectedKeys.size === 0) {
+            if (item.hasChanges !== false && item.store_id === storeId) {
+              itemsToSend.push({
+                internal_product_id: item.internal_product_id,
+                store_id: item.store_id,
+              });
+            }
+          } else {
+            if (selectedKeys.has(key)) {
+              itemsToSend.push({
+                internal_product_id: item.internal_product_id,
+                store_id: item.store_id,
+              });
+            }
+          }
+        });
 
         const res = await fetch('/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            store_id: storeId,
-            internal_product_ids: idsArray
-          })
+          body: JSON.stringify({ store_id: storeId, items: itemsToSend }),
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
@@ -475,8 +475,8 @@ function renderDashboard(scriptTag) {
         if (Array.isArray(data.results)) {
           data.results.forEach(r => {
             html += '- ' + r.internal_product_id + ' (' + (r.sku || 'fara SKU') + '): ' +
-                    (r.action || '') + ' -> ' + (r.status || '') +
-                    (r.error ? ' (error: ' + r.error + ')' : '') + '\\n';
+              (r.action || '') + ' -> ' + (r.status || '') +
+              (r.error ? ' (error: ' + r.error + ')' : '') + '\\n';
           });
         }
         appendLog(html);
@@ -494,6 +494,4 @@ function renderDashboard(scriptTag) {
   `;
 }
 
-module.exports = {
-  renderDashboard
-};
+module.exports = getDashboardPageHtml;

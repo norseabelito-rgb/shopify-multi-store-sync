@@ -7,17 +7,20 @@ const { extractDriveFolderId, getImageUrlsFromDriveFolder } = require('../lib/dr
 const {
   getShopifyAccessTokenForStore,
   findProductIdByHandle,
+  getProductByGid,
   createProductInStore,
   updateProductInStore,
   deleteProductInStore,
-  getProductByGid
 } = require('../lib/shopify');
-const { buildProductPayload, determinePlannedActionForRow } = require('../lib/mapping');
+const {
+  buildProductPayload,
+  diffProduct,
+  determinePlannedActionForRow,
+} = require('../lib/mapping');
 
 const router = express.Router();
 
-// ---------- /stores ----------
-
+// /stores
 router.get('/stores', async (req, res) => {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
@@ -33,7 +36,7 @@ router.get('/stores', async (req, res) => {
       store_name: s.store_name,
       shopify_domain: s.shopify_domain,
       currency: s.currency,
-      language: s.language
+      language: s.language,
     }));
 
     res.json(clean);
@@ -43,8 +46,7 @@ router.get('/stores', async (req, res) => {
   }
 });
 
-// ---------- /preview ----------
-
+// /preview
 router.get('/preview', async (req, res) => {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
@@ -60,7 +62,7 @@ router.get('/preview', async (req, res) => {
     const [productsSheet, storesSheet, psSheet] = await Promise.all([
       loadSheet(spreadsheetId, 'Products'),
       loadSheet(spreadsheetId, 'Stores'),
-      loadSheet(spreadsheetId, 'Product_Store')
+      loadSheet(spreadsheetId, 'Product_Store'),
     ]);
 
     const products = productsSheet.rows;
@@ -98,10 +100,10 @@ router.get('/preview', async (req, res) => {
           store_id: storeId,
           sku: row.store_sku || '',
           title: row.title || '',
-          tags: '',
           plannedAction: 'skip',
           reason: 'No product found in Products for this internal_product_id',
-          image_url: null
+          image_url: null,
+          hasChanges: false,
         });
         continue;
       }
@@ -109,9 +111,9 @@ router.get('/preview', async (req, res) => {
       const classification = await determinePlannedActionForRow(store, accessToken, product, row);
       const sku = row.store_sku || product.master_sku || product.internal_product_id;
 
+      let imageUrls = [];
       let imageUrl = null;
       let mediaDebug = null;
-      let imageUrls = [];
 
       if (product.media_folder_url) {
         const folderId = extractDriveFolderId(product.media_folder_url);
@@ -119,7 +121,7 @@ router.get('/preview', async (req, res) => {
           media_folder_url: product.media_folder_url,
           media_folder_id: folderId || null,
           status: 'pending',
-          count: 0
+          count: 0,
         };
 
         try {
@@ -139,52 +141,79 @@ router.get('/preview', async (req, res) => {
         }
       }
 
-      // construim payloadul final ca să avem titlu + tags EXACT cum vor fi trimise
-      const payloadForPreview = buildProductPayload(product, store, row, imageUrls);
-      const newTitle = payloadForPreview.title;
-      const newTags = payloadForPreview.tags;
+      const previewImageUrls = Array.isArray(imageUrls)
+        ? imageUrls.map((u) => `/media?src=${encodeURIComponent(u)}`)
+        : [];
 
-      // dacă e update, luăm valorile curente din Shopify pentru comparație
-      let existing = null;
-      if (classification.plannedAction === 'update' && classification.existingProductId) {
-        try {
-          const shopifyProduct = await getProductByGid(
-            store.shopify_domain,
-            accessToken,
-            classification.existingProductId
-          );
+      const plannedAction = classification.plannedAction;
+      let hasChanges = true;
+      let changedFields = [];
+      let existingSummary = {};
 
-          if (shopifyProduct) {
-            existing = {
-              title: shopifyProduct.title || '',
-              tags: shopifyProduct.tags || '',
-              images: Array.isArray(shopifyProduct.images)
-                ? shopifyProduct.images.map((img) => img.src).filter(Boolean)
-                : []
-            };
-          }
-        } catch (e) {
-          console.error('Error fetching existing Shopify product for preview', internalId, e);
+      if (plannedAction === 'update') {
+        let productId = classification.existingProductId;
+        if (!productId && row.handle) {
+          productId = await findProductIdByHandle(store.shopify_domain, accessToken, row.handle);
         }
+
+        if (productId) {
+          const existing = await getProductByGid(store.shopify_domain, accessToken, productId);
+          const newPayload = buildProductPayload(product, store, row, imageUrls);
+
+          const diff = diffProduct(existing, newPayload);
+          hasChanges = diff.hasChanges;
+          changedFields = diff.changedFields;
+
+          existingSummary = {
+            title: existing.title || '',
+            sku:
+              (existing.variants &&
+                existing.variants[0] &&
+                existing.variants[0].sku) ||
+              '',
+            tags: existing.tags || '',
+            images: (existing.images || []).map((img) => img.src),
+            preview_images: (existing.images || []).map((img) =>
+              `/media?src=${encodeURIComponent(img.src)}`
+            ),
+          };
+        } else {
+          hasChanges = true;
+          changedFields = ['creare (fallback)'];
+        }
+      } else if (plannedAction === 'create') {
+        hasChanges = true;
+        changedFields = ['create'];
+        existingSummary = {
+          title: '',
+          sku: '',
+          tags: '',
+          images: [],
+          preview_images: [],
+        };
+      } else if (plannedAction === 'delete') {
+        hasChanges = true;
+        changedFields = ['delete'];
       }
 
-      const previewImageUrl = imageUrl
-        ? `/media?src=${encodeURIComponent(imageUrl)}`
-        : null;
+      const tmpPayload = buildProductPayload(product, store, row, []);
+      const tagsNew = tmpPayload.tags;
 
       previewResults.push({
         internal_product_id: internalId,
         store_id: storeId,
         sku,
-        title: newTitle || row.title || product.internal_name || '',
-        tags: newTags || '',
-        plannedAction: classification.plannedAction,
+        title: row.title || product.internal_name || '',
+        tags_new: tagsNew,
+        plannedAction,
         reason: classification.reason || '',
         image_url: imageUrl,
-        preview_image_url: previewImageUrl,
+        preview_image_urls: previewImageUrls,
         image_urls: imageUrls,
         media_debug: mediaDebug,
-        existing
+        hasChanges,
+        changed_fields: changedFields,
+        existing: existingSummary,
       });
     }
 
@@ -195,8 +224,7 @@ router.get('/preview', async (req, res) => {
   }
 });
 
-// ---------- /sync ----------
-
+// /sync
 router.post('/sync', async (req, res) => {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
@@ -204,18 +232,12 @@ router.post('/sync', async (req, res) => {
       throw new Error('Missing GOOGLE_SHEETS_ID env var');
     }
 
-    const {
-      store_id: filterStoreId,
-      internal_product_id: filterProductId,
-      internal_product_ids: filterProductIds
-    } = req.body || {};
-
-    const idsArray = Array.isArray(filterProductIds) ? filterProductIds : null;
+    const { store_id: filterStoreId, internal_product_id: filterProductId, items } = req.body || {};
 
     const [productsSheet, storesSheet, psSheet] = await Promise.all([
       loadSheet(spreadsheetId, 'Products'),
       loadSheet(spreadsheetId, 'Stores'),
-      loadSheet(spreadsheetId, 'Product_Store')
+      loadSheet(spreadsheetId, 'Product_Store'),
     ]);
 
     const products = productsSheet.rows;
@@ -234,12 +256,23 @@ router.post('/sync', async (req, res) => {
 
     const validActions = ['create', 'update', 'delete'];
 
+    const selectedSet = new Set(
+      Array.isArray(items)
+        ? items.map(
+            (it) => (it.store_id || filterStoreId || '') + '::' + (it.internal_product_id || '')
+          )
+        : []
+    );
+
     const toProcess = productStoreRows.filter((r) => {
       const action = (r.sync_action || '').toLowerCase();
       if (!validActions.includes(action)) return false;
       if (filterStoreId && r.store_id !== filterStoreId) return false;
       if (filterProductId && r.internal_product_id !== filterProductId) return false;
-      if (idsArray && !idsArray.includes(r.internal_product_id)) return false;
+      if (selectedSet.size) {
+        const key = (r.store_id || '') + '::' + (r.internal_product_id || '');
+        if (!selectedSet.has(key)) return false;
+      }
       return true;
     });
 
@@ -260,7 +293,7 @@ router.post('/sync', async (req, res) => {
         action: rawAction,
         status: 'pending',
         error: null,
-        sku: row.store_sku || ''
+        sku: row.store_sku || '',
       };
 
       try {
@@ -276,7 +309,12 @@ router.post('/sync', async (req, res) => {
 
         const accessToken = getShopifyAccessTokenForStore(storeId);
 
-        const classification = await determinePlannedActionForRow(store, accessToken, product, row);
+        const classification = await determinePlannedActionForRow(
+          store,
+          accessToken,
+          product,
+          row
+        );
         const plannedAction = classification.plannedAction;
         const sku = row.store_sku || product.master_sku || product.internal_product_id;
         result.sku = sku;
@@ -295,7 +333,11 @@ router.post('/sync', async (req, res) => {
             try {
               imageUrls = await getImageUrlsFromDriveFolder(product.media_folder_url, 10);
             } catch (e) {
-              console.error('Error getting images for product during create', internalId, e.message);
+              console.error(
+                'Error getting images for product during create',
+                internalId,
+                e.message
+              );
             }
           }
 
@@ -348,19 +390,18 @@ router.post('/sync', async (req, res) => {
     return res.json({
       message: 'Sync finished',
       processed: results.length,
-      results
+      results,
     });
   } catch (err) {
     console.error('Fatal /sync error:', err);
     return res.status(500).json({
       error: 'Sync failed',
-      message: err.message || String(err)
+      message: err.message || String(err),
     });
   }
 });
 
-// ---------- /media proxy ----------
-
+// /media – proxy pentru Drive
 router.get('/media', async (req, res) => {
   const src = req.query.src;
   if (!src) {
