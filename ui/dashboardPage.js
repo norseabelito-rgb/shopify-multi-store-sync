@@ -75,7 +75,7 @@ function renderDashboard(scriptTag) {
     .preview-table td {
       padding:8px 10px;
       border-bottom:1px solid #262635;
-      vertical-align:top;
+      vertical-align:middle; /* centrare verticală pentru toate celulele */
     }
     .preview-table th {
       text-align:left;
@@ -87,6 +87,9 @@ function renderDashboard(scriptTag) {
     .preview-table tbody tr:last-child td {
       border-bottom:none;
     }
+
+    .col-images { width:240px; }
+    .col-checkbox { width:48px; text-align:center; }
 
     .preview-img-main {
       width:52px;
@@ -109,6 +112,7 @@ function renderDashboard(scriptTag) {
       border-radius:4px;
       object-fit:cover;
       background:#1f2937;
+      display:block;
     }
 
     .preview-title { font-size:13px; font-weight:600; margin-bottom:2px; }
@@ -162,7 +166,6 @@ function renderDashboard(scriptTag) {
 
     let currentPreview = [];
     let selectedIds = new Set();
-    let lastStoreId = null;
 
     function appendLog(text) {
       const ts = new Date().toISOString();
@@ -253,12 +256,12 @@ function renderDashboard(scriptTag) {
       const thead = document.createElement('thead');
       thead.innerHTML = \`
         <tr>
-          <th>Poze noi</th>
+          <th class="col-images">Poze noi</th>
           <th>Produs nou</th>
           <th>Tag-uri noi</th>
           <th>Acțiune</th>
           <th>Valori curente în Shopify</th>
-          <th class="checkbox-cell">
+          <th class="checkbox-cell col-checkbox">
             <input
               id="select-all"
               type="checkbox"
@@ -278,12 +281,13 @@ function renderDashboard(scriptTag) {
 
         // col: poze noi
         const tdImg = document.createElement('td');
+        tdImg.className = 'col-images';
         const mainSrc = (item.image_urls && item.image_urls[0]) || item.image_url || null;
         if (mainSrc) {
           const mainImg = document.createElement('img');
           mainImg.className = 'preview-img-main';
           mainImg.referrerPolicy = 'no-referrer';
-          mainImg.src = item.preview_image_url || mainSrc;
+          mainImg.src = item.preview_image_url || ('/media?src=' + encodeURIComponent(mainSrc));
           mainImg.alt = item.title || internalId || 'product image';
           tdImg.appendChild(mainImg);
         } else {
@@ -297,7 +301,7 @@ function renderDashboard(scriptTag) {
             const t = document.createElement('img');
             t.className = 'thumb';
             t.referrerPolicy = 'no-referrer';
-            t.src = url;
+            t.src = '/media?src=' + encodeURIComponent(url); // proxy și pentru thumb-uri
             t.alt = 'thumb';
             thumbs.appendChild(t);
           });
@@ -336,7 +340,7 @@ function renderDashboard(scriptTag) {
               const t = document.createElement('img');
               t.className = 'thumb';
               t.referrerPolicy = 'no-referrer';
-              t.src = url;
+              t.src = '/media?src=' + encodeURIComponent(url); // proxy și aici
               t.alt = 'shopify image';
               thumbs.appendChild(t);
             });
@@ -348,7 +352,7 @@ function renderDashboard(scriptTag) {
 
         // col: checkbox aprobare
         const tdCheck = document.createElement('td');
-        tdCheck.className = 'checkbox-cell';
+        tdCheck.className = 'checkbox-cell col-checkbox';
         const chk = document.createElement('input');
         chk.type = 'checkbox';
         chk.checked = true;
@@ -416,7 +420,6 @@ function renderDashboard(scriptTag) {
     async function handlePreview(storeId, btn) {
       try {
         btn.disabled = true;
-        lastStoreId = storeId;
         appendLog('Preview pentru store ' + storeId + '...');
         const res = await fetch('/preview?store_id=' + encodeURIComponent(storeId));
         if (!res.ok) throw new Error('HTTP ' + res.status);
