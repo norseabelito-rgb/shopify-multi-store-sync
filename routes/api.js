@@ -20,20 +20,35 @@ const {
 
 const router = express.Router();
 
-// Helper: ia statistici pentru un magazin Shopify
-async function fetchStoreStats(shopifyDomain, storeId) {
-  // încercăm să luăm token-ul din env după STORE_ID:
-  // ex: store_id = "BF24H" -> SHOPIFY_TOKEN_BF24H
+// Helper: ia statistici (produse active/draft + comenzi azi) pentru un magazin Shopify
+async function fetchStoreStats(storeId, rawDomain) {
+  // curățăm domeniul (să scăpăm de newline / spații)
+  const shopifyDomain = String(rawDomain || '').trim();
+
+  if (!shopifyDomain) {
+    console.warn('[fetchStoreStats] shopifyDomain lipsă pentru store', storeId);
+    return {
+      active_products: null,
+      draft_products: null,
+      today_orders: null,
+    };
+  }
+
+  // token-ul îl luăm din ENV, ex: SHOPIFY_TOKEN_BF24H
   const envKey =
-    'SHOPIFY_TOKEN_' + String(storeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+    'SHOPIFY_TOKEN_' +
+    String(storeId || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '_');
+
   const accessToken = process.env[envKey];
 
-  if (!shopifyDomain || !accessToken) {
+  if (!accessToken) {
     console.warn(
-      '[fetchStoreStats] Lipsesc shopifyDomain sau token pentru store',
+      '[fetchStoreStats] token lipsă pentru store',
       storeId,
-      'envKey=',
-      envKey
+      ' (ENV key:',
+      envKey + ')'
     );
     return {
       active_products: null,
@@ -42,25 +57,25 @@ async function fetchStoreStats(shopifyDomain, storeId) {
     };
   }
 
-  const base = `https://${shopifyDomain}/admin/api/2024-10`;
+  const baseUrl = `https://${shopifyDomain}/admin/api/2024-10`;
   const headers = {
     'X-Shopify-Access-Token': accessToken,
     'Content-Type': 'application/json',
   };
 
-  // începutul zilei curente în UTC (pentru comenzi de azi)
+  // începutul zilei curente în UTC — pentru "comenzi azi"
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(now.getUTCDate()).padStart(2, '0');
-  const todayStart = `${year}-${month}-${day}T00:00:00Z`;
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(now.getUTCDate()).padStart(2, '0');
+  const todayStart = `${yyyy}-${mm}-${dd}T00:00:00Z`;
 
   try {
     const [activeRes, draftRes, ordersRes] = await Promise.all([
-      fetch(`${base}/products/count.json?status=active`, { headers }),
-      fetch(`${base}/products/count.json?status=draft`, { headers }),
+      fetch(`${baseUrl}/products/count.json?status=active`, { headers }),
+      fetch(`${baseUrl}/products/count.json?status=draft`, { headers }),
       fetch(
-        `${base}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
+        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
           todayStart
         )}`,
         { headers }
@@ -68,7 +83,9 @@ async function fetchStoreStats(shopifyDomain, storeId) {
     ]);
 
     if (!activeRes.ok || !draftRes.ok || !ordersRes.ok) {
-      console.error('[fetchStoreStats] HTTP error for', shopifyDomain, {
+      console.error('[fetchStoreStats] HTTP error', {
+        storeId,
+        domain: shopifyDomain,
         activeStatus: activeRes.status,
         draftStatus: draftRes.status,
         ordersStatus: ordersRes.status,
@@ -85,12 +102,12 @@ async function fetchStoreStats(shopifyDomain, storeId) {
     const ordersJson = await ordersRes.json();
 
     return {
-      active_products: activeJson.count || 0,
-      draft_products: draftJson.count || 0,
-      today_orders: ordersJson.count || 0,
+      active_products: activeJson.count ?? 0,
+      draft_products: draftJson.count ?? 0,
+      today_orders: ordersJson.count ?? 0,
     };
   } catch (err) {
-    console.error('[fetchStoreStats] Exception for', shopifyDomain, err);
+    console.error('[fetchStoreStats] Exception pentru store', storeId, err);
     return {
       active_products: null,
       draft_products: null,
@@ -112,12 +129,14 @@ router.get('/stores', async (req, res) => {
 
     const enriched = await Promise.all(
       stores.map(async (s) => {
-        const stats = await fetchStoreStats(s.shopify_domain, s.store_id);
+        const cleanDomain = (s.shopify_domain || '').trim();
+
+        const stats = await fetchStoreStats(s.store_id, cleanDomain);
 
         return {
           store_id: s.store_id,
           store_name: s.store_name,
-          shopify_domain: s.shopify_domain,
+          shopify_domain: cleanDomain,
           currency: s.currency,
           language: s.language,
           active_products: stats.active_products,
