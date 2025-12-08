@@ -486,13 +486,17 @@ app.get('/', (req, res) => {
           row.className = 'preview-card';
 
           const img = document.createElement('img');
-          img.className = 'preview-img';
-          if (item.image_url) {
-            img.src = item.image_url;
-            img.alt = item.title || item.internal_product_id || 'product image';
-          } else {
-            img.alt = 'Fără imagine';
-          }
+img.className = 'preview-img';
+
+// unele host-uri sunt mofturoase cu referrer-ul
+img.referrerPolicy = 'no-referrer';
+
+if (item.image_url) {
+  img.src = item.image_url;
+  img.alt = item.title || item.internal_product_id || 'product image';
+} else {
+  img.alt = 'Fără imagine';
+}
 
           const content = document.createElement('div');
           content.className = 'preview-content';
