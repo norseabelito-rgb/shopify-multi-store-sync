@@ -20,7 +20,7 @@ const {
 
 const router = express.Router();
 
-// Helper: ia statistici (produse active/draft + comenzi azi) pentru un magazin Shopify
+// Helper: ia statistici (produse active/draft + comenzi azi/săptămână/lună/an) pentru un magazin Shopify
 async function fetchStoreStats(storeId, rawDomain) {
   const shopifyDomain = String(rawDomain || '').trim();
 
@@ -30,6 +30,9 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      week_orders: null,
+      month_orders: null,
+      year_orders: null,
       _debug: 'NO_DOMAIN',
     };
   }
@@ -54,6 +57,9 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      week_orders: null,
+      month_orders: null,
+      year_orders: null,
       _debug: 'NO_TOKEN:' + envKey,
     };
   }
@@ -64,15 +70,41 @@ async function fetchStoreStats(storeId, rawDomain) {
     'Content-Type': 'application/json',
   };
 
-  // începutul zilei curente în UTC — pentru "comenzi azi"
+  // date boundaries (UTC) – pentru comenzi
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(now.getUTCDate()).padStart(2, '0');
+
+  // azi (00:00 UTC)
   const todayStart = `${yyyy}-${mm}-${dd}T00:00:00Z`;
 
+  // început de săptămână (luni 00:00 UTC)
+  const dayOfWeek = now.getUTCDay(); // 0 = duminică
+  const diffToMonday = (dayOfWeek + 6) % 7; // 0 pentru luni, 1 pentru marți etc.
+  const weekStartDate = new Date(now);
+  weekStartDate.setUTCDate(now.getUTCDate() - diffToMonday);
+  weekStartDate.setUTCHours(0, 0, 0, 0);
+  const wYYYY = weekStartDate.getUTCFullYear();
+  const wMM = String(weekStartDate.getUTCMonth() + 1).padStart(2, '0');
+  const wDD = String(weekStartDate.getUTCDate()).padStart(2, '0');
+  const weekStart = `${wYYYY}-${wMM}-${wDD}T00:00:00Z`;
+
+  // început de lună
+  const monthStart = `${yyyy}-${mm}-01T00:00:00Z`;
+
+  // început de an
+  const yearStart = `${yyyy}-01-01T00:00:00Z`;
+
   try {
-    const [activeRes, draftRes, ordersRes] = await Promise.all([
+    const [
+      activeRes,
+      draftRes,
+      todayOrdersRes,
+      weekOrdersRes,
+      monthOrdersRes,
+      yearOrdersRes,
+    ] = await Promise.all([
       fetch(`${baseUrl}/products/count.json?status=active`, { headers }),
       fetch(`${baseUrl}/products/count.json?status=draft`, { headers }),
       fetch(
@@ -81,13 +113,41 @@ async function fetchStoreStats(storeId, rawDomain) {
         )}`,
         { headers }
       ),
+      fetch(
+        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
+          weekStart
+        )}`,
+        { headers }
+      ),
+      fetch(
+        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
+          monthStart
+        )}`,
+        { headers }
+      ),
+      fetch(
+        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
+          yearStart
+        )}`,
+        { headers }
+      ),
     ]);
 
-    if (!activeRes.ok || !draftRes.ok || !ordersRes.ok) {
+    if (
+      !activeRes.ok ||
+      !draftRes.ok ||
+      !todayOrdersRes.ok ||
+      !weekOrdersRes.ok ||
+      !monthOrdersRes.ok ||
+      !yearOrdersRes.ok
+    ) {
       const info = {
         activeStatus: activeRes.status,
         draftStatus: draftRes.status,
-        ordersStatus: ordersRes.status,
+        todayStatus: todayOrdersRes.status,
+        weekStatus: weekOrdersRes.status,
+        monthStatus: monthOrdersRes.status,
+        yearStatus: yearOrdersRes.status,
       };
       console.error('[fetchStoreStats] HTTP error', {
         storeId,
@@ -98,18 +158,27 @@ async function fetchStoreStats(storeId, rawDomain) {
         active_products: null,
         draft_products: null,
         today_orders: null,
+        week_orders: null,
+        month_orders: null,
+        year_orders: null,
         _debug: 'HTTP:' + JSON.stringify(info),
       };
     }
 
     const activeJson = await activeRes.json();
     const draftJson = await draftRes.json();
-    const ordersJson = await ordersRes.json();
+    const todayJson = await todayOrdersRes.json();
+    const weekJson = await weekOrdersRes.json();
+    const monthJson = await monthOrdersRes.json();
+    const yearJson = await yearOrdersRes.json();
 
     return {
       active_products: activeJson.count ?? 0,
       draft_products: draftJson.count ?? 0,
-      today_orders: ordersJson.count ?? 0,
+      today_orders: todayJson.count ?? 0,
+      week_orders: weekJson.count ?? 0,
+      month_orders: monthJson.count ?? 0,
+      year_orders: yearJson.count ?? 0,
       _debug: null,
     };
   } catch (err) {
@@ -118,10 +187,14 @@ async function fetchStoreStats(storeId, rawDomain) {
       active_products: null,
       draft_products: null,
       today_orders: null,
+      week_orders: null,
+      month_orders: null,
+      year_orders: null,
       _debug: 'EX:' + String(err.message || err),
     };
   }
 }
+
 
 // /stores
 router.get('/stores', async (req, res) => {
@@ -149,6 +222,9 @@ router.get('/stores', async (req, res) => {
           active_products: stats.active_products,
           draft_products: stats.draft_products,
           today_orders: stats.today_orders,
+          week_orders: stats.week_orders,
+          month_orders: stats.month_orders,
+          year_orders: stats.year_orders,
           _debug: stats._debug || null,
         };
       })

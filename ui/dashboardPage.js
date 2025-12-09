@@ -270,6 +270,48 @@ function dashboardPage() {
       margin-top: 4px;
     }
 
+    /* Rezumat total comenzi (slotul gol din grid) */
+    .store-summary {
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.18);
+      background: rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .store-summary-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .store-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+    }
+
+    .store-summary-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .store-summary-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .store-summary-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e4ecff;
+    }
+
     button {
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
@@ -711,7 +753,7 @@ function dashboardPage() {
       }
     }
 
-    // Load stores (numai desenează cardurile + stats)
+    // Load stores (carduri + stats + rezumat total)
     async function loadStores() {
       try {
         var res = await fetch('/stores');
@@ -719,14 +761,37 @@ function dashboardPage() {
         var data = await res.json();
         storesEl.innerHTML = '';
 
+        // Totale globale (suma peste toate magazinele)
+        var totalToday = 0;
+        var totalWeek = 0;
+        var totalMonth = 0;
+        var totalYear = 0;
+
         data.forEach(function (store) {
           var card = document.createElement('div');
           card.className = 'store-card';
 
           var storeLabel = store.store_name || store.store_id;
-          var activeCount = (store.active_products != null ? String(store.active_products) : '–');
-          var draftCount = (store.draft_products != null ? String(store.draft_products) : '–');
-          var todayOrders = (store.today_orders != null ? String(store.today_orders) : '–');
+          var activeCount =
+            store.active_products != null ? String(store.active_products) : '–';
+          var draftCount =
+            store.draft_products != null ? String(store.draft_products) : '–';
+          var todayOrders =
+            store.today_orders != null ? String(store.today_orders) : '–';
+
+          // adunăm la totaluri (dacă sunt numere)
+          if (typeof store.today_orders === 'number') {
+            totalToday += store.today_orders;
+          }
+          if (typeof store.week_orders === 'number') {
+            totalWeek += store.week_orders;
+          }
+          if (typeof store.month_orders === 'number') {
+            totalMonth += store.month_orders;
+          }
+          if (typeof store.year_orders === 'number') {
+            totalYear += store.year_orders;
+          }
 
           var html =
             '<div class="store-header">' +
@@ -743,7 +808,7 @@ function dashboardPage() {
                 '<span class="store-stat-value">' + draftCount + '</span>' +
               '</div>' +
               '<div class="store-stat">' +
-                '<span class="store-stat-label">Comenzi</span>' +
+                '<span class="store-stat-label">Comenzi azi</span>' +
                 '<span class="store-stat-value">' + todayOrders + '</span>' +
               '</div>' +
             '</div>' +
@@ -765,6 +830,33 @@ function dashboardPage() {
           card.innerHTML = html;
           storesEl.appendChild(card);
         });
+
+        // Blocul de rezumat total – folosește slotul gol din grid
+        var summary = document.createElement('div');
+        summary.className = 'store-summary';
+
+        summary.innerHTML =
+          '<div class="store-summary-title">Total comenzi (toate magazinele)</div>' +
+          '<div class="store-summary-grid">' +
+            '<div class="store-summary-item">' +
+              '<span class="store-summary-label">Astăzi</span>' +
+              '<span class="store-summary-value">' + totalToday + '</span>' +
+            '</div>' +
+            '<div class="store-summary-item">' +
+              '<span class="store-summary-label">Săptămâna curentă</span>' +
+              '<span class="store-summary-value">' + totalWeek + '</span>' +
+            '</div>' +
+            '<div class="store-summary-item">' +
+              '<span class="store-summary-label">Luna curentă</span>' +
+              '<span class="store-summary-value">' + totalMonth + '</span>' +
+            '</div>' +
+            '<div class="store-summary-item">' +
+              '<span class="store-summary-label">Anul curent</span>' +
+              '<span class="store-summary-value">' + totalYear + '</span>' +
+            '</div>' +
+          '</div>';
+
+        storesEl.appendChild(summary);
 
         appendLog('Store-urile au fost încărcate / actualizate.');
       } catch (err) {
