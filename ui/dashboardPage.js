@@ -856,8 +856,7 @@ function dashboardPage() {
             '</div>' +
           '</div>';
 
-        storesEl.appendChild(summary);
-
+        storesEl.insertBefore(summary, storesEl.firstChild);
         appendLog('Store-urile au fost încărcate / actualizate.');
       } catch (err) {
         appendLog('Eroare la loadStores: ' + err.message);
