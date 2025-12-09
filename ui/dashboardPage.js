@@ -836,7 +836,7 @@ function dashboardPage() {
         summary.className = 'store-summary';
 
         summary.innerHTML =
-          '<div class="store-summary-title">Total comenzi \n(toate magazinele)</div>' +
+          '<div class="store-summary-title">Total comenzi (toate magazinele)</div>' +
           '<div class="store-summary-grid">' +
             '<div class="store-summary-item">' +
               '<span class="store-summary-label">Astăzi</span>' +
