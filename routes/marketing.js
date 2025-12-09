@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 
 const marketingPage = require('../ui/marketingPage');
-const { loadSheet } = require('../services/googleSheets');
+const { loadSheet } = require('../lib/google');
 
 // helper: încarcă config pentru un cont TikTok din sheet-ul TikTokAccounts
 async function getTiktokAccountConfig(accountId) {
