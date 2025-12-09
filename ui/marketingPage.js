@@ -6,16 +6,18 @@ function marketingPage() {
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
-  <title>Marketing – TikTok Ads Control</title>
+  <title>Marketing Control – TikTok Ads</title>
   <style>
     :root {
-      --bg: #05060c;
-      --panel: rgba(15, 17, 26, 0.92);
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #eef2ff;
-      --muted: #9aa4b5;
-      --accent: #5c8bff;
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.96);
+      --border: rgba(148, 163, 184, 0.3);
+      --border-soft: rgba(148, 163, 184, 0.18);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --accent-soft: rgba(56, 189, 248, 0.16);
+      --danger: #f97373;
     }
 
     * { box-sizing: border-box; }
@@ -24,21 +26,21 @@ function marketingPage() {
       margin: 0;
       min-height: 100vh;
       padding: 28px;
-      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        radial-gradient(1200px at 20% 20%, rgba(92, 139, 255, 0.08), transparent 45%),
-        radial-gradient(1000px at 80% 10%, rgba(73, 199, 255, 0.07), transparent 40%),
-        linear-gradient(180deg, #06070f, #05060c);
+        radial-gradient(1200px at 5% 0%, rgba(56, 189, 248, 0.2), transparent 55%),
+        radial-gradient(1400px at 95% 0%, rgba(96, 165, 250, 0.2), transparent 55%),
+        linear-gradient(180deg, #020617, #020617);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
     }
 
-    h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
-    h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: -0.01em; }
-    p  { margin: 0 0 10px; color: var(--muted); }
+    h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.03em; }
+    h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: -0.02em; }
+    p  { margin: 4px 0 10px; color: var(--muted); }
 
     .page-shell {
-      max-width: 1200px;
+      max-width: 1240px;
       margin: 0 auto 40px;
       display: flex;
       flex-direction: column;
@@ -47,44 +49,47 @@ function marketingPage() {
 
     .hero {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       gap: 16px;
     }
 
-    .hero-sub {
-      font-size: 12px;
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 10px;
       color: var(--muted);
+      margin: 0 0 8px;
     }
 
-    .badge-pill {
+    .status-pill {
       border-radius: 999px;
-      border: 1px solid rgba(92, 139, 255, 0.45);
-      padding: 6px 12px;
+      padding: 6px 14px;
+      border: 1px solid rgba(34, 197, 94, 0.6);
+      color: #bbf7d0;
       font-size: 11px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      background: radial-gradient(circle at 0% 0%, rgba(92, 139, 255, 0.25), transparent 55%);
-      color: #dbe4ff;
+      background: radial-gradient(circle at 0% 0%, rgba(22, 163, 74, 0.35), transparent 60%);
     }
 
     .panel {
       background: var(--panel);
       border-radius: 14px;
-      border: 1px solid var(--border);
-      padding: 16px;
+      border: 1px solid var(--border-soft);
+      padding: 16px 16px 14px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 70px rgba(15, 23, 42, 0.9);
     }
 
     .panel::before {
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, rgba(92, 139, 255, 0.08), transparent 40%);
-      opacity: 0.7;
+      background: radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.16), transparent 55%);
       pointer-events: none;
+      opacity: 0.7;
     }
 
     .panel > * {
@@ -96,41 +101,38 @@ function marketingPage() {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
-    .muted {
-      color: var(--muted);
-      font-size: 12px;
-      margin: 2px 0 0;
-    }
+    .muted { color: var(--muted); font-size: 12px; }
 
-    /* GRID CONTURI */
+    /* Accounts grid */
     .accounts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 14px;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .account-card {
-      background: linear-gradient(145deg, rgba(22, 27, 38, 0.95), rgba(10, 14, 24, 0.95));
       border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: radial-gradient(circle at 0% 0%, var(--accent-soft), transparent 65%);
       padding: 12px 12px 10px;
-      border: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       gap: 8px;
-      transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.18s ease;
+      cursor: default;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
     }
 
     .account-card:hover {
       transform: translateY(-2px);
-      border-color: var(--border-strong);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+      border-color: var(--border);
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.9);
     }
 
-    .account-label {
+    .account-title {
       font-size: 14px;
       font-weight: 600;
     }
@@ -145,110 +147,207 @@ function marketingPage() {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
       margin-top: 4px;
-      font-size: 11px;
     }
 
-    .account-stat {
-      padding: 6px 7px;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+    .stat-chip {
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(15, 23, 42, 0.85);
+      padding: 6px 8px;
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
 
-    .account-stat-label {
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .stat-note {
       font-size: 10px;
       color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
     }
 
-    .account-stat-value {
-      font-size: 12px;
-      font-weight: 500;
-      color: #e4ecff;
-    }
-
-    .account-actions {
-      margin-top: 6px;
-    }
-
-    .account-actions button {
-      border-radius: 8px;
-      padding: 5px 9px;
-      cursor: pointer;
-      margin-right: 6px;
+    .account-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       margin-top: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: linear-gradient(130deg, #111827, #020617);
-      color: #e5e7eb;
-      font-size: 11px;
+    }
+
+    .tag {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: var(--muted);
+    }
+
+    button {
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: linear-gradient(135deg, #60a5fa, #38bdf8);
+      color: #0b1120;
+      font-size: 12px;
+      padding: 5px 11px;
+      cursor: pointer;
       letter-spacing: 0.01em;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-      transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.14s ease, opacity 0.18s ease;
+      box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45);
+      transition: transform 0.13s ease, box-shadow 0.15s ease, filter 0.13s ease, opacity 0.15s ease;
     }
 
-    .account-actions button.primary {
-      background: linear-gradient(130deg, #5c8bff, #49c7ff);
-      color: #020617;
-      box-shadow: 0 6px 18px rgba(92, 139, 255, 0.35);
-    }
-
-    .account-actions button:hover:not(:disabled) {
+    button:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
-      filter: brightness(1.02);
+      filter: brightness(1.05);
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.6);
     }
 
-    .account-actions button:disabled {
-      opacity: 0.55;
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
       box-shadow: none;
     }
 
-    /* PANEL AGREGATE */
-    .totals-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px;
-      margin-top: 6px;
+    button.secondary {
+      background: rgba(15, 23, 42, 0.95);
+      color: var(--text);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.9);
+    }
+
+    button.danger {
+      background: linear-gradient(135deg, #f97373, #fb7185);
+      border-color: rgba(248, 113, 113, 0.7);
+      box-shadow: 0 8px 22px rgba(190, 24, 93, 0.5);
+    }
+
+    /* Campaigns table */
+
+    .campaign-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .campaign-current-account {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .campaign-current-account strong {
+      color: #e5e7eb;
+    }
+
+    .campaigns-wrapper {
+      max-height: 420px;
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: 12px;
     }
 
-    .totals-item {
-      padding: 7px 9px;
-      border-radius: 9px;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    thead {
+      position: sticky;
+      top: 0;
+      background: rgba(15, 23, 42, 0.98);
+      z-index: 1;
+      backdrop-filter: blur(12px);
     }
 
-    .totals-label {
+    th, td {
+      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+      padding: 8px 10px;
+      vertical-align: middle;
+    }
+
+    th {
+      text-align: left;
       font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: var(--muted);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    tbody tr:hover {
+      background: rgba(30, 64, 175, 0.35);
+    }
+
+    .status-pill {
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
 
-    .totals-value {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e5e7eb;
+    .status-active {
+      border-color: rgba(74, 222, 128, 0.7);
+      color: #bbf7d0;
+      background: rgba(22, 163, 74, 0.2);
     }
 
-    .small-pill {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 10px;
-      color: #c7d2fe;
-      background: rgba(15, 23, 42, 0.9);
-      margin-left: 6px;
+    .status-paused {
+      border-color: rgba(251, 191, 36, 0.7);
+      color: #fef3c7;
+      background: rgba(180, 83, 9, 0.3);
+    }
+
+    .status-unknown {
+      border-color: rgba(148, 163, 184, 0.7);
+      color: #e5e7eb;
+      background: rgba(30, 64, 175, 0.3);
+    }
+
+    .metric-strong {
+      font-weight: 600;
+    }
+
+    .metric-muted {
+      color: var(--muted);
+    }
+
+    .campaign-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* Log */
+
+    #log {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      background: rgba(15, 23, 42, 0.96);
+      border-radius: 10px;
+      padding: 10px;
+      border: 1px solid var(--border-soft);
+      max-height: 220px;
+      overflow: auto;
+      color: #e5e7eb;
     }
   </style>
 </head>
@@ -256,195 +355,317 @@ function marketingPage() {
   <div class="page-shell">
     <header class="hero">
       <div>
-        <h1>Marketing – TikTok Ads Control</h1>
-        <p class="hero-sub">Vizualizezi rapid performanța pe conturi și rulezi acțiuni în masă (pauză, reactivare, ajustare bugete).</p>
+        <p class="eyebrow">Marketing Control</p>
+        <h1>TikTok Ads – Multi-Account</h1>
+        <p>Vizualizezi rapid performanța pe conturi & controlezi campaniile (pauză/pornește/buget) dintr-un singur loc.</p>
       </div>
-      <div class="badge-pill">Marketing module</div>
+      <div class="status-pill">
+        TikTok API – Ready (tokens via ENV)
+      </div>
     </header>
 
-    <!-- PANOU AGREGAT -->
+    <!-- Accounts -->
     <section class="panel">
       <div class="section-heading">
         <div>
-          <h2>Sumar cheltuieli</h2>
-          <p class="muted">Total spend cumulat pe toate conturile TikTok conectate.</p>
+          <h2>Conturi TikTok Ads</h2>
+          <p class="muted">Date reale atunci când adaugi token-urile în ENV (<code style="font-size:11px;">TIKTOK_TOKEN_*</code>).</p>
         </div>
-        <div style="font-size:11px;color:#9ca3af;">
-          <span>Refreshed automat la 60s</span>
+        <button id="refresh-accounts" class="secondary">Reîncarcă</button>
+      </div>
+      <div id="accounts" class="accounts-grid"></div>
+    </section>
+
+    <!-- Campaigns -->
+    <section class="panel">
+      <div class="section-heading">
+        <div class="campaign-header">
+          <h2>Campanii</h2>
+        </div>
+        <div class="campaign-current-account" id="current-account-label">
+          Niciun cont selectat încă.
         </div>
       </div>
-      <div class="totals-grid">
-        <div class="totals-item">
-          <div class="totals-label">Azi</div>
-          <div class="totals-value" id="totals-today">—</div>
-        </div>
-        <div class="totals-item">
-          <div class="totals-label">Ultimele 7 zile</div>
-          <div class="totals-value" id="totals-week">—</div>
-        </div>
-        <div class="totals-item">
-          <div class="totals-label">Luna curentă</div>
-          <div class="totals-value" id="totals-month">—</div>
-        </div>
-        <div class="totals-item">
-          <div class="totals-label">Anul curent</div>
-          <div class="totals-value" id="totals-year">—</div>
-        </div>
+
+      <div class="campaigns-wrapper" id="campaigns-wrapper">
+        <!-- tabelul se randează din JS -->
       </div>
     </section>
 
-    <!-- CONTURI -->
+    <!-- Log -->
     <section class="panel">
       <div class="section-heading">
         <div>
-          <h2>Conturi TikTok Ads conectate</h2>
-          <p class="muted">Fiecare card reprezintă un advertiser TikTok configurat în sheet-ul <code>TikTokAccounts</code>.</p>
+          <h2>Log acțiuni</h2>
+          <p class="muted">Aici vezi ce apeluri & acțiuni ai trimis către TikTok API.</p>
         </div>
       </div>
-
-      <div id="accounts" class="accounts-grid"></div>
+      <div id="log">Ready. Încarcă conturile TikTok sau selectează un cont pentru a vedea campaniile.</div>
     </section>
   </div>
 
   <script>
-    var accountsContainer = document.getElementById('accounts');
-    var totalsTodayEl  = document.getElementById('totals-today');
-    var totalsWeekEl   = document.getElementById('totals-week');
-    var totalsMonthEl  = document.getElementById('totals-month');
-    var totalsYearEl   = document.getElementById('totals-year');
+    var accountsEl = document.getElementById('accounts');
+    var refreshAccountsBtn = document.getElementById('refresh-accounts');
+    var campaignsWrapperEl = document.getElementById('campaigns-wrapper');
+    var currentAccountLabelEl = document.getElementById('current-account-label');
+    var logEl = document.getElementById('log');
 
-    async function loadAccountsAndStats() {
+    var currentAccount = null;
+
+    function appendLog(msg) {
+      var ts = new Date().toISOString();
+      logEl.textContent = '[' + ts + '] ' + msg + '\\n' + logEl.textContent;
+    }
+
+    function formatMoney(value, currency) {
+      if (value == null || isNaN(value)) return '–';
+      var v = Number(value);
+      return v.toFixed(2) + ' ' + (currency || '');
+    }
+
+    function formatInt(val) {
+      if (val == null || isNaN(val)) return '–';
+      return String(Math.round(Number(val)));
+    }
+
+    function statusClass(status) {
+      var s = String(status || '').toUpperCase();
+      if (s.includes('ACTIVE')) return 'status-pill status-active';
+      if (s.includes('PAUSE')) return 'status-pill status-paused';
+      return 'status-pill status-unknown';
+    }
+
+    async function loadAccounts() {
       try {
-        const res = await fetch('/tiktok/accounts');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const accounts = await res.json();
+        refreshAccountsBtn.disabled = true;
+        accountsEl.innerHTML = '<div class="muted">Încarc conturile TikTok...</div>';
 
-        accountsContainer.innerHTML = '';
-        var aggregate = {
-          haveData: false,
-          currency: null,
-          today: 0,
-          week: 0,
-          month: 0,
-          year: 0
-        };
+        const res = await fetch('/api/marketing/accounts');
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
 
-        for (const acc of accounts) {
-          const card = document.createElement('div');
+        const data = await res.json();
+        const accounts = data.accounts || [];
+
+        if (!accounts.length) {
+          accountsEl.innerHTML = '<div class="muted">Nu există încă rânduri în sheet-ul <strong>TikTokAccounts</strong>.</div>';
+          return;
+        }
+
+        accountsEl.innerHTML = '';
+
+        accounts.forEach(function (acc) {
+          var card = document.createElement('div');
           card.className = 'account-card';
-          const safeId = acc.account_id;
 
-          card.innerHTML = \`
-            <div>
-              <div class="account-label">\${acc.label || acc.account_id}</div>
-              <div class="account-sub">Advertiser ID: \${acc.advertiser_id || '—'}</div>
-            </div>
-            <div class="account-stats">
-              <div class="account-stat">
-                <span class="account-stat-label">Azi</span>
-                <span class="account-stat-value" id="stat-today-\${safeId}">—</span>
-              </div>
-              <div class="account-stat">
-                <span class="account-stat-label">7 zile</span>
-                <span class="account-stat-value" id="stat-week-\${safeId}">—</span>
-              </div>
-              <div class="account-stat">
-                <span class="account-stat-label">Lună</span>
-                <span class="account-stat-value" id="stat-month-\${safeId}">—</span>
-              </div>
-              <div class="account-stat">
-                <span class="account-stat-label">An</span>
-                <span class="account-stat-value" id="stat-year-\${safeId}">—</span>
-              </div>
-            </div>
-            <div class="account-actions">
-              <button class="primary" data-type="INCREASE_BUDGET" data-account-id="\${safeId}">+20% buget azi</button>
-              <button data-type="PAUSE_ALL" data-account-id="\${safeId}">Pauză toate campaniile</button>
-              <button data-type="RESUME_ALL" data-account-id="\${safeId}">Repornește campaniile</button>
-            </div>
-          \`;
+          var debugInfo = acc._debug || null;
 
-          accountsContainer.appendChild(card);
+          var today = acc.today || {};
+          var week = acc.week || {};
+          var month = acc.month || {};
+          var year = acc.year || {};
 
-          // încărcăm stats pentru contul curent
-          try {
-            const statsRes = await fetch('/tiktok/stats?account_id=' + encodeURIComponent(acc.account_id));
-            if (!statsRes.ok) throw new Error('HTTP ' + statsRes.status);
-            const stats = await statsRes.json();
+          card.innerHTML =
+            '<div>' +
+              '<div class="account-title">' + (acc.display_name || acc.account_id) + '</div>' +
+              '<div class="account-sub">Advertiser ID: ' + (acc.advertiser_id || '–') + '</div>' +
+            '</div>' +
+            '<div class="account-stats">' +
+              '<div class="stat-chip">' +
+                '<div class="stat-label">Azi</div>' +
+                '<div class="stat-value">' + formatMoney(today.spend, acc.currency) + '</div>' +
+                '<div class="stat-note">Rezultate: ' + formatInt(today.results) + '</div>' +
+              '</div>' +
+              '<div class="stat-chip">' +
+                '<div class="stat-label">Săptămână</div>' +
+                '<div class="stat-value">' + formatMoney(week.spend, acc.currency) + '</div>' +
+                '<div class="stat-note">Rezultate: ' + formatInt(week.results) + '</div>' +
+              '</div>' +
+              '<div class="stat-chip">' +
+                '<div class="stat-label">Lună</div>' +
+                '<div class="stat-value">' + formatMoney(month.spend, acc.currency) + '</div>' +
+                '<div class="stat-note">Rezultate: ' + formatInt(month.results) + '</div>' +
+              '</div>' +
+              '<div class="stat-chip">' +
+                '<div class="stat-label">An</div>' +
+                '<div class="stat-value">' + formatMoney(year.spend, acc.currency) + '</div>' +
+                '<div class="stat-note">Rezultate: ' + formatInt(year.results) + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="account-footer">' +
+              '<span class="tag">' + (debugInfo ? debugInfo : ('Token OK · ' + (acc.currency || ''))) + '</span>' +
+              '<button class="btn-view-campaigns" data-account-id="' + acc.account_id + '">Vezi campanii</button>' +
+            '</div>';
 
-            const curr = stats.currency || acc.currency || '';
+          accountsEl.appendChild(card);
+        });
 
-            updateStatLabel('stat-today-' + safeId,  stats.today  && stats.today.spend,  curr);
-            updateStatLabel('stat-week-' + safeId,   stats.week   && stats.week.spend,   curr);
-            updateStatLabel('stat-month-' + safeId,  stats.month  && stats.month.spend,  curr);
-            updateStatLabel('stat-year-' + safeId,   stats.year   && stats.year.spend,   curr);
-
-            if (!aggregate.currency && curr) aggregate.currency = curr;
-            if (typeof stats.today?.spend  === 'number') { aggregate.today  += stats.today.spend;  aggregate.haveData = true; }
-            if (typeof stats.week?.spend   === 'number') { aggregate.week   += stats.week.spend;   aggregate.haveData = true; }
-            if (typeof stats.month?.spend  === 'number') { aggregate.month  += stats.month.spend;  aggregate.haveData = true; }
-            if (typeof stats.year?.spend   === 'number') { aggregate.year   += stats.year.spend;   aggregate.haveData = true; }
-          } catch (err) {
-            console.error('load stats error for', acc.account_id, err);
-          }
-        }
-
-        // actualizăm panoul agregat
-        if (aggregate.haveData) {
-          const cur = aggregate.currency || '';
-          totalsTodayEl.textContent = aggregate.today.toFixed(2) + ' ' + cur;
-          totalsWeekEl.textContent  = aggregate.week.toFixed(2)  + ' ' + cur;
-          totalsMonthEl.textContent = aggregate.month.toFixed(2) + ' ' + cur;
-          totalsYearEl.textContent  = aggregate.year.toFixed(2)  + ' ' + cur;
-        } else {
-          totalsTodayEl.textContent = '—';
-          totalsWeekEl.textContent  = '—';
-          totalsMonthEl.textContent = '—';
-          totalsYearEl.textContent  = '—';
-        }
+        appendLog('Conturi TikTok încărcate (' + accounts.length + ').');
       } catch (err) {
-        console.error('loadAccountsAndStats error', err);
+        appendLog('Eroare la loadAccounts: ' + err.message);
+        accountsEl.innerHTML = '<div class="muted">Eroare la încărcarea conturilor TikTok.</div>';
+      } finally {
+        refreshAccountsBtn.disabled = false;
       }
     }
 
-    function updateStatLabel(id, value, currency) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      if (typeof value === 'number') {
-        el.textContent = value.toFixed(2) + ' ' + (currency || '');
-      } else {
-        el.textContent = '—';
+    async function loadCampaignsForAccount(accountId) {
+      try {
+        currentAccount = accountId;
+        campaignsWrapperEl.innerHTML = '<div class="muted" style="padding:8px 10px;">Încarc campaniile pentru ' + accountId + '...</div>';
+        currentAccountLabelEl.innerHTML = 'Cont selectat: <strong>' + accountId + '</strong>';
+
+        const res = await fetch('/api/marketing/accounts/' + encodeURIComponent(accountId) + '/campaigns');
+        if (!res.ok) {
+          const txt = await res.text();
+          appendLog('Eroare la loadCampaigns (' + accountId + '): HTTP ' + res.status + ' ' + txt);
+          campaignsWrapperEl.innerHTML = '<div class="muted" style="padding:8px 10px;">Eroare la încărcarea campaniilor.</div>';
+          return;
+        }
+
+        const data = await res.json();
+        const campaigns = data.campaigns || [];
+
+        if (!campaigns.length) {
+          campaignsWrapperEl.innerHTML = '<div class="muted" style="padding:8px 10px;">Nu există campanii pentru acest cont.</div>';
+          appendLog('Nicio campanie retur pentru account ' + accountId);
+          return;
+        }
+
+        var rowsHtml = campaigns.map(function (c) {
+          var statusUpper = String(c.status || '').toUpperCase();
+          var isActive = statusUpper.includes('ACTIVE');
+
+          return (
+            '<tr>' +
+              '<td>' +
+                '<div class="metric-strong">' + (c.name || '(fără nume)') + '</div>' +
+                '<div class="metric-muted">ID: ' + (c.id || '–') + '</div>' +
+              '</td>' +
+              '<td>' +
+                '<span class="' + statusClass(c.status) + '">' + (c.status || 'UNKNOWN') + '</span>' +
+              '</td>' +
+              '<td>' + (c.objective || '–') + '</td>' +
+              '<td>' + (c.daily_budget != null ? c.daily_budget : '–') + '</td>' +
+              '<td>' + (c.today_spend != null ? c.today_spend.toFixed(2) : '–') + '</td>' +
+              '<td>' + (c.today_results != null ? c.today_results : '–') + '</td>' +
+              '<td>' + (c.cpa != null ? c.cpa.toFixed(2) : '–') + '</td>' +
+              '<td>' +
+                '<div class="campaign-actions">' +
+                  '<button ' +
+                    'class="secondary btn-act" ' +
+                    'data-campaign-id="' + c.id + '" ' +
+                    'data-action="' + (isActive ? 'pause' : 'resume') + '"' +
+                  '>' + (isActive ? 'Pauză' : 'Pornește') + '</button>' +
+                  '<button ' +
+                    'class="secondary btn-act" ' +
+                    'data-campaign-id="' + c.id + '" ' +
+                    'data-action="budget_up_20" ' +
+                    'data-current-budget="' + (c.daily_budget != null ? c.daily_budget : '') + '"' +
+                  '>+20% buget</button>' +
+                '</div>' +
+              '</td>' +
+            '</tr>'
+          );
+        }).join('');
+
+        var tableHtml =
+          '<table>' +
+            '<thead>' +
+              '<tr>' +
+                '<th>Campanie</th>' +
+                '<th>Status</th>' +
+                '<th>Obiectiv</th>' +
+                '<th>Buget zilnic</th>' +
+                '<th>Spend azi</th>' +
+                '<th>Rezultate azi</th>' +
+                '<th>CPA (approx)</th>' +
+                '<th>Acțiuni</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + rowsHtml + '</tbody>' +
+          '</table>';
+
+        campaignsWrapperEl.innerHTML = tableHtml;
+
+        appendLog('Campanii încărcate pentru account ' + accountId + ' (' + campaigns.length + ').');
+      } catch (err) {
+        appendLog('Eroare la loadCampaignsForAccount: ' + err.message);
+        campaignsWrapperEl.innerHTML = '<div class="muted" style="padding:8px 10px;">Eroare la încărcarea campaniilor.</div>';
       }
     }
 
-    // delegare acțiuni butoane
-    accountsContainer.addEventListener('click', async function (e) {
+    // delegare click pe conturi
+    accountsEl.addEventListener('click', function (e) {
       var btn = e.target;
       if (!(btn instanceof HTMLButtonElement)) return;
+      if (!btn.classList.contains('btn-view-campaigns')) return;
 
       var accountId = btn.getAttribute('data-account-id');
-      var type = btn.getAttribute('data-type');
-      if (!accountId || !type) return;
+      if (!accountId) return;
+
+      loadCampaignsForAccount(accountId);
+    });
+
+    // delegare click pe acțiuni campanie
+    campaignsWrapperEl.addEventListener('click', async function (e) {
+      var btn = e.target;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      if (!btn.classList.contains('btn-act')) return;
+
+      if (!currentAccount) {
+        appendLog('Nu există cont selectat pentru acțiuni campanii.');
+        return;
+      }
+
+      var campaignId = btn.getAttribute('data-campaign-id');
+      var action = btn.getAttribute('data-action');
+      var currentBudgetStr = btn.getAttribute('data-current-budget');
+      var currentBudget = currentBudgetStr ? Number(currentBudgetStr) : null;
 
       btn.disabled = true;
+
       try {
-        await fetch('/tiktok/action', {
+        var body = {
+          account_id: currentAccount,
+          action: action,
+        };
+
+        if (action === 'budget_up_20') {
+          body.value = currentBudget;
+        }
+
+        appendLog('Aplic acțiune "' + action + '" pe campanie ' + campaignId + ' (account ' + currentAccount + ').');
+
+        var res = await fetch('/api/marketing/campaigns/' + encodeURIComponent(campaignId) + '/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: accountId, type: type })
+          body: JSON.stringify(body),
         });
-        alert('Acțiune trimisă: ' + type + ' pentru ' + accountId);
+
+        var txt = await res.text();
+        if (!res.ok) {
+          appendLog('Eroare la acțiune campanie: HTTP ' + res.status + ' ' + txt);
+          return;
+        }
+
+        appendLog('Acțiune campanie OK: ' + txt);
+
+        // după acțiune, reîncărcăm campaniile pentru contul curent
+        loadCampaignsForAccount(currentAccount);
       } catch (err) {
-        console.error('tiktok action error', err);
-        alert('Eroare la acțiune: ' + err.message);
+        appendLog('Eroare la aplicarea acțiunii: ' + err.message);
       } finally {
         btn.disabled = false;
       }
     });
 
-    // init + auto-refresh la 60s
-    loadAccountsAndStats();
-    setInterval(loadAccountsAndStats, 60000);
+    refreshAccountsBtn.addEventListener('click', loadAccounts);
+
+    // init
+    loadAccounts();
   </script>
 </body>
 </html>
