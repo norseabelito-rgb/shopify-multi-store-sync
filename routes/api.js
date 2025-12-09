@@ -256,7 +256,6 @@ router.get('/preview', async (req, res) => {
       loadSheet(spreadsheetId, 'Products'),
       loadSheet(spreadsheetId, 'Stores'),
       loadSheet(spreadsheetId, 'Product_Store'),
-      loadSheet(spreadsheetId, 'TikTokAccounts'),
     ]);
 
     const products = productsSheet.rows;
