@@ -32,6 +32,7 @@ function dashboardPage() {
         linear-gradient(180deg, #06070f, #05060c);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      transition: background 0.18s ease;
     }
 
     h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.01em; }
@@ -44,13 +45,23 @@ function dashboardPage() {
       color: var(--accent);
     }
 
-    .page-shell {
+    .app-shell {
       max-width: 1200px;
       margin: 0 auto 56px;
+      position: relative;
+    }
+
+    .page-shell {
       display: flex;
       flex-direction: column;
       gap: 16px;
       transition: filter 0.18s ease, transform 0.18s ease;
+    }
+
+    body.menu-open .page-shell {
+      filter: blur(4px);
+      transform: scale(0.99);
+      transform-origin: 50% 0;
     }
 
     .hero {
@@ -518,7 +529,8 @@ function dashboardPage() {
       accent-color: #5c8bff;
     }
 
-    /* card sumar comenzi (toate magazinele) */
+    /* CARD SUMAR COMENZI TOATE MAGAZINELE */
+
     .store-summary {
       background: radial-gradient(circle at 0 0, rgba(92, 139, 255, 0.35), rgba(10, 14, 26, 0.96));
       border-color: rgba(92, 139, 255, 0.65);
@@ -567,12 +579,7 @@ function dashboardPage() {
       color: #f3f4ff;
     }
 
-    /* APP SHELL & SIDEBAR */
-
-    .app-shell {
-      position: relative;
-      min-height: 100vh;
-    }
+    /* SIDEBAR + BURGER */
 
     .sidebar-toggle {
       position: fixed;
@@ -586,6 +593,7 @@ function dashboardPage() {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
       gap: 4px;
       cursor: pointer;
       padding: 0;
@@ -643,18 +651,11 @@ function dashboardPage() {
       display: flex;
       flex-direction: column;
       padding: 18px 16px 16px;
-      gap: 16px;
+      gap: 12px;
     }
 
     body.menu-open .sidebar {
       transform: translateX(0);
-    }
-
-    body.menu-open .page-shell {
-      filter: blur(4px);
-      transform: scale(0.99);
-      transform-origin: 50% 0;
-      transition: filter 0.18s ease, transform 0.18s ease;
     }
 
     .sidebar-header {
@@ -662,6 +663,7 @@ function dashboardPage() {
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      margin-bottom: 8px;
     }
 
     .sidebar-title {
@@ -674,45 +676,25 @@ function dashboardPage() {
     .sidebar-close {
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.15);
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       background: rgba(3, 5, 15, 0.9);
       color: #e5ebff;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
     }
 
-    .sidebar-section-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #9ca4c0;
-      margin-bottom: 4px;
-    }
-
-    .sidebar-store-select {
-      width: 100%;
-      padding: 7px 9px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(9, 11, 20, 0.95);
-      color: #e5ebff;
-      font-size: 12px;
-    }
-
     .sidebar-nav {
-      margin-top: 4px;
       display: flex;
       flex-direction: column;
       gap: 4px;
       font-size: 13px;
     }
 
-    .nav-item,
-    .nav-sub-item {
+    .nav-item {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -724,22 +706,9 @@ function dashboardPage() {
       border: 1px solid transparent;
     }
 
-    .nav-item:hover,
-    .nav-sub-item:hover {
+    .nav-item:hover {
       background: rgba(92, 139, 255, 0.12);
       border-color: rgba(92, 139, 255, 0.35);
-    }
-
-    .nav-item.active {
-      background: linear-gradient(135deg, #5c8bff, #49c7ff);
-      color: #050711;
-      box-shadow: 0 10px 28px rgba(92, 139, 255, 0.55);
-    }
-
-    .nav-sub-item {
-      font-size: 12px;
-      padding-left: 26px;
-      color: #a9b4d4;
     }
 
     .nav-icon {
@@ -747,14 +716,6 @@ function dashboardPage() {
       text-align: center;
       font-size: 13px;
       opacity: 0.9;
-    }
-
-    .nav-group-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: #858fb0;
-      margin: 8px 0 2px;
     }
 
     @media (max-width: 640px) {
@@ -769,72 +730,32 @@ function dashboardPage() {
   </style>
 </head>
 <body>
+  <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Deschide meniul principal">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Control Center</div>
+      <button class="sidebar-close" id="sidebar-close" aria-label="Închide">×</button>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item"><span class="nav-icon">🏠</span><span>Home</span></div>
+      <div class="nav-item"><span class="nav-icon">🏬</span><span>My Stores</span></div>
+      <div class="nav-item"><span class="nav-icon">📣</span><span>Ads</span></div>
+      <div class="nav-item"><span class="nav-icon">📦</span><span>Orders</span></div>
+      <div class="nav-item"><span class="nav-icon">🚚</span><span>Shipping</span></div>
+      <div class="nav-item"><span class="nav-icon">📊</span><span>Inventory</span></div>
+      <div class="nav-item"><span class="nav-icon">💬</span><span>Helpdesk</span></div>
+      <div class="nav-item"><span class="nav-icon">⚙️</span><span>Settings</span></div>
+    </nav>
+  </aside>
+
   <div class="app-shell">
-    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Deschide meniul principal">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
-
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-title">Control Center</div>
-        <button class="sidebar-close" id="sidebar-close" aria-label="Închide meniul">×</button>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-section-label">Magazin focus</div>
-        <select id="sidebar-store-select" class="sidebar-store-select">
-          <option value="__all__">Toate magazinele</option>
-        </select>
-      </div>
-
-      <nav class="sidebar-nav">
-        <div class="nav-group">
-          <a href="#" class="nav-item active" data-nav="home">
-            <span class="nav-icon">🏠</span>
-            <span>Home</span>
-          </a>
-          <a href="#" class="nav-item" data-nav="stores">
-            <span class="nav-icon">🏬</span>
-            <span>My Stores</span>
-          </a>
-        </div>
-
-        <div class="nav-group">
-          <div class="nav-group-label">Ads</div>
-          <a href="#" class="nav-sub-item" data-nav="ads-tiktok">TikTok Ads</a>
-          <a href="#" class="nav-sub-item" data-nav="ads-meta">Meta Ads</a>
-          <a href="#" class="nav-sub-item" data-nav="ads-google">Google Ads</a>
-        </div>
-
-        <div class="nav-group">
-          <a href="#" class="nav-item" data-nav="orders">
-            <span class="nav-icon">📦</span>
-            <span>Orders</span>
-          </a>
-          <a href="#" class="nav-item" data-nav="shipping">
-            <span class="nav-icon">🚚</span>
-            <span>Shipping</span>
-          </a>
-          <a href="#" class="nav-item" data-nav="inventory">
-            <span class="nav-icon">📊</span>
-            <span>Inventory</span>
-          </a>
-          <a href="#" class="nav-item" data-nav="helpdesk">
-            <span class="nav-icon">💬</span>
-            <span>Helpdesk</span>
-          </a>
-          <a href="#" class="nav-item" data-nav="settings">
-            <span class="nav-icon">⚙️</span>
-            <span>Settings</span>
-          </a>
-        </div>
-      </nav>
-    </aside>
-
-    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-
     <div class="page-shell">
       <header class="hero">
         <div>
@@ -922,7 +843,41 @@ function dashboardPage() {
   </div>
 
   <script>
-    // Elemente globale
+    // Sidebar toggle
+    (function () {
+      var toggle = document.getElementById('sidebar-toggle');
+      var backdrop = document.getElementById('sidebar-backdrop');
+      var closeBtn = document.getElementById('sidebar-close');
+
+      function openMenu() { document.body.classList.add('menu-open'); }
+      function closeMenu() { document.body.classList.remove('menu-open'); }
+
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          if (document.body.classList.contains('menu-open')) {
+            closeMenu();
+          } else {
+            openMenu();
+          }
+        });
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener('click', closeMenu);
+      }
+
+      if (closeBtn) {
+        closeBtn.addEventListener('click', closeMenu);
+      }
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeMenu();
+        }
+      });
+    })();
+
+    // Elemente globale existente
     var logEl = document.getElementById('log');
     var storesEl = document.getElementById('stores');
     var previewContainer = document.getElementById('preview-results');
@@ -937,12 +892,6 @@ function dashboardPage() {
     var loadingExtraEl = document.getElementById('loading-extra');
     var loadingEtaEl = document.getElementById('loading-eta');
 
-    var sidebarToggle = document.getElementById('sidebar-toggle');
-    var sidebarClose = document.getElementById('sidebar-close');
-    var sidebarBackdrop = document.getElementById('sidebar-backdrop');
-    var sidebarStoreSelect = document.getElementById('sidebar-store-select');
-    var navItems = document.querySelectorAll('.nav-item, .nav-sub-item');
-
     // State
     var currentPreviewItems = [];
     var currentStoreId = null;
@@ -953,59 +902,6 @@ function dashboardPage() {
     var loadingInterval = null;
     var loadingStartTime = 0;
     var loadingTotalMs = 0;
-
-    // Sidebar toggle + nav
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', function () {
-        document.body.classList.add('menu-open');
-      });
-    }
-    if (sidebarClose) {
-      sidebarClose.addEventListener('click', function () {
-        document.body.classList.remove('menu-open');
-      });
-    }
-    if (sidebarBackdrop) {
-      sidebarBackdrop.addEventListener('click', function () {
-        document.body.classList.remove('menu-open');
-      });
-    }
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        document.body.classList.remove('menu-open');
-      }
-    });
-
-    if (navItems && navItems.length) {
-      navItems.forEach(function (item) {
-        item.addEventListener('click', function (evt) {
-          if (item.getAttribute('href') === '#') {
-            evt.preventDefault();
-          }
-          navItems.forEach(function (it) { it.classList.remove('active'); });
-          if (item.classList.contains('nav-item')) {
-            item.classList.add('active');
-          }
-          var navKey = item.getAttribute('data-nav') || '';
-          if (navKey) {
-            appendLog('Navigare meniu: ' + navKey);
-          }
-          document.body.classList.remove('menu-open');
-        });
-      });
-    }
-
-    if (sidebarStoreSelect) {
-      sidebarStoreSelect.addEventListener('change', function () {
-        var val = sidebarStoreSelect.value;
-        if (!val || val === '__all__') {
-          appendLog('Magazin focus: toate magazinele.');
-        } else {
-          appendLog('Magazin focus: ' + val);
-        }
-      });
-    }
 
     function appendLog(text) {
       var ts = new Date().toISOString();
@@ -1087,33 +983,12 @@ function dashboardPage() {
       }
     }
 
-    // Load stores (numai desenează cardurile + stats)
+    // Load stores + sumar comenzi toate magazinele
     async function loadStores() {
       try {
         var res = await fetch('/stores');
         if (!res.ok) throw new Error('HTTP ' + res.status);
         var data = await res.json();
-
-        // actualizăm și dropdown-ul din sidebar cu lista de magazine
-        if (sidebarStoreSelect) {
-          var prevVal = sidebarStoreSelect.value || '__all__';
-          sidebarStoreSelect.innerHTML = '<option value="__all__">Toate magazinele</option>';
-          data.forEach(function (store) {
-            var opt = document.createElement('option');
-            opt.value = store.store_id || '';
-            opt.textContent = store.store_name || store.store_id || store.shopify_domain || 'Store';
-            sidebarStoreSelect.appendChild(opt);
-          });
-          var foundPrev = false;
-          for (var i = 0; i < sidebarStoreSelect.options.length; i++) {
-            if (sidebarStoreSelect.options[i].value === prevVal) {
-              foundPrev = true;
-              break;
-            }
-          }
-          sidebarStoreSelect.value = foundPrev ? prevVal : '__all__';
-        }
-
         storesEl.innerHTML = '';
 
         var totalToday = 0;
@@ -1176,7 +1051,6 @@ function dashboardPage() {
             '</div>';
         });
 
-        // card sumar comenzi toate magazinele
         var summaryCard =
           '<div class="store-card store-summary">' +
             '<div class="store-header">' +
