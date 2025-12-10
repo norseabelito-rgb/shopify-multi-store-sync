@@ -1073,7 +1073,7 @@ function dashboardPage() {
           '</div>';
       }
 
-      function renderMyStoresCards(stores) {
+            function renderMyStoresCards(stores) {
         if (!stores.length) {
           myEmpty.style.display = 'block';
           myGridWrapper.innerHTML = '';
@@ -1081,13 +1081,28 @@ function dashboardPage() {
           renderExecHeader(null);
           return;
         }
+
         myEmpty.style.display = 'none';
 
+        // Dacă avem UN singur magazin în context:
+        // - afișăm DOAR header-ul executiv
+        // - sub el lăsăm un placeholder pentru viitoare acțiuni
         if (stores.length === 1) {
-          renderExecHeader(stores[0]);
-        } else {
-          renderExecHeader(null);
+          const store = stores[0];
+          renderExecHeader(store);
+
+          myGridWrapper.innerHTML = '';
+          const info = document.createElement('div');
+          info.className = 'muted';
+          info.style.marginTop = '8px';
+          info.textContent =
+            'Aici vei putea adăuga acțiuni rapide pentru acest magazin (de ex. verificare produse, sync, marketing etc.).';
+          myGridWrapper.appendChild(info);
+          return;
         }
+
+        // Mai multe magazine -> nu mai arătăm header-ul executiv, ci doar cardurile
+        renderExecHeader(null);
 
         const grid = document.createElement('div');
         grid.className = 'stores-grid';
@@ -1123,14 +1138,20 @@ function dashboardPage() {
         myGridWrapper.appendChild(grid);
       }
 
-      async function loadStores() {
+            async function loadStores() {
         try {
           const res = await fetch('/stores');
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           const allStores = Array.isArray(data) ? data : [];
 
-          // populate dropdown
+          // --- REBUILD dropdown-ul de context, fără să duplicăm opțiunile ---
+          storeContextSelect.innerHTML = '';
+          const optAll = document.createElement('option');
+          optAll.value = 'all';
+          optAll.textContent = 'All stores';
+          storeContextSelect.appendChild(optAll);
+
           allStores.forEach((s) => {
             const opt = document.createElement('option');
             opt.value = s.store_id;
@@ -1138,7 +1159,17 @@ function dashboardPage() {
             storeContextSelect.appendChild(opt);
           });
 
-          if (!selectedStoreId) selectedStoreId = 'all';
+          // dacă store-ul selectat nu mai există, revenim la "all"
+          if (
+            !selectedStoreId ||
+            (selectedStoreId !== 'all' &&
+              !allStores.some(
+                (s) => String(s.store_id) === String(selectedStoreId)
+              ))
+          ) {
+            selectedStoreId = 'all';
+          }
+
           storeContextSelect.value = selectedStoreId;
 
           let visibleStores = allStores;
