@@ -546,7 +546,7 @@ function dashboardPage() {
         display: none;
       }
       .app-shell {
-        padding-left: 260px;
+        padding-left: 0; /* nu mai împingem conținutul în dreapta */
       }
       .burger-btn {
         display: none;
@@ -863,7 +863,7 @@ function dashboardPage() {
       }
 
       function loadStoresSummary() {
-        fetch('/api/stores')
+        fetch('/stores')
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();

@@ -1210,4 +1210,4 @@ function shopifyPage() {
   `;
 }
 
-module.exports = dashboardPage;
+module.exports = shopifyPage;
