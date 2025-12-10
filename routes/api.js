@@ -396,6 +396,7 @@ function normalizeOrderListEntry(order, store) {
     id: order.id,
     store_id: store.store_id,
     store_name: store.store_name || store.store_id,
+    shopify_domain: store.shopify_domain || '',
     name: order.name || `#${order.order_number || order.id}`,
     created_at: order.created_at,
     customer_name: customerName || 'Guest',
@@ -412,6 +413,7 @@ function normalizeOrderListEntry(order, store) {
 async function fetchOrdersForStoreWithFilters(store, filters) {
   const storeId = store.store_id;
   const domain = String(store.shopify_domain || '').trim();
+  const storeWithDomain = { ...store, shopify_domain: domain };
 
   if (!domain) {
     console.warn('[orders] shopify_domain lipsă pentru store', storeId);
@@ -459,7 +461,7 @@ async function fetchOrdersForStoreWithFilters(store, filters) {
     const orders = data.orders || [];
     return orders
       .filter((o) => orderMatchesQuery(o, q))
-      .map((o) => normalizeOrderListEntry(o, store));
+      .map((o) => normalizeOrderListEntry(o, storeWithDomain));
   } catch (err) {
     console.error('[orders] eroare la fetch pentru store', storeId, err);
     return [];
@@ -487,6 +489,8 @@ function normalizeOrderDetail(order, store) {
     price: safePrice(li.price),
     total: safePrice(li.price) * (li.quantity || 0),
     fulfillment_status: li.fulfillment_status || null,
+    image_src:
+      (li.image && (li.image.src || li.image.original_src)) || li.image || null,
   }));
   const itemsCount = mappedLineItems.reduce((acc, li) => acc + (li.quantity || 0), 0);
 
@@ -503,6 +507,7 @@ function normalizeOrderDetail(order, store) {
     total_price: safePrice(order.total_price || order.current_total_price),
     total_tax: safePrice(order.total_tax || order.current_total_tax),
     total_discounts: safePrice(order.total_discounts),
+    shopify_domain: store.shopify_domain || '',
     financial_status: order.financial_status || null,
     fulfillment_status: order.fulfillment_status || null,
     payment_gateway_names: order.payment_gateway_names || [],
@@ -660,7 +665,7 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const normalized = normalizeOrderDetail(detail, store);
+    const normalized = normalizeOrderDetail(detail, { ...store, shopify_domain: domain });
     res.json({ order: normalized });
   } catch (err) {
     console.error('/orders detail error', { storeId, orderId, err });

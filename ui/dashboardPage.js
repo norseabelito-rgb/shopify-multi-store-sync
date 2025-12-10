@@ -37,11 +37,14 @@ function dashboardPage() {
         linear-gradient(150deg, #020617, #020617 40%, #020617);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
     }
 
     .app-shell {
       display: flex;
       min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
 
     /* SIDEBAR */
@@ -56,6 +59,9 @@ function dashboardPage() {
       display: flex;
       flex-direction: column;
       gap: 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
     }
 
     .sidebar-header {
@@ -181,6 +187,8 @@ function dashboardPage() {
     .main {
       flex: 1;
       padding: 20px 26px 26px;
+      height: 100vh;
+      overflow-y: auto;
     }
 
     .main-inner {
@@ -575,6 +583,11 @@ function dashboardPage() {
       align-items: center;
       gap: 10px;
       margin-bottom: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: linear-gradient(180deg, rgba(11,15,25,0.98), rgba(11,15,25,0.96));
+      padding-bottom: 8px;
     }
 
     .orders-search {
@@ -638,6 +651,12 @@ function dashboardPage() {
 
     .orders-table-wrapper {
       position: relative;
+      max-height: calc(100vh - 320px);
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.9);
+      background: radial-gradient(circle at 0% 0%, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.98));
+      min-height: 180px;
     }
 
     .orders-table-wrapper table tbody tr {
@@ -709,6 +728,17 @@ function dashboardPage() {
       color: var(--muted);
     }
 
+    .orders-limit {
+      min-width: 120px;
+    }
+    .orders-limit select {
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: var(--text);
+      font-size: 12px;
+    }
+
     .drawer-backdrop {
       position: fixed;
       inset: 0;
@@ -724,25 +754,46 @@ function dashboardPage() {
       pointer-events: auto;
     }
 
-    .details-drawer {
+    .drawer-stack {
       position: fixed;
       top: 0;
       right: 0;
       height: 100vh;
+      display: flex;
+      align-items: stretch;
+      justify-content: flex-end;
+      gap: 0;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    .drawer-panel {
       width: 420px;
       max-width: 92vw;
       background: rgba(11, 15, 25, 0.98);
       border-left: 1px solid var(--border);
       box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
       transform: translateX(100%);
-      transition: transform 0.28s ease;
-      z-index: 30;
+      transition: transform 0.28s ease, opacity 0.28s ease;
       display: flex;
       flex-direction: column;
+      pointer-events: auto;
+      opacity: 0;
     }
 
-    .details-drawer.open {
-      transform: translateX(0);
+    .drawer-panel.open {
+      transform: translateX(var(--drawer-shift, 0));
+      opacity: 1;
+    }
+
+    .drawer-panel:not(:last-child) {
+      box-shadow: -8px 0 24px rgba(0,0,0,0.35);
+    }
+
+    .drawer-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
     }
 
     .drawer-header {
@@ -817,9 +868,27 @@ function dashboardPage() {
       border-bottom: 0;
     }
 
+    .line-item-left {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .line-thumb {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.22), rgba(15, 23, 42, 0.9));
+      background-size: cover;
+      background-position: center;
+      flex-shrink: 0;
+    }
+
     .line-item-title {
       font-weight: 500;
       font-size: 12px;
+      text-align: left;
     }
 
     .link-inline {
@@ -857,6 +926,12 @@ function dashboardPage() {
     .stat-card-mini .value {
       font-size: 14px;
       font-weight: 600;
+    }
+
+    .btn-ghost {
+      border-color: var(--border);
+      background: rgba(15, 23, 42, 0.82);
+      color: #e5e7eb;
     }
   </style>
 </head>
@@ -1188,6 +1263,15 @@ function dashboardPage() {
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </label>
+                <label class="filter-chip orders-limit">
+                  <span>Show</span>
+                  <select id="orders-limit">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                  </select>
+                </label>
               </div>
             </div>
 
@@ -1280,13 +1364,7 @@ function dashboardPage() {
   </div>
 
   <div id="drawer-backdrop" class="drawer-backdrop"></div>
-  <aside id="details-drawer" class="details-drawer" aria-hidden="true">
-    <div class="drawer-header">
-      <div class="drawer-title" id="drawer-title">Details</div>
-      <button id="drawer-close" class="btn">Close</button>
-    </div>
-    <div class="drawer-body" id="drawer-body"></div>
-  </aside>
+  <div id="drawer-stack" class="drawer-stack" aria-hidden="true"></div>
 
   <script>
     (function () {
@@ -1321,6 +1399,7 @@ function dashboardPage() {
       const ordersStatusSelect = document.getElementById('orders-status');
       const ordersFromInput = document.getElementById('orders-from');
       const ordersToInput = document.getElementById('orders-to');
+      const ordersLimitSelect = document.getElementById('orders-limit');
       const ordersMeta = document.getElementById('orders-meta');
       const ordersLoading = document.getElementById('orders-loading');
       const ordersEmpty = document.getElementById('orders-empty');
@@ -1328,11 +1407,8 @@ function dashboardPage() {
       const ordersTableBody = document.getElementById('orders-tbody');
       const defaultOrdersEmptyHTML = ordersEmpty ? ordersEmpty.innerHTML : '';
 
-      const drawerEl = document.getElementById('details-drawer');
+      const drawerStackEl = document.getElementById('drawer-stack');
       const drawerBackdrop = document.getElementById('drawer-backdrop');
-      const drawerTitleEl = document.getElementById('drawer-title');
-      const drawerBodyEl = document.getElementById('drawer-body');
-      const drawerCloseBtn = document.getElementById('drawer-close');
 
       const ordersState = {
         items: [],
@@ -1349,6 +1425,7 @@ function dashboardPage() {
       let ordersDirty = true;
       const orderDetailsCache = new Map();
       let activeOrderDetail = null;
+      const drawerState = { panels: [] };
 
       function formatNumber(n) {
         if (n == null || isNaN(n)) return '–';
@@ -1461,6 +1538,10 @@ function dashboardPage() {
           selectedStoreId === 'all' ? 'All stores' : selectedStoreId;
         contextLabelEl.textContent = contextText;
         storeContextLive.textContent = contextText;
+
+        if (view !== 'orders') {
+          closeAllPanels();
+        }
 
         if (view === 'orders' && ordersDirty) {
           loadOrders();
@@ -1633,7 +1714,14 @@ function dashboardPage() {
           ? ' · search: "' + ordersState.filters.q + '"'
           : '';
         ordersMeta.textContent =
-          'Afișăm ' + (count || 0) + ' comenzi pentru ' + contextText + statusText + searchText;
+          'Afișăm ' +
+          (count || 0) +
+          ' comenzi pentru ' +
+          contextText +
+          statusText +
+          searchText +
+          ' · limită ' +
+          ordersState.filters.limit;
       }
 
       function renderOrdersTable() {
@@ -1732,23 +1820,44 @@ function dashboardPage() {
         });
       }
 
-      function openDrawer() {
-        drawerEl.classList.add('open');
-        drawerBackdrop.classList.add('visible');
-        drawerEl.setAttribute('aria-hidden', 'false');
+      function buildShopifyUrl(type, payload, domainOverride) {
+        const domain = domainOverride || (payload && payload.shopify_domain);
+        if (!domain) return null;
+        if (type === 'order' && payload && payload.id) {
+          return 'https://' + domain + '/admin/orders/' + payload.id;
+        }
+        if (type === 'customer' && payload && payload.customer && payload.customer.id) {
+          return 'https://' + domain + '/admin/customers/' + payload.customer.id;
+        }
+        if (type === 'product' && payload && payload.product_id) {
+          return 'https://' + domain + '/admin/products/' + payload.product_id;
+        }
+        return null;
       }
 
-      function closeDrawer() {
-        drawerEl.classList.remove('open');
-        drawerBackdrop.classList.remove('visible');
-        drawerEl.setAttribute('aria-hidden', 'true');
-        drawerTitleEl.textContent = 'Details';
-        drawerBodyEl.innerHTML = '';
+      function setPanels(panels) {
+        drawerState.panels = panels.slice(0, 3);
+        if (!drawerState.panels.length) {
+          activeOrderDetail = null;
+        }
+        renderDrawerStack();
       }
 
-      function renderOrderDetail(detail) {
-        activeOrderDetail = detail;
-        drawerTitleEl.textContent = detail.name || 'Order';
+      function closePanelsFrom(index) {
+        drawerState.panels = drawerState.panels.slice(0, index);
+        if (!drawerState.panels.length) {
+          activeOrderDetail = null;
+        }
+        renderDrawerStack();
+      }
+
+      function closeAllPanels() {
+        drawerState.panels = [];
+        activeOrderDetail = null;
+        renderDrawerStack();
+      }
+
+      function renderOrderPanelContent(detail) {
         const statusHtml = [
           detail.financial_status ? statusPill(detail.financial_status) : '',
           detail.fulfillment_status ? statusPill(detail.fulfillment_status) : '',
@@ -1772,18 +1881,28 @@ function dashboardPage() {
           (detail.line_items || [])
             .map((li) => {
               const total = li.total || li.price * (li.quantity || 0);
+              const safeImg = li.image_src
+                ? String(li.image_src).replace(/"/g, '%22').replace(/'/g, '%27')
+                : '';
+              const thumb =
+                '<div class="line-thumb"' +
+                (safeImg ? ' style="background-image:url(\'' + safeImg + '\');"' : '') +
+                '></div>';
               return (
                 '<div class="line-item">' +
-                  '<div>' +
-                    '<div class="line-item-title">' +
-                      '<button class="link-inline order-product-link" ' +
-                        'data-product-id="' + escapeHtml(li.product_id || '') + '" ' +
-                        'data-product-title="' + escapeHtml(li.title || '') + '" ' +
-                        'data-product-sku="' + escapeHtml(li.sku || '') + '" ' +
-                        'data-product-price="' + (li.price || 0) + '"' +
-                      '>' +
-                        escapeHtml(li.title || 'Product') +
-                      '</button>' +
+                  '<div class="line-item-left">' +
+                    thumb +
+                    '<div>' +
+                      '<div class="line-item-title">' +
+                        '<button class="link-inline order-product-link" ' +
+                          'data-product-id="' + escapeHtml(li.product_id || '') + '" ' +
+                          'data-product-title="' + escapeHtml(li.title || '') + '" ' +
+                          'data-product-sku="' + escapeHtml(li.sku || '') + '" ' +
+                          'data-product-price="' + (li.price || 0) + '"' +
+                        '>' +
+                          escapeHtml(li.title || 'Product') +
+                        '</button>' +
+                      '</div>' +
                       (li.sku ? '<div class="order-sub">SKU: ' + escapeHtml(li.sku) + '</div>' : '') +
                     '</div>' +
                   '</div>' +
@@ -1813,80 +1932,78 @@ function dashboardPage() {
             '</div>'
           : '<div class="order-sub">Guest checkout</div>';
 
-        drawerBodyEl.innerHTML =
-          '<div class="drawer-section">' +
-            '<div class="kv-row"><span>Store</span><strong>' +
-              escapeHtml(detail.store_name || detail.store_id || '') +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Placed</span><strong>' +
-              formatDateTime(detail.created_at) +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Total</span><strong>' +
-              formatMoney(detail.total_price, detail.currency) +
-            '</strong></div>' +
-            (statusHtml
-              ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
-                statusHtml +
-                '</div>'
-              : '') +
-          '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Customer</div>' +
-            customerBlock +
-            '<div class="order-sub" style="margin-top:6px;">' +
-              escapeHtml(formatAddress(detail.shipping_address || detail.billing_address)) +
+        const orderUrl = buildShopifyUrl('order', detail);
+
+        const bodyHtml = detail.error
+          ? '<div class="orders-empty-inline">Nu am putut încărca comanda.<br />' +
+            escapeHtml(detail.error) +
+            '</div>'
+          : detail._loading
+          ? '<div class="orders-empty-inline">Se încarcă detaliile comenzii...</div>'
+          : '<div class="drawer-section">' +
+              '<div class="kv-row"><span>Store</span><strong>' +
+                escapeHtml(detail.store_name || detail.store_id || '') +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Placed</span><strong>' +
+                formatDateTime(detail.created_at) +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Total</span><strong>' +
+                formatMoney(detail.total_price, detail.currency) +
+              '</strong></div>' +
+              (statusHtml
+                ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
+                  statusHtml +
+                  '</div>'
+                : '') +
+            '</div>' +
+            '<div class="drawer-section">' +
+              '<div class="section-heading">Customer</div>' +
+              customerBlock +
+              '<div class="order-sub" style="margin-top:6px;">' +
+                escapeHtml(formatAddress(detail.shipping_address || detail.billing_address)) +
+              '</div>' +
+            '</div>' +
+            '<div class="drawer-section">' +
+              '<div class="section-heading">Items</div>' +
+              itemsHtml +
+            '</div>' +
+            '<div class="drawer-section">' +
+              '<div class="section-heading">Shipping & Payment</div>' +
+              '<div class="kv-row"><span>Shipping</span><strong>' +
+                escapeHtml(shippingText) +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Payment</span><strong>' +
+                escapeHtml(gateway) +
+              '</strong></div>' +
+            '</div>';
+
+        return (
+          '<div class="drawer-header">' +
+            '<div>' +
+              '<div class="drawer-title">' + escapeHtml(detail.name || 'Order') + '</div>' +
+              '<div class="order-sub">' +
+                escapeHtml(detail.store_name || detail.store_id || '') +
+                ' · ' +
+                (detail.created_at ? formatDateTime(detail.created_at) : '') +
+              '</div>' +
+            '</div>' +
+            '<div class="drawer-actions">' +
+              (orderUrl
+                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                  escapeHtml(orderUrl) +
+                  '">Deschide în Shopify</a>'
+                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+              '<button class="btn" data-action="close-panel">Close</button>' +
             '</div>' +
           '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Items</div>' +
-            itemsHtml +
-          '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Shipping & Payment</div>' +
-            '<div class="kv-row"><span>Shipping</span><strong>' +
-              escapeHtml(shippingText) +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Payment</span><strong>' +
-              escapeHtml(gateway) +
-            '</strong></div>' +
-          '</div>';
-
-        const customerBtn = drawerBodyEl.querySelector('[data-action="view-customer"]');
-        if (customerBtn) {
-          customerBtn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            openCustomerPanel(detail);
-          });
-        }
-        drawerBodyEl.querySelectorAll('.order-product-link').forEach((btn) => {
-          btn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const product = {
-              id: btn.getAttribute('data-product-id'),
-              title: btn.getAttribute('data-product-title') || '',
-              sku: btn.getAttribute('data-product-sku') || '',
-              price: parseFloat(btn.getAttribute('data-product-price') || '0'),
-            };
-            openProductPanel(product, detail);
-          });
-        });
-
-        openDrawer();
+          '<div class="drawer-body">' + bodyHtml + '</div>'
+        );
       }
 
-      function openCustomerPanel(detail) {
+      function renderCustomerPanelContent(detail) {
         const customer = detail.customer;
-        drawerTitleEl.textContent = 'Customer';
-        if (!customer) {
-          drawerBodyEl.innerHTML =
-            '<div class="drawer-section"><div class="order-sub">Guest checkout</div></div>';
-          openDrawer();
-          return;
-        }
-
         const addressText = formatAddress(detail.shipping_address || detail.billing_address);
-        const email = customer.email || detail.contact_email || '';
+        const email = customer ? customer.email || detail.contact_email || '' : '';
         const relatedOrders = ordersState.items.filter(
           (o) =>
             email &&
@@ -1900,66 +2017,75 @@ function dashboardPage() {
           relatedOrders.length && relatedOrders[0].created_at
             ? relatedOrders[0].created_at
             : null;
+        const customerUrl = buildShopifyUrl('customer', detail);
 
-        drawerBodyEl.innerHTML =
-          '<div class="drawer-section">' +
-            '<button class="link-inline" data-action="back-to-order">← Back to order</button>' +
-          '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Contact</div>' +
-            '<div class="kv-row"><span>Name</span><strong>' +
-              escapeHtml(
-                (customer.first_name || '') + ' ' + (customer.last_name || '')
-              ) +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Email</span><strong>' +
-              escapeHtml(email || '—') +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Phone</span><strong>' +
-              escapeHtml(customer.phone || '—') +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Address</span><strong>' +
-              escapeHtml(addressText) +
-            '</strong></div>' +
-          '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Orders summary</div>' +
-            '<div class="drawer-stats">' +
-              '<div class="stat-card-mini">' +
-                '<span class="label">Orders</span>' +
-                '<div class="value">' + relatedOrders.length + '</div>' +
-              '</div>' +
-              '<div class="stat-card-mini">' +
-                '<span class="label">Total</span>' +
-                '<div class="value">' + formatMoney(totalSpend, detail.currency) + '</div>' +
-              '</div>' +
-              '<div class="stat-card-mini">' +
-                '<span class="label">Last order</span>' +
-                '<div class="value">' +
-                  (lastOrderDate ? formatDateTime(lastOrderDate) : '—') +
+        const body = customer
+          ? '<div class="drawer-section">' +
+              '<div class="section-heading">Contact</div>' +
+              '<div class="kv-row"><span>Name</span><strong>' +
+                escapeHtml((customer.first_name || '') + ' ' + (customer.last_name || '')) +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Email</span><strong>' +
+                escapeHtml(email || '—') +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Phone</span><strong>' +
+                escapeHtml(customer.phone || '—') +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Address</span><strong>' +
+                escapeHtml(addressText) +
+              '</strong></div>' +
+            '</div>' +
+            '<div class="drawer-section">' +
+              '<div class="section-heading">Orders summary</div>' +
+              '<div class="drawer-stats">' +
+                '<div class="stat-card-mini">' +
+                  '<span class="label">Orders</span>' +
+                  '<div class="value">' + relatedOrders.length + '</div>' +
+                '</div>' +
+                '<div class="stat-card-mini">' +
+                  '<span class="label">Total</span>' +
+                  '<div class="value">' + formatMoney(totalSpend, detail.currency) + '</div>' +
+                '</div>' +
+                '<div class="stat-card-mini">' +
+                  '<span class="label">Last order</span>' +
+                  '<div class="value">' +
+                    (lastOrderDate ? formatDateTime(lastOrderDate) : '—') +
+                  '</div>' +
                 '</div>' +
               '</div>' +
+            '</div>'
+          : '<div class="drawer-section"><div class="order-sub">Guest checkout</div></div>';
+
+        return (
+          '<div class="drawer-header">' +
+            '<div>' +
+              '<div class="drawer-title">' +
+                escapeHtml(
+                  customer
+                    ? (customer.first_name || '') + ' ' + (customer.last_name || '')
+                    : 'Customer'
+                ) +
+              '</div>' +
+              '<div class="order-sub">' + escapeHtml(email || detail.store_name || '') + '</div>' +
             '</div>' +
-          '</div>';
-
-        const backBtn = drawerBodyEl.querySelector('[data-action="back-to-order"]');
-        if (backBtn) {
-          backBtn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            renderOrderDetail(detail);
-          });
-        }
-
-        openDrawer();
+            '<div class="drawer-actions">' +
+              (customerUrl
+                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                  escapeHtml(customerUrl) +
+                  '">Deschide în Shopify</a>'
+                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+              '<button class="btn" data-action="close-panel">Close</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="drawer-body">' + body + '</div>'
+        );
       }
 
-      function openProductPanel(product, detail) {
-        drawerTitleEl.textContent = 'Product';
+      function renderProductPanelContent(product, detail) {
         const count = countOrdersForProduct(product.title);
-        drawerBodyEl.innerHTML =
-          '<div class="drawer-section">' +
-            '<button class="link-inline" data-action="back-to-order">← Back to order</button>' +
-          '</div>' +
+        const productUrl = buildShopifyUrl('product', product, detail.shopify_domain);
+
+        const body =
           '<div class="drawer-section">' +
             '<div class="section-heading">Product</div>' +
             '<div class="kv-row"><span>Title</span><strong>' +
@@ -1982,27 +2108,128 @@ function dashboardPage() {
             '</strong></div>' +
           '</div>';
 
-        const backBtn = drawerBodyEl.querySelector('[data-action="back-to-order"]');
-        if (backBtn) {
-          backBtn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            renderOrderDetail(detail);
-          });
+        return (
+          '<div class="drawer-header">' +
+            '<div>' +
+              '<div class="drawer-title">' + escapeHtml(product.title || 'Product') + '</div>' +
+              '<div class="order-sub">' + escapeHtml(product.sku || '') + '</div>' +
+            '</div>' +
+            '<div class="drawer-actions">' +
+              (productUrl
+                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                  escapeHtml(productUrl) +
+                  '">Deschide în Shopify</a>'
+                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+              '<button class="btn" data-action="close-panel">Close</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="drawer-body">' + body + '</div>'
+        );
+      }
+
+      function renderDrawerStack() {
+        if (!drawerStackEl) return;
+        drawerStackEl.innerHTML = '';
+
+        if (!drawerState.panels.length) {
+          drawerStackEl.setAttribute('aria-hidden', 'true');
+          drawerBackdrop.classList.remove('visible');
+          return;
         }
 
-        openDrawer();
+        drawerStackEl.setAttribute('aria-hidden', 'false');
+        drawerBackdrop.classList.add('visible');
+        const total = drawerState.panels.length;
+
+        drawerState.panels.forEach((panel, idx) => {
+          const el = document.createElement('div');
+          el.className = 'drawer-panel';
+          el.style.setProperty(
+            '--drawer-shift',
+            '-' + Math.max(0, (total - idx - 1) * 12) + 'px'
+          );
+
+          if (panel.type === 'order') {
+            el.innerHTML = renderOrderPanelContent(panel.detail);
+          } else if (panel.type === 'customer') {
+            el.innerHTML = renderCustomerPanelContent(panel.detail);
+          } else if (panel.type === 'product') {
+            el.innerHTML = renderProductPanelContent(panel.product, panel.detail);
+          }
+
+          drawerStackEl.appendChild(el);
+          requestAnimationFrame(() => el.classList.add('open'));
+
+          const closeBtn = el.querySelector('[data-action="close-panel"]');
+          if (closeBtn) {
+            closeBtn.addEventListener('click', () => closePanelsFrom(idx));
+          }
+
+          if (panel.type === 'order') {
+            const customerBtn = el.querySelector('[data-action="view-customer"]');
+            if (customerBtn) {
+              customerBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                openCustomerPanel(panel.detail);
+              });
+            }
+            el.querySelectorAll('.order-product-link').forEach((btn) => {
+              btn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const product = {
+                  product_id: btn.getAttribute('data-product-id'),
+                  title: btn.getAttribute('data-product-title') || '',
+                  sku: btn.getAttribute('data-product-sku') || '',
+                  price: parseFloat(btn.getAttribute('data-product-price') || '0'),
+                };
+                openProductPanel(product, panel.detail);
+              });
+            });
+          }
+        });
+      }
+
+      function openCustomerPanel(detail) {
+        if (!detail) return;
+        activeOrderDetail = detail;
+        const base = [{ type: 'order', detail }];
+        if (detail.customer) {
+          base.push({ type: 'customer', detail });
+        }
+        setPanels(base);
+      }
+
+      function openProductPanel(product, detail) {
+        if (!detail) return;
+        activeOrderDetail = detail;
+        const stack = [{ type: 'order', detail }];
+        const hasCustomerPanel = drawerState.panels.find((p) => p.type === 'customer');
+        if (hasCustomerPanel) {
+          stack.push({ type: 'customer', detail });
+        }
+        if (product) {
+          stack.push({ type: 'product', product, detail });
+        }
+        setPanels(stack);
       }
 
       async function openOrderDrawer(orderId, storeId) {
         if (!orderId || !storeId) return;
         const cacheKey = storeId + '::' + orderId;
-        drawerTitleEl.textContent = 'Order #' + orderId;
-        drawerBodyEl.innerHTML =
-          '<div class="orders-empty-inline">Se încarcă detaliile comenzii...</div>';
-        openDrawer();
+        const loadingDetail = {
+          id: orderId,
+          store_id: storeId,
+          name: 'Order #' + orderId,
+          _loading: true,
+          line_items: [],
+        };
+        setPanels([{ type: 'order', detail: loadingDetail }]);
 
         if (orderDetailsCache.has(cacheKey)) {
-          renderOrderDetail(orderDetailsCache.get(cacheKey));
+          const cached = orderDetailsCache.get(cacheKey);
+          activeOrderDetail = cached;
+          setPanels([{ type: 'order', detail: cached }]);
           return;
         }
 
@@ -2018,13 +2245,29 @@ function dashboardPage() {
           const detail = data.order;
           if (!detail) throw new Error('Order missing in response');
           orderDetailsCache.set(cacheKey, detail);
-          renderOrderDetail(detail);
+          activeOrderDetail = detail;
+          setPanels([{ type: 'order', detail }]);
         } catch (err) {
           console.error('Error loading order', err);
-          drawerBodyEl.innerHTML =
-            '<div class="orders-empty-inline">Nu am putut încărca comanda.<br />' +
-            escapeHtml(err.message || String(err)) +
-            '</div>';
+          setPanels([
+            {
+              type: 'order',
+              detail: {
+                id: orderId,
+                store_id: storeId,
+                name: 'Order #' + orderId,
+                _loading: false,
+                line_items: [],
+                store_name: '',
+                shopify_domain: '',
+                created_at: '',
+                customer: null,
+                currency: '',
+                total_price: 0,
+                error: err.message || String(err),
+              },
+            },
+          ]);
         }
       }
 
@@ -2197,8 +2440,24 @@ function dashboardPage() {
         });
       }
 
-      drawerCloseBtn.addEventListener('click', closeDrawer);
-      drawerBackdrop.addEventListener('click', closeDrawer);
+      if (ordersLimitSelect) {
+        ordersLimitSelect.value = String(ordersState.filters.limit);
+        ordersLimitSelect.addEventListener('change', () => {
+          const val = parseInt(ordersLimitSelect.value, 10);
+          ordersState.filters.limit = Number.isNaN(val) ? 50 : val;
+          loadOrders();
+        });
+      }
+
+      if (drawerBackdrop) {
+        drawerBackdrop.addEventListener('click', closeAllPanels);
+      }
+
+      document.addEventListener('keyup', (ev) => {
+        if (ev.key === 'Escape') {
+          closeAllPanels();
+        }
+      });
 
       // change context
       storeContextSelect.addEventListener('change', () => {
@@ -2210,7 +2469,7 @@ function dashboardPage() {
         selectedStoreId = nextStoreId;
         ordersDirty = true;
         orderDetailsCache.clear();
-        closeDrawer();
+        closeAllPanels();
         loadStores(previousStoreId);
       });
 
