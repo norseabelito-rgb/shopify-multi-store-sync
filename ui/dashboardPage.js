@@ -1886,7 +1886,7 @@ function dashboardPage() {
                 : '';
               const thumb =
                 '<div class="line-thumb"' +
-                (safeImg ? ' style="background-image:url(\'' + safeImg + '\');"' : '') +
+                (safeImg ? ' style="background-image:url(\\'' + safeImg + '\\');"' : '') +
                 '></div>';
               return (
                 '<div class="line-item">' +
