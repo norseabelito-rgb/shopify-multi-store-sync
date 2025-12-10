@@ -374,6 +374,13 @@ function normalizeOrderListEntry(order, store) {
   const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
   const qtyTotal = lineItems.reduce((acc, li) => acc + (li.quantity || 0), 0);
 
+  const simpleLineItems = lineItems.map((li) => ({
+    id: li.id,
+    product_id: li.product_id,
+    title: li.title,
+    quantity: li.quantity || 0,
+  }));
+
   const summaryParts = lineItems.slice(0, 3).map((li) => {
     const qty = li.quantity || 1;
     const title = li.title || 'Item';
@@ -397,6 +404,7 @@ function normalizeOrderListEntry(order, store) {
     store_id: store.store_id,
     store_name: store.store_name || store.store_id,
     shopify_domain: store.shopify_domain || '',
+    customer_id: order.customer && order.customer.id ? order.customer.id : null,
     name: order.name || `#${order.order_number || order.id}`,
     created_at: order.created_at,
     customer_name: customerName || 'Guest',
@@ -407,6 +415,7 @@ function normalizeOrderListEntry(order, store) {
     currency: order.currency || store.currency || 'RON',
     financial_status: order.financial_status || null,
     fulfillment_status: order.fulfillment_status || null,
+    line_items: simpleLineItems,
   };
 }
 
@@ -581,13 +590,15 @@ router.get('/stores', async (req, res) => {
 //   q        = text (order #, customer, produs)
 //   status   = all | open | paid | fulfilled | cancelled
 //   from/to  = YYYY-MM-DD
-//   limit    = max 250 (default 50)
+//   limit    = max 200 (default 50)
+//   page     = default 1
 router.get('/orders', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const statusFilter = (req.query.status || 'all').toLowerCase();
     const searchQuery = (req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 250);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
 
@@ -605,7 +616,7 @@ router.get('/orders', async (req, res) => {
       status: statusFilter,
       from: dateFrom,
       to: dateTo,
-      limit,
+      limit: Math.min(limit * page, 250), // per-store fetch cap
       q: searchQuery,
     };
 
@@ -624,11 +635,20 @@ router.get('/orders', async (req, res) => {
       return tb - ta;
     });
 
-    const limited = allOrders.slice(0, limit);
+    const start = (page - 1) * limit;
+    const limited = allOrders.slice(start, start + limit);
+    const total = allOrders.length;
+    const hasNext = start + limited.length < total;
+    const hasPrev = page > 1 && start > 0;
 
     res.json({
       orders: limited,
       count: limited.length,
+      page,
+      limit,
+      total,
+      hasNext,
+      hasPrev,
     });
   } catch (err) {
     console.error('/orders error', err);

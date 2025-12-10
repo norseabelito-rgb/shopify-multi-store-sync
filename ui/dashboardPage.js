@@ -586,8 +586,11 @@ function dashboardPage() {
       position: sticky;
       top: 0;
       z-index: 3;
-      background: linear-gradient(180deg, rgba(11,15,25,0.98), rgba(11,15,25,0.96));
-      padding-bottom: 8px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.45);
     }
 
     .orders-search {
@@ -651,7 +654,7 @@ function dashboardPage() {
 
     .orders-table-wrapper {
       position: relative;
-      max-height: calc(100vh - 320px);
+      max-height: calc(100vh - 360px);
       overflow: auto;
       border-radius: 12px;
       border: 1px solid rgba(15, 23, 42, 0.9);
@@ -762,14 +765,17 @@ function dashboardPage() {
       display: flex;
       align-items: stretch;
       justify-content: flex-end;
-      gap: 0;
+      gap: 10px;
       pointer-events: none;
       z-index: 30;
+      padding: 10px;
+      box-sizing: border-box;
+      overflow-x: auto;
     }
 
     .drawer-panel {
-      width: 420px;
-      max-width: 92vw;
+      width: 430px;
+      max-width: 90vw;
       background: rgba(11, 15, 25, 0.98);
       border-left: 1px solid var(--border);
       box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
@@ -788,6 +794,16 @@ function dashboardPage() {
 
     .drawer-panel:not(:last-child) {
       box-shadow: -8px 0 24px rgba(0,0,0,0.35);
+    }
+
+    .drawer-panel.order-panel { width: 460px; }
+    .drawer-panel.customer-panel { width: 380px; }
+    .drawer-panel.product-panel { width: 340px; }
+
+    @media (max-width: 1100px) {
+      .drawer-panel.order-panel { width: 360px; }
+      .drawer-panel.customer-panel { width: 320px; }
+      .drawer-panel.product-panel { width: 300px; }
     }
 
     .drawer-actions {
@@ -889,6 +905,7 @@ function dashboardPage() {
       font-weight: 500;
       font-size: 12px;
       text-align: left;
+      display: block;
     }
 
     .link-inline {
@@ -932,6 +949,53 @@ function dashboardPage() {
       border-color: var(--border);
       background: rgba(15, 23, 42, 0.82);
       color: #e5e7eb;
+    }
+
+    .btn-shopify {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #0b0f19;
+      border: 1px solid rgba(34, 197, 94, 0.6);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      box-shadow: 0 10px 24px rgba(34, 197, 94, 0.35);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .btn-shopify:hover {
+      filter: brightness(1.08);
+    }
+
+    .orders-pagination {
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pagination-btn {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,0.92);
+      color: #e5e7eb;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -1305,6 +1369,7 @@ function dashboardPage() {
                 </table>
               </div>
             </div>
+            <div id="orders-pagination" class="orders-pagination"></div>
           </section>
         </section>
 
@@ -1406,6 +1471,7 @@ function dashboardPage() {
       const ordersTableShell = document.getElementById('orders-table-shell');
       const ordersTableBody = document.getElementById('orders-tbody');
       const defaultOrdersEmptyHTML = ordersEmpty ? ordersEmpty.innerHTML : '';
+      const ordersPagination = document.getElementById('orders-pagination');
 
       const drawerStackEl = document.getElementById('drawer-stack');
       const drawerBackdrop = document.getElementById('drawer-backdrop');
@@ -1421,6 +1487,10 @@ function dashboardPage() {
           limit: 50,
         },
         error: '',
+        page: 1,
+        total: 0,
+        hasNext: false,
+        hasPrev: false,
       };
       let ordersDirty = true;
       const orderDetailsCache = new Map();
@@ -1501,12 +1571,30 @@ function dashboardPage() {
         return parts || '—';
       }
 
-      function countOrdersForProduct(title) {
-        if (!title) return 0;
-        const needle = String(title).toLowerCase();
-        return ordersState.items.filter((o) =>
-          String(o.items_summary || '').toLowerCase().includes(needle)
-        ).length;
+      function ordersContainingProduct(productId, title) {
+        const needle = title ? String(title).toLowerCase() : '';
+        return ordersState.items.filter((o) => {
+          const list = Array.isArray(o.line_items) ? o.line_items : [];
+          return list.some((li) => {
+            const byId = productId && li.product_id && String(li.product_id) === String(productId);
+            const byTitle =
+              needle && String(li.title || '').toLowerCase().includes(needle.toLowerCase());
+            return byId || byTitle;
+          });
+        });
+      }
+
+      function ordersForCustomer(customer) {
+        if (!customer) return [];
+        const email = customer.email ? String(customer.email).toLowerCase() : '';
+        const customerId = customer.id ? String(customer.id) : null;
+        return ordersState.items.filter((o) => {
+          const oEmail = o.customer_email ? String(o.customer_email).toLowerCase() : '';
+          const sameEmail = email && oEmail === email;
+          const sameId =
+            customerId && o.customer_id && String(o.customer_id) === String(customerId);
+          return sameEmail || sameId;
+        });
       }
 
       function setView(view) {
@@ -1713,6 +1801,13 @@ function dashboardPage() {
         const searchText = ordersState.filters.q
           ? ' · search: "' + ordersState.filters.q + '"'
           : '';
+        const pageText =
+          ordersState.total && ordersState.total > ordersState.filters.limit
+            ? ' · pagina ' +
+              ordersState.page +
+              '/' +
+              Math.max(1, Math.ceil(ordersState.total / ordersState.filters.limit))
+            : '';
         ordersMeta.textContent =
           'Afișăm ' +
           (count || 0) +
@@ -1721,7 +1816,8 @@ function dashboardPage() {
           statusText +
           searchText +
           ' · limită ' +
-          ordersState.filters.limit;
+          ordersState.filters.limit +
+          pageText;
       }
 
       function renderOrdersTable() {
@@ -1818,6 +1914,51 @@ function dashboardPage() {
             openOrderDrawer(orderId, storeId);
           });
         });
+
+        renderPagination();
+      }
+
+      function renderPagination() {
+        if (!ordersPagination) return;
+        const totalPages = ordersState.total
+          ? Math.max(1, Math.ceil(ordersState.total / ordersState.filters.limit))
+          : ordersState.hasNext
+          ? ordersState.page + 1
+          : ordersState.page;
+        const current = ordersState.page;
+
+        const prevDisabled = current <= 1 || !ordersState.hasPrev;
+        const nextDisabled = current >= totalPages || !ordersState.hasNext;
+
+        ordersPagination.innerHTML =
+          '<button class="pagination-btn" id="orders-prev" ' +
+          (prevDisabled ? 'disabled' : '') +
+          '>Prev</button>' +
+          '<span>Page ' +
+          current +
+          ' of ' +
+          totalPages +
+          '</span>' +
+          '<button class="pagination-btn" id="orders-next" ' +
+          (nextDisabled ? 'disabled' : '') +
+          '>Next</button>';
+
+        const prevBtn = document.getElementById('orders-prev');
+        const nextBtn = document.getElementById('orders-next');
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => {
+            if (prevDisabled) return;
+            ordersState.page = Math.max(1, ordersState.page - 1);
+            loadOrders();
+          });
+        }
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => {
+            if (nextDisabled) return;
+            ordersState.page = ordersState.page + 1;
+            loadOrders();
+          });
+        }
       }
 
       function buildShopifyUrl(type, payload, domainOverride) {
@@ -1989,10 +2130,10 @@ function dashboardPage() {
             '</div>' +
             '<div class="drawer-actions">' +
               (orderUrl
-                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
                   escapeHtml(orderUrl) +
                   '">Deschide în Shopify</a>'
-                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+                : '<button class="btn-shopify" disabled>Deschide în Shopify</button>') +
               '<button class="btn" data-action="close-panel">Close</button>' +
             '</div>' +
           '</div>' +
@@ -2004,19 +2145,12 @@ function dashboardPage() {
         const customer = detail.customer;
         const addressText = formatAddress(detail.shipping_address || detail.billing_address);
         const email = customer ? customer.email || detail.contact_email || '' : '';
-        const relatedOrders = ordersState.items.filter(
-          (o) =>
-            email &&
-            String(o.customer_email || '').toLowerCase() === String(email).toLowerCase()
-        );
+        const relatedOrders = ordersForCustomer(customer);
         const totalSpend = relatedOrders.reduce(
           (sum, o) => sum + (Number(o.total_price) || 0),
           0
         );
-        const lastOrderDate =
-          relatedOrders.length && relatedOrders[0].created_at
-            ? relatedOrders[0].created_at
-            : null;
+        const lastOrder = relatedOrders.length ? relatedOrders[0] : null;
         const customerUrl = buildShopifyUrl('customer', detail);
 
         const body = customer
@@ -2049,7 +2183,11 @@ function dashboardPage() {
                 '<div class="stat-card-mini">' +
                   '<span class="label">Last order</span>' +
                   '<div class="value">' +
-                    (lastOrderDate ? formatDateTime(lastOrderDate) : '—') +
+                    (lastOrder
+                      ? escapeHtml(lastOrder.name || '#' + lastOrder.id) +
+                        ' · ' +
+                        formatDateTime(lastOrder.created_at)
+                      : '—') +
                   '</div>' +
                 '</div>' +
               '</div>' +
@@ -2070,10 +2208,10 @@ function dashboardPage() {
             '</div>' +
             '<div class="drawer-actions">' +
               (customerUrl
-                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
                   escapeHtml(customerUrl) +
                   '">Deschide în Shopify</a>'
-                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+                : '<button class="btn-shopify" disabled>Deschide în Shopify</button>') +
               '<button class="btn" data-action="close-panel">Close</button>' +
             '</div>' +
           '</div>' +
@@ -2082,7 +2220,9 @@ function dashboardPage() {
       }
 
       function renderProductPanelContent(product, detail) {
-        const count = countOrdersForProduct(product.title);
+        const productOrders = ordersContainingProduct(product.product_id, product.title);
+        const count = productOrders.length;
+        const lastOrder = productOrders.length ? productOrders[0] : null;
         const productUrl = buildShopifyUrl('product', product, detail.shopify_domain);
 
         const body =
@@ -2098,15 +2238,19 @@ function dashboardPage() {
               formatMoney(product.price, detail.currency) +
             '</strong></div>' +
           '</div>' +
-          '<div class="drawer-section">' +
-            '<div class="section-heading">Context</div>' +
-            '<div class="kv-row"><span>Orders in view</span><strong>' +
-              count +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Last seen</span><strong>' +
-              escapeHtml(detail.name || '') +
-            '</strong></div>' +
-          '</div>';
+            '<div class="drawer-section">' +
+              '<div class="section-heading">Context</div>' +
+              '<div class="kv-row"><span>Orders in view</span><strong>' +
+                count +
+              '</strong></div>' +
+              '<div class="kv-row"><span>Last seen</span><strong>' +
+              (lastOrder
+                ? escapeHtml(lastOrder.name || '#' + lastOrder.id) +
+                  ' · ' +
+                  formatDateTime(lastOrder.created_at)
+                : '—') +
+              '</strong></div>' +
+            '</div>';
 
         return (
           '<div class="drawer-header">' +
@@ -2116,10 +2260,10 @@ function dashboardPage() {
             '</div>' +
             '<div class="drawer-actions">' +
               (productUrl
-                ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
                   escapeHtml(productUrl) +
                   '">Deschide în Shopify</a>'
-                : '<button class="btn btn-ghost" disabled>Deschide în Shopify</button>') +
+                : '<button class="btn-shopify" disabled>Deschide în Shopify</button>') +
               '<button class="btn" data-action="close-panel">Close</button>' +
             '</div>' +
           '</div>' +
@@ -2143,7 +2287,13 @@ function dashboardPage() {
 
         drawerState.panels.forEach((panel, idx) => {
           const el = document.createElement('div');
-          el.className = 'drawer-panel';
+          const typeClass =
+            panel.type === 'customer'
+              ? 'customer-panel'
+              : panel.type === 'product'
+              ? 'product-panel'
+              : 'order-panel';
+          el.className = 'drawer-panel ' + typeClass;
           el.style.setProperty(
             '--drawer-shift',
             '-' + Math.max(0, (total - idx - 1) * 12) + 'px'
@@ -2279,6 +2429,7 @@ function dashboardPage() {
         const qs = new URLSearchParams();
         qs.set('store_id', selectedStoreId || 'all');
         qs.set('limit', ordersState.filters.limit);
+        qs.set('page', ordersState.page);
         if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
         if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
         if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
@@ -2289,10 +2440,17 @@ function dashboardPage() {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           ordersState.items = Array.isArray(data.orders) ? data.orders : [];
+          ordersState.page = data.page || ordersState.page;
+          ordersState.total = data.total != null ? data.total : ordersState.items.length;
+          ordersState.hasNext = Boolean(data.hasNext);
+          ordersState.hasPrev = Boolean(data.hasPrev);
         } catch (err) {
           console.error('Error /orders', err);
           ordersState.items = [];
           ordersState.error = err.message || String(err);
+          ordersState.total = 0;
+          ordersState.hasNext = false;
+          ordersState.hasPrev = ordersState.page > 1;
         } finally {
           ordersState.loading = false;
           ordersDirty = false;
@@ -2410,6 +2568,7 @@ function dashboardPage() {
           clearTimeout(searchDebounce);
           searchDebounce = setTimeout(() => {
             ordersState.filters.q = ordersSearchInput.value.trim();
+            ordersState.page = 1;
             loadOrders();
           }, 260);
         });
@@ -2422,6 +2581,7 @@ function dashboardPage() {
       if (ordersStatusSelect) {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
+          ordersState.page = 1;
           loadOrders();
         });
       }
@@ -2429,6 +2589,7 @@ function dashboardPage() {
       if (ordersFromInput) {
         ordersFromInput.addEventListener('change', () => {
           ordersState.filters.from = ordersFromInput.value;
+          ordersState.page = 1;
           loadOrders();
         });
       }
@@ -2436,6 +2597,7 @@ function dashboardPage() {
       if (ordersToInput) {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
+          ordersState.page = 1;
           loadOrders();
         });
       }
@@ -2445,6 +2607,7 @@ function dashboardPage() {
         ordersLimitSelect.addEventListener('change', () => {
           const val = parseInt(ordersLimitSelect.value, 10);
           ordersState.filters.limit = Number.isNaN(val) ? 50 : val;
+          ordersState.page = 1;
           loadOrders();
         });
       }
@@ -2469,6 +2632,7 @@ function dashboardPage() {
         selectedStoreId = nextStoreId;
         ordersDirty = true;
         orderDetailsCache.clear();
+        ordersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
       });
