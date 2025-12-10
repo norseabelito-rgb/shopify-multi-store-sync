@@ -195,6 +195,129 @@ async function fetchStoreStats(storeId, rawDomain) {
   }
 }
 
+// Helper: ia comenzile unui magazin Shopify (ultimele X zile, max Y comenzi)
+async function fetchStoreOrdersForStore(store, daysBack = 30, limit = 50) {
+  const storeId = store.store_id;
+  const shopifyDomain = String(store.shopify_domain || '').trim();
+
+  if (!shopifyDomain) {
+    console.warn('[fetchStoreOrdersForStore] shopifyDomain lipsă pentru store', storeId);
+    return [];
+  }
+
+  // token-ul îl luăm din ENV, ex: SHOPIFY_TOKEN_BF24H
+  const envKey =
+    'SHOPIFY_TOKEN_' +
+    String(storeId || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '_');
+
+  const accessToken = process.env[envKey];
+
+  if (!accessToken) {
+    console.warn(
+      '[fetchStoreOrdersForStore] token lipsă pentru store',
+      storeId,
+      '(ENV key:',
+      envKey + ')'
+    );
+    return [];
+  }
+
+  const baseUrl = `https://${shopifyDomain}/admin/api/2024-10`;
+  const headers = {
+    'X-Shopify-Access-Token': accessToken,
+    'Content-Type': 'application/json',
+  };
+
+  // created_at_min = acum - daysBack (UTC)
+  const now = new Date();
+  const since = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+  const yyyy = since.getUTCFullYear();
+  const mm = String(since.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(since.getUTCDate()).padStart(2, '0');
+  const hh = String(since.getUTCHours()).padStart(2, '0');
+  const mi = String(since.getUTCMinutes()).padStart(2, '0');
+  const ss = String(since.getUTCSeconds()).padStart(2, '0');
+  const createdAtMin = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}Z`;
+
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 250);
+
+  const url =
+    `${baseUrl}/orders.json` +
+    `?status=any` +
+    `&created_at_min=${encodeURIComponent(createdAtMin)}` +
+    `&limit=${safeLimit}` +
+    `&order=created_at%20desc` +
+    `&fields=id,name,order_number,created_at,financial_status,fulfillment_status,total_price,currency,email,phone,` +
+    `billing_address,shipping_address,customer,line_items`;
+
+  try {
+    const res = await fetch(url, { headers });
+
+    if (!res.ok) {
+      console.error('[fetchStoreOrdersForStore] HTTP error', {
+        storeId,
+        domain: shopifyDomain,
+        status: res.status,
+      });
+      return [];
+    }
+
+    const json = await res.json();
+    const orders = json.orders || [];
+
+    // Normalizăm un pic structura ca să fie ușor de folosit în UI
+    return orders.map((o) => ({
+      // context store
+      store_id: storeId,
+      store_name: store.store_name || storeId,
+      shopify_domain: shopifyDomain,
+
+      // date comandă
+      id: o.id,
+      name: o.name,
+      order_number: o.order_number,
+      created_at: o.created_at,
+      financial_status: o.financial_status || null,
+      fulfillment_status: o.fulfillment_status || null,
+      total_price: o.total_price ? parseFloat(o.total_price) : 0,
+      currency: o.currency || store.currency || 'RON',
+
+      // client
+      customer: o.customer
+        ? {
+            id: o.customer.id,
+            email: o.customer.email || null,
+            phone: o.customer.phone || null,
+            first_name: o.customer.first_name || '',
+            last_name: o.customer.last_name || '',
+          }
+        : null,
+
+      // adrese
+      billing_address: o.billing_address || null,
+      shipping_address: o.shipping_address || null,
+
+      // line items (produse)
+      line_items: Array.isArray(o.line_items)
+        ? o.line_items.map((li) => ({
+            id: li.id,
+            product_id: li.product_id,
+            variant_id: li.variant_id,
+            title: li.title,
+            sku: li.sku,
+            quantity: li.quantity,
+            price: li.price ? parseFloat(li.price) : 0,
+          }))
+        : [],
+    }));
+  } catch (err) {
+    console.error('[fetchStoreOrdersForStore] Exception pentru store', storeId, err);
+    return [];
+  }
+}
+
 
 // /stores
 router.get('/stores', async (req, res) => {
@@ -236,6 +359,66 @@ router.get('/stores', async (req, res) => {
     res
       .status(500)
       .json({ error: 'Failed to load stores', message: err.message });
+  }
+});
+
+// /orders – listă de comenzi centralizată (all stores sau 1 store)
+// Query params:
+//   store_id (opțional)  – dacă lipsește, ia toate magazinele
+//   days     (opțional)  – câte zile în urmă (default 30)
+//   limit    (opțional)  – limit per store, max 250
+router.get('/orders', async (req, res) => {
+  try {
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+    if (!spreadsheetId) {
+      throw new Error('Missing GOOGLE_SHEETS_ID env var');
+    }
+
+    const storeIdFilter = req.query.store_id || null;
+    const daysBack = parseInt(req.query.days || '30', 10) || 30;
+    const perStoreLimit =
+      Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 250);
+
+    const storesSheet = await loadSheet(spreadsheetId, 'Stores');
+    const stores = storesSheet.rows || [];
+
+    const targetStores = stores.filter((s) =>
+      storeIdFilter ? String(s.store_id) === String(storeIdFilter) : true
+    );
+
+    if (!targetStores.length) {
+      return res.json({ count: 0, orders: [] });
+    }
+
+    const allOrdersNested = await Promise.all(
+      targetStores.map((s) =>
+        fetchStoreOrdersForStore(s, daysBack, perStoreLimit)
+      )
+    );
+
+    // flatten
+    const allOrders = allOrdersNested.reduce(
+      (acc, arr) => acc.concat(arr || []),
+      []
+    );
+
+    // sort desc by created_at
+    allOrders.sort((a, b) => {
+      const ta = a.created_at ? Date.parse(a.created_at) : 0;
+      const tb = b.created_at ? Date.parse(b.created_at) : 0;
+      return tb - ta;
+    });
+
+    res.json({
+      count: allOrders.length,
+      orders: allOrders,
+    });
+  } catch (err) {
+    console.error('/orders error', err);
+    res.status(500).json({
+      error: 'Failed to load orders',
+      message: err.message || String(err),
+    });
   }
 });
 
