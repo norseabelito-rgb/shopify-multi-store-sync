@@ -668,9 +668,25 @@ function dashboardPage() {
         </ul>
       </div>
 
-      <div class="sidebar-footer">
-        <span>Env: <strong>Railway</strong></span>
-        <span id="sidebar-active-store">Active store: <strong>All stores</strong></span>
+            <div class="sidebar-footer">
+        <div class="env-pill">Env: Railway</div>
+        <div class="env-pill">
+          <div style="font-size:11px;opacity:0.8;margin-bottom:3px;">Active store</div>
+          <select
+            id="active-store-select"
+            style="
+              width: 100%;
+              background: transparent;
+              border: none;
+              color: #e5edff;
+              font-size: 11px;
+              outline: none;
+              padding: 2px 0;
+            "
+          >
+            <option value="ALL">All stores</option>
+          </select>
+        </div>
       </div>
     </aside>
 
@@ -846,6 +862,14 @@ function dashboardPage() {
         var totalDraft = 0;
         var totalTodayOrders = 0;
 
+            var activeStoreId = (function () {
+      try {
+        return localStorage.getItem('activeStoreId') || 'ALL';
+      } catch (e) {
+        return 'ALL';
+      }
+    })();
+
         stores.forEach(function (s) {
           var a = Number(s.active_products || 0);
           var d = Number(s.draft_products || 0);
@@ -862,17 +886,118 @@ function dashboardPage() {
         cardAdsStatus.textContent = 'Preparing';
       }
 
-      function loadStoresSummary() {
+           function loadStoresSummary() {
         fetch('/stores')
-          .then(function (res) {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.json();
+          .then(function (r) {
+            return r.json();
           })
-          .then(function (data) {
-            updateHomeOverviewFromStores(data);
+          .then(function (stores) {
+            if (!Array.isArray(stores)) stores = [];
+
+            // --- 1) Populăm dropdown-ul de store-uri ---
+            var selectEl = document.getElementById('active-store-select');
+            if (selectEl) {
+              var optionsHtml =
+                '<option value="ALL">All stores</option>' +
+                stores
+                  .map(function (s) {
+                    var id = s.store_id || '';
+                    var label = s.store_name || id || 'Unnamed store';
+                    return (
+                      '<option value="' +
+                      id +
+                      '">' +
+                      label +
+                      '</option>'
+                    );
+                  })
+                  .join('');
+
+              selectEl.innerHTML = optionsHtml;
+
+              // Dacă store-ul salvat nu mai există, resetăm la ALL
+              var found =
+                activeStoreId === 'ALL'
+                  ? true
+                  : stores.some(function (s) {
+                      return s.store_id === activeStoreId;
+                    });
+              if (!found) {
+                activeStoreId = 'ALL';
+                try {
+                  localStorage.setItem('activeStoreId', activeStoreId);
+                } catch (e) {}
+              }
+
+              selectEl.value = activeStoreId;
+
+              selectEl.onchange = function () {
+                activeStoreId = this.value || 'ALL';
+                try {
+                  localStorage.setItem('activeStoreId', activeStoreId);
+                } catch (e) {}
+                // Recalculează KPI-urile pentru noul store selectat
+                loadStoresSummary();
+              };
+            }
+
+            // --- 2) Calculăm KPI-urile în funcție de activeStoreId ---
+
+            var scopeStores;
+            if (activeStoreId === 'ALL') {
+              scopeStores = stores;
+            } else {
+              scopeStores = stores.filter(function (s) {
+                return s.store_id === activeStoreId;
+              });
+            }
+
+            var totalStoresAll = stores.length;
+            var totalActive = 0;
+            var totalDraft = 0;
+            var totalOrdersToday = 0;
+
+            scopeStores.forEach(function (s) {
+              if (typeof s.active_products === 'number') {
+                totalActive += s.active_products;
+              }
+              if (typeof s.draft_products === 'number') {
+                totalDraft += s.draft_products;
+              }
+              if (typeof s.today_orders === 'number') {
+                totalOrdersToday += s.today_orders;
+              }
+            });
+
+            var storesValueEl = document.getElementById('kpi-stores-value');
+            var productsValueEl = document.getElementById('kpi-products-value');
+            var ordersValueEl = document.getElementById('kpi-orders-value');
+            var adsValueEl = document.getElementById('kpi-ads-value');
+
+            if (storesValueEl) {
+              // dacă e ALL => nr total magazine; dacă e filtrat => câte magazine sunt în scope (de obicei 1)
+              var scopedStoresCount = scopeStores.length || 0;
+              storesValueEl.textContent =
+                activeStoreId === 'ALL'
+                  ? totalStoresAll || 0
+                  : scopedStoresCount || 0;
+            }
+
+            if (productsValueEl) {
+              productsValueEl.textContent = (totalActive + totalDraft) || 0;
+            }
+
+            if (ordersValueEl) {
+              ordersValueEl.textContent = totalOrdersToday || 0;
+            }
+
+            if (adsValueEl) {
+              // Deocamdată placeholder; ulterior îl legăm la modulul de ads
+              adsValueEl.textContent = '—';
+            }
           })
           .catch(function (err) {
-            console.error('Failed to load stores summary', err);
+            console.error('loadStoresSummary error', err);
           });
       }
 
