@@ -1,1171 +1,1126 @@
 // ui/dashboardPage.js
-//
-// Shell principal pentru platformă: meniu lateral + pagini interne (Home, My Stores, Ads etc.)
 
 function dashboardPage() {
-  const uiPassword = process.env.DASHBOARD_PASSWORD || "";
-
   return `
 <!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
-  <title>Control Panel – Multi-Store</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multi-Store Hub</title>
   <style>
     :root {
       --bg: #020617;
-      --bg-soft: #030712;
-      --panel: rgba(15,23,42,0.98);
-      --panel-soft: rgba(15,23,42,0.92);
-      --accent: #4f46e5;
-      --accent-soft: rgba(79,70,229,0.18);
-      --accent-strong: rgba(79,70,229,0.4);
-      --border-soft: rgba(148,163,184,0.28);
-      --border-subtle: rgba(148,163,184,0.12);
+      --bg-deep: #020617;
+      --sidebar: #020617;
+      --panel: rgba(11, 15, 25, 0.96);
+      --panel-soft: rgba(15, 23, 42, 0.96);
+      --border: rgba(148, 163, 184, 0.2);
+      --border-soft: rgba(148, 163, 184, 0.12);
       --text: #e5e7eb;
       --muted: #9ca3af;
-      --danger: #f97373;
+      --accent: #4f8cff;
+      --accent-soft: rgba(79, 140, 255, 0.18);
+      --danger: #fb7185;
       --success: #22c55e;
-      --shadow-soft: 0 20px 60px rgba(15,23,42,0.9);
-      --radius-lg: 18px;
-      --radius-md: 12px;
-      --radius-sm: 999px;
     }
 
     * { box-sizing: border-box; }
 
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      height: 100%;
-      background: radial-gradient(circle at 0% 0%, rgba(129,140,248,0.13), transparent 55%),
-                  radial-gradient(circle at 100% 0%, rgba(56,189,248,0.12), transparent 55%),
-                  linear-gradient(180deg,#020617,#020617 40%,#020617);
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.25), transparent 55%),
+        radial-gradient(circle at 130% -10%, rgba(45, 212, 191, 0.18), transparent 55%),
+        linear-gradient(150deg, #020617, #020617 40%, #020617);
       color: var(--text);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
 
-    body {
+    .app-shell {
       display: flex;
-      align-items: stretch;
-      justify-content: center;
-      padding: 20px;
+      min-height: 100vh;
     }
 
-    .app-frame {
-      position: relative;
-      width: 100%;
-      max-width: 1340px;
-      height: calc(100vh - 40px);
-      border-radius: 26px;
-      overflow: hidden;
-      background: radial-gradient(circle at top left, rgba(79,70,229,0.25), transparent 55%),
-                  radial-gradient(circle at top right, rgba(56,189,248,0.18), transparent 55%),
-                  linear-gradient(135deg,#020617,#020617 40%,#020617);
-      border: 1px solid rgba(148,163,184,0.35);
-      box-shadow: var(--shadow-soft);
-      display: flex;
-    }
-
-    .app-frame.blurred-main .app-main {
-      filter: blur(2px) saturate(0.7);
-      pointer-events: none;
-      user-select: none;
-    }
+    /* SIDEBAR */
 
     .sidebar {
-      position: relative;
       width: 260px;
-      background: linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.97));
-      border-right: 1px solid var(--border-soft);
-      padding: 18px 16px 12px;
+      padding: 18px 18px 14px;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.36), transparent 60%),
+        linear-gradient(180deg, #020617, #030712 50%, #020617);
+      border-right: 1px solid rgba(15, 23, 42, 0.9);
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      z-index: 20;
+      gap: 18px;
     }
 
     .sidebar-header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 10px;
-    }
-
-    .sidebar-title-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .sidebar-eyebrow {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--muted);
-    }
-
-    .sidebar-title {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-    }
-
-    .sidebar-badge {
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(251,191,36,0.25);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #facc15;
-      background: radial-gradient(circle at 0 0, rgba(251,191,36,0.18), transparent 60%);
-    }
-
-    .sidebar-nav {
-      margin-top: 2px;
-      padding-top: 8px;
-      border-top: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
+      align-items: center;
       gap: 6px;
     }
 
-    .nav-section-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-      margin: 4px 0 2px;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 9px;
-      border-radius: 10px;
-      border: 1px solid transparent;
-      cursor: pointer;
-      font-size: 13px;
-      color: #e5e7eb;
-      background: transparent;
-      transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
-    }
-
-    .nav-item span.icon {
-      width: 18px;
-      text-align: center;
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
-    .nav-item span.label {
-      flex: 1;
-      text-align: left;
-    }
-
-    .nav-item small {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-    }
-
-    .nav-item:hover {
-      background: rgba(15,23,42,0.96);
-      border-color: var(--border-subtle);
-      transform: translateY(-1px);
-    }
-
-    .nav-item.active {
-      border-color: var(--accent-strong);
-      background: radial-gradient(circle at 0 0, rgba(79,70,229,0.35), transparent 60%);
-      box-shadow: 0 0 0 1px rgba(79,70,229,0.45), 0 12px 40px rgba(15,23,42,0.9);
-    }
-
-    .nav-item-sub {
-      margin-left: 26px;
-      padding-left: 6px;
-      border-left: 1px dashed rgba(148,163,184,0.3);
-    }
-
-    .sidebar-footer {
-      margin-top: auto;
-      padding-top: 10px;
-      border-top: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .store-filter-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-
-    .store-filter-select {
-      width: 100%;
-      border-radius: 999px;
-      border: 1px solid var(--border-subtle);
-      padding: 6px 8px;
-      background: rgba(15,23,42,0.96);
-      color: var(--text);
-      font-size: 12px;
-    }
-
-    .store-filter-note {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    .sidebar-footer-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 10px;
-      color: var(--muted);
-    }
-
-    .sidebar-footer-meta span.key {
-      padding: 3px 7px;
-      border-radius: 999px;
-      border: 1px dashed var(--border-subtle);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 10px;
-    }
-
-    .app-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 14px 18px 16px;
-      position: relative;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-
-    .burger-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 30px;
-      height: 30px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.45);
-      background: rgba(15,23,42,0.92);
-      cursor: pointer;
-      margin-right: 8px;
-      transition: background 0.16s ease, transform 0.12s ease, box-shadow 0.12s ease;
-    }
-
-    .burger-btn span {
-      display: block;
-      width: 14px;
-      height: 2px;
-      border-radius: 999px;
-      background: #e5e7eb;
-      position: relative;
-    }
-
-    .burger-btn span::before,
-    .burger-btn span::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      width: 14px;
-      height: 2px;
-      border-radius: 999px;
-      background: #e5e7eb;
-      transform-origin: center;
-    }
-
-    .burger-btn span::before {
-      top: -4px;
-    }
-
-    .burger-btn span::after {
-      top: 4px;
-    }
-
-    .burger-btn:hover {
-      background: rgba(30,64,175,0.95);
-      box-shadow: 0 0 0 1px rgba(129,140,248,0.5), 0 10px 30px rgba(15,23,42,0.9);
-      transform: translateY(-1px);
-    }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .topbar-titles {
+    .brand {
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
 
-    .topbar-eyebrow {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--muted);
-    }
-
-    .topbar-title {
-      font-size: 18px;
+    .brand-title {
+      font-size: 13px;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
     }
 
-    .topbar-subtitle {
+    .brand-sub {
       font-size: 11px;
       color: var(--muted);
     }
 
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .pill {
-      padding: 3px 8px;
+    .beta-pill {
+      font-size: 10px;
+      padding: 3px 6px;
       border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.3);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.9);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .sidebar-section-label {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.14em;
+      color: var(--muted);
+      margin: 10px 0 4px;
     }
 
-    .pill-accent {
-      border-color: rgba(79,70,229,0.5);
-      background: radial-gradient(circle at 0 0, rgba(79,70,229,0.35), transparent 65%);
-      color: #e0e7ff;
-    }
-
-    .pill-soft {
-      background: rgba(15,23,42,0.92);
-    }
-
-    .view-root {
-      flex: 1;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-subtle);
-      background: radial-gradient(circle at top left, rgba(79,70,229,0.18), transparent 60%),
-                  radial-gradient(circle at bottom right, rgba(56,189,248,0.1), transparent 60%),
-                  linear-gradient(145deg,rgba(15,23,42,0.98),rgba(15,23,42,0.98));
-      padding: 14px 14px 12px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .view-scroll {
-      flex: 1;
-      overflow: auto;
-      padding-right: 4px;
-    }
-
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .kpi-card {
-      border-radius: 14px;
-      padding: 10px 10px 9px;
-      background: radial-gradient(circle at 0 0, rgba(15,23,42,0.9), transparent 65%),
-                  linear-gradient(145deg, rgba(15,23,42,0.96), rgba(15,23,42,0.98));
-      border: 1px solid rgba(148,163,184,0.35);
-      box-shadow: 0 10px 32px rgba(15,23,42,0.85);
+    .nav-list {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
 
-    .kpi-label {
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-    }
-
-    .kpi-value {
-      font-size: 20px;
-      font-weight: 600;
-      letter-spacing: -0.03em;
-    }
-
-    .kpi-sub {
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .kpi-tag {
-      margin-left: auto;
-      padding: 3px 6px;
-      border-radius: 999px;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      border: 1px solid rgba(52,211,153,0.4);
-      color: #6ee7b7;
-      background: rgba(6,78,59,0.35);
-    }
-
-    .kpi-tag-soft {
-      border-color: rgba(148,163,184,0.35);
-      color: var(--muted);
-      background: rgba(15,23,42,0.85);
-    }
-
-    .section-header {
+    .nav-item {
+      border-radius: 10px;
+      border: 1px solid transparent;
+      padding: 7px 9px;
+      font-size: 13px;
       display: flex;
       align-items: center;
+      gap: 8px;
+      color: #e5e7eb;
+      cursor: pointer;
+      background: transparent;
+      text-align: left;
+    }
+
+    .nav-item span {
+      flex: 1;
+    }
+
+    .nav-item small {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+    }
+
+    .nav-item.active {
+      border-color: rgba(79, 140, 255, 0.7);
+      background: radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.3), rgba(15, 23, 42, 0.96));
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.9);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid rgba(15, 23, 42, 0.9);
+    }
+
+    .sidebar-footer-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .context-select {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.96);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .sidebar-footer-hint {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .sidebar-footer-env {
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
       justify-content: space-between;
-      gap: 10px;
+    }
+
+    /* MAIN */
+
+    .main {
+      flex: 1;
+      padding: 20px 26px 26px;
+    }
+
+    .main-inner {
+      max-width: 1600px; /* mai întins, mai puțin spațiu mort */
+      margin: 0 auto;
+    }
+
+    .top-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .top-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .page-subtitle {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .context-pill {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.2), transparent 55%);
+      color: #e5e7eb;
+    }
+
+    .context-pill span:first-child {
+      opacity: 0.6;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 9px;
+    }
+
+    /* STAT CARDS (top) */
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
       margin-bottom: 6px;
     }
 
-    .section-title-wrap {
+    .stat-main {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-chip {
+      align-self: flex-start;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .stat-desc {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* PANELS */
+
+    .panel {
+      background: var(--panel-soft);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 14px 16px 12px;
+      margin-bottom: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .panel-title-block {
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
 
-    .section-title {
+    .panel-title {
       font-size: 13px;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #cbd5f5;
     }
 
-    .section-subtitle {
+    .panel-subtitle {
       font-size: 11px;
       color: var(--muted);
     }
 
-    .store-table {
+    .badge-soft {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    /* TABLE HOME */
+
+    .table-wrapper {
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.9);
+      overflow: hidden;
+      background: radial-gradient(circle at 0% 0%, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.98));
+    }
+
+    table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11px;
-      color: #e5e7eb;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid rgba(148,163,184,0.35);
-      background: rgba(15,23,42,0.98);
-    }
-
-    .store-table thead {
-      background: linear-gradient(90deg,rgba(15,23,42,0.98),rgba(17,24,39,0.98));
-    }
-
-    .store-table th,
-    .store-table td {
-      padding: 7px 9px;
-      border-bottom: 1px solid rgba(148,163,184,0.18);
-      text-align: left;
-      white-space: nowrap;
-    }
-
-    .store-table th {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-    }
-
-    .store-table tbody tr:nth-child(even) {
-      background: rgba(15,23,42,0.96);
-    }
-
-    .store-table tbody tr:hover {
-      background: rgba(30,64,175,0.55);
-    }
-
-    .tag-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 6px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.35);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-    }
-
-    .view-empty {
-      padding: 16px;
-      border-radius: 14px;
-      border: 1px dashed rgba(148,163,184,0.45);
-      background: rgba(15,23,42,0.92);
       font-size: 12px;
-      color: var(--muted);
+      color: #e5e7eb;
     }
 
-    .iframe-shell {
-      margin-top: 10px;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1px solid rgba(148,163,184,0.35);
-      background: rgba(15,23,42,0.98);
-      box-shadow: 0 14px 40px rgba(15,23,42,0.95);
+    thead {
+      background: rgba(15, 23, 42, 0.98);
     }
 
-    .iframe-shell-header {
-      padding: 8px 10px;
-      border-bottom: 1px solid rgba(148,163,184,0.25);
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+    }
+
+    th {
       font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      text-align: left;
+    }
+
+    th.numeric,
+    td.numeric {
+      text-align: center; /* cifre centrate */
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    tbody tr:hover {
+      background: rgba(30, 64, 175, 0.55);
+    }
+
+    .store-name-cell {
+      font-weight: 500;
+    }
+
+    .muted {
       color: var(--muted);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 12px 32px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .empty-state strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #e5e7eb;
+      font-size: 14px;
+    }
+
+    /* MY STORES – cards */
+
+    .stores-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
 
-    .iframe-shell-header strong {
-      color: #e5e7eb;
-      font-weight: 500;
+    @media (max-width: 1200px) {
+      .stores-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .stores-grid { grid-template-columns: minmax(0, 1fr); }
     }
 
-    .iframe-shell iframe {
-      width: 100%;
-      height: 340px;
-      border: none;
-      background: #020617;
-    }
-
-    .badge-store-context {
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .badge-store-context strong {
-      color: #e5e7eb;
-      font-weight: 500;
-    }
-
-    /* Password gate */
-
-    .pw-gate-backdrop {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 0 0, rgba(17,24,39,0.94), transparent 65%),
-                  radial-gradient(circle at 100% 0, rgba(15,23,42,0.96), transparent 65%),
-                  rgba(15,23,42,0.98);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 50;
-    }
-
-    .pw-gate-card {
-      width: 320px;
-      max-width: 90vw;
-      border-radius: 20px;
-      border: 1px solid rgba(148,163,184,0.55);
-      background: radial-gradient(circle at 0 0, rgba(79,70,229,0.3), transparent 60%),
-                  radial-gradient(circle at 100% 100%, rgba(56,189,248,0.2), transparent 60%),
-                  rgba(15,23,42,0.98);
-      box-shadow: 0 22px 70px rgba(15,23,42,0.95);
-      padding: 18px 18px 16px;
+    .store-card {
+      border-radius: 14px;
+      border: 1px solid var(--border-soft);
+      background: radial-gradient(circle at 0% 0%, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.98));
+      padding: 12px 13px 11px;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
 
-    .pw-gate-title {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
+    .store-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
     }
 
-    .pw-gate-sub {
+    .store-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .store-domain {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .store-stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .stat-chip-store {
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.96);
+      padding: 6px 7px;
+    }
+
+    .stat-chip-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 3px;
+    }
+
+    .stat-chip-value {
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* EXEC header single store */
+
+    .exec-store-header {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(79, 140, 255, 0.4), rgba(15, 23, 42, 0.98));
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .exec-left h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+
+    .exec-left p {
+      margin: 0;
       font-size: 12px;
       color: var(--muted);
     }
 
-    .pw-input {
-      width: 100%;
-      border-radius: 12px;
-      border: 1px solid rgba(148,163,184,0.6);
-      background: rgba(15,23,42,0.96);
-      color: var(--text);
+    .exec-right {
+      display: flex;
+      gap: 10px;
+    }
+
+    .exec-kpi {
+      min-width: 100px;
       padding: 8px 10px;
-      font-size: 13px;
-      margin-top: 4px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border-soft);
+      text-align: center;
     }
 
-    .pw-btn {
-      margin-top: 10px;
-      width: 100%;
+    .exec-kpi-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .exec-kpi-value {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    /* BUTTONS */
+
+    .btn {
       border-radius: 999px;
-      border: 1px solid rgba(79,70,229,0.8);
-      background: radial-gradient(circle at 0 0, rgba(79,70,229,0.5), transparent 65%);
-      color: #e0e7ff;
-      padding: 7px 10px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      box-shadow: 0 14px 40px rgba(15,23,42,0.95);
-      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-    }
-
-    .pw-btn:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.04);
-      box-shadow: 0 18px 50px rgba(15,23,42,0.98);
-    }
-
-    .pw-error {
-      margin-top: 6px;
+      border: 1px solid var(--border);
+      padding: 7px 14px;
       font-size: 11px;
-      color: #fecaca;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      background: rgba(15, 23, 42, 0.92);
+      color: #e5e7eb;
+      cursor: pointer;
     }
 
-    .hidden {
-      display: none !important;
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #22c1c3);
+      color: #020617;
+      border-color: transparent;
     }
 
-    /* Simple responsive: for small widths collapse sidebar visually (burger only) */
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
 
-    @media (max-width: 980px) {
-      .sidebar {
-        position: absolute;
-        inset: 0 auto 0 0;
-        transform: translateX(-100%);
-        transition: transform 0.2s ease-out;
-      }
-      .sidebar.open {
-        transform: translateX(0);
-      }
+    /* VIEWS */
+
+    .view {
+      display: none;
+    }
+    .view.active {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div class="app-frame" id="app-frame">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-title-wrap">
-          <div class="sidebar-eyebrow">Control Center</div>
-          <div class="sidebar-title">Multi-Store Hub</div>
+  <div class="app-shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <div class="brand">
+          <div class="brand-title">Multi-Store Hub</div>
+          <div class="brand-sub">Sync · Ads · Ops</div>
         </div>
-        <div class="sidebar-badge">BETA</div>
-      </div>
-
-      <nav class="sidebar-nav" id="sidebar-nav">
-        <div class="nav-section-label">Main</div>
-        <button class="nav-item active" data-view="home">
-          <span class="icon">🏠</span>
-          <span class="label">Home</span>
-        </button>
-        <button class="nav-item" data-view="my-stores">
-          <span class="icon">🛒</span>
-          <span class="label">My Stores</span>
-        </button>
-
-        <div class="nav-section-label">Marketing</div>
-        <button class="nav-item" data-view="ads">
-          <span class="icon">📊</span>
-          <span class="label">Ads Overview</span>
-          <small>coming soon</small>
-        </button>
-        <button class="nav-item nav-item-sub" data-view="ads-tiktok">
-          <span class="icon">🎵</span>
-          <span class="label">TikTok Ads</span>
-        </button>
-        <button class="nav-item nav-item-sub" data-view="ads-meta">
-          <span class="icon">📘</span>
-          <span class="label">Meta Ads</span>
-        </button>
-        <button class="nav-item nav-item-sub" data-view="ads-google">
-          <span class="icon">🔍</span>
-          <span class="label">Google Ads</span>
-        </button>
-
-        <div class="nav-section-label">Ops</div>
-        <button class="nav-item" data-view="orders">
-          <span class="icon">📦</span>
-          <span class="label">Orders</span>
-        </button>
-        <button class="nav-item" data-view="shipping">
-          <span class="icon">🚚</span>
-          <span class="label">Shipping</span>
-        </button>
-        <button class="nav-item" data-view="inventory">
-          <span class="icon">📦</span>
-          <span class="label">Inventory</span>
-        </button>
-
-        <div class="nav-section-label">Support</div>
-        <button class="nav-item" data-view="helpdesk">
-          <span class="icon">💬</span>
-          <span class="label">Helpdesk</span>
-        </button>
-        <button class="nav-item" data-view="settings">
-          <span class="icon">⚙️</span>
-          <span class="label">Settings</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div>
-          <div class="store-filter-label">Store context</div>
-          <select id="store-filter" class="store-filter-select">
-            <option value="ALL">All stores</option>
-          </select>
-          <div class="store-filter-note">
-            Orice view (Home, My Stores, Ads etc.) va afișa date doar pentru magazinul ales aici.
-          </div>
-        </div>
-        <div class="sidebar-footer-meta">
-          <span>Context live</span>
-          <span class="key">⌘ + K</span>
-        </div>
-      </div>
-    </aside>
-
-    <main class="app-main" id="app-main">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="burger-btn" id="burger-btn" title="Deschide meniul">
-            <span></span>
-          </button>
-          <div class="topbar-titles">
-            <div class="topbar-eyebrow">Operational overview</div>
-            <div class="topbar-title" id="topbar-title">Home</div>
-            <div class="topbar-subtitle" id="store-context-label">
-              Acum vezi date pentru <strong>toate magazinele</strong>.
-            </div>
-          </div>
-        </div>
-        <div class="topbar-right">
-          <div class="pill pill-soft" id="time-pill">—</div>
-          <div class="pill pill-accent">Live mode</div>
-        </div>
+        <div class="beta-pill">Beta</div>
       </header>
 
-      <section class="view-root">
-        <div class="section-header">
-          <div class="section-title-wrap">
-            <div class="section-title">General overview</div>
-            <div class="section-subtitle" id="section-subtitle">
-              Sumare pentru toate magazinele conectate.
-            </div>
-          </div>
-          <div class="badge-store-context" id="badge-store-context">
-            Context: <strong>All stores</strong>
-          </div>
+      <div>
+        <div class="sidebar-section-label">Main</div>
+        <div class="nav-list">
+          <button class="nav-item" data-view="home">
+            <span>Home</span>
+          </button>
+          <button class="nav-item" data-view="stores">
+            <span>My Stores</span>
+          </button>
         </div>
-        <div class="view-scroll" id="view-root">
-          <!-- content dinamic -->
-        </div>
-      </section>
-    </main>
-
-    <div class="pw-gate-backdrop hidden" id="pw-gate">
-      <div class="pw-gate-card">
-        <div>
-          <div class="pw-gate-title">Acces privat</div>
-          <div class="pw-gate-sub">
-            Introdu parola pentru a intra în tabloul de control intern.
-          </div>
-        </div>
-        <div>
-          <label for="pw-input" class="pw-gate-sub">Parolă</label>
-          <input id="pw-input" type="password" class="pw-input" autocomplete="current-password" />
-        </div>
-        <button class="pw-btn" id="pw-submit">Intră în platformă</button>
-        <div class="pw-error hidden" id="pw-error">Parolă greșită. Încearcă din nou.</div>
       </div>
-    </div>
+
+      <div>
+        <div class="sidebar-section-label">Marketing</div>
+        <div class="nav-list">
+          <button class="nav-item" data-view="ads-overview">
+            <span>Ads Overview</span>
+            <small>Coming soon</small>
+          </button>
+          <button class="nav-item" data-view="tiktok">
+            <span>TikTok Ads</span>
+          </button>
+          <button class="nav-item" data-view="meta">
+            <span>Meta Ads</span>
+          </button>
+          <button class="nav-item" data-view="google">
+            <span>Google Ads</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="sidebar-section-label">Ops</div>
+        <div class="nav-list">
+          <button class="nav-item" data-view="orders">
+            <span>Orders</span>
+          </button>
+          <button class="nav-item" data-view="shipping">
+            <span>Shipping</span>
+          </button>
+          <button class="nav-item" data-view="inventory">
+            <span>Inventory</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="sidebar-section-label">Support</div>
+        <div class="nav-list">
+          <button class="nav-item" data-view="helpdesk">
+            <span>Helpdesk</span>
+          </button>
+          <button class="nav-item" data-view="settings">
+            <span>Settings</span>
+          </button>
+        </div>
+      </div>
+
+      <footer class="sidebar-footer">
+        <div class="sidebar-footer-label">Store context</div>
+        <select id="store-context-select" class="context-select">
+          <option value="all">All stores</option>
+        </select>
+        <p class="sidebar-footer-hint">
+          Orice view (Home, My Stores, Ads etc.) va afișa date doar pentru magazinul ales aici.
+        </p>
+        <div class="sidebar-footer-env">
+          <span>Env: Railway</span>
+          <span id="store-context-live">All stores</span>
+        </div>
+      </footer>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <div class="main-inner">
+        <header class="top-line">
+          <div class="top-title-block">
+            <div class="eyebrow">Operational overview</div>
+            <h1 class="page-title" id="page-title">Home</h1>
+            <p class="page-subtitle" id="page-subtitle">
+              Acum vezi date pentru <strong>toate magazinele</strong>.
+            </p>
+          </div>
+          <div class="context-pill">
+            <span>Context</span>
+            <span id="context-label">All stores</span>
+          </div>
+        </header>
+
+        <!-- HOME VIEW -->
+        <section id="view-home" class="view active">
+          <section class="grid-top">
+            <article class="stat-card">
+              <div class="stat-label">Produse active</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-active-home">–</div>
+                <div class="stat-chip">Catalog</div>
+              </div>
+              <p class="stat-desc">
+                Total produse active în Shopify (conform Stores + API).
+              </p>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Produse draft</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-draft-home">–</div>
+                <div class="stat-chip">Pregătite</div>
+              </div>
+              <p class="stat-desc">
+                Produse pregătite pentru listare în magazine.
+              </p>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Comenzi azi</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-today-home">–</div>
+                <div class="stat-chip">Azi</div>
+              </div>
+              <p class="stat-desc">
+                Comenzi înregistrate în ultimele 24h pentru contextul curent.
+              </p>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Comenzi în acest an</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-year-home">–</div>
+                <div class="stat-chip">YTD</div>
+              </div>
+              <p class="stat-desc">
+                Total comenzi cumulate în anul curent (context curent).
+              </p>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Stores snapshot</div>
+                <p class="panel-subtitle">
+                  Detalii rapide pentru fiecare magazin din context.
+                </p>
+              </div>
+              <div class="badge-soft" id="stores-count-home">0 stores</div>
+            </div>
+
+            <div id="home-table-wrapper" class="table-wrapper">
+              <div class="empty-state" id="home-empty">
+                <strong>Nu sunt magazine încărcate.</strong>
+                Adaugă magazine în foaia <code>Stores</code> și verifică endpoint-ul
+                <code>/stores</code>.
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- MY STORES VIEW -->
+        <section id="view-stores" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">General overview</div>
+                <p class="panel-subtitle">
+                  Sumare pentru toate magazinele conectate (în context).
+                </p>
+              </div>
+              <div class="badge-soft" id="stores-count-mystores">0 stores</div>
+            </div>
+
+            <div id="exec-store-header" class="exec-store-header"></div>
+
+            <div id="mystores-grid-wrapper">
+              <div class="empty-state" id="mystores-empty">
+                <strong>Nu sunt magazine încărcate.</strong>
+                Adaugă magazine în foaia <code>Stores</code>.
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Shopify Multi-Store Sync</div>
+                <p class="panel-subtitle">
+                  Funcționalitatea de sincronizare Shopify existentă, reutilizată aici (fără iframe).
+                </p>
+              </div>
+              <div class="badge-soft" id="sync-context-label">
+                Context: toate magazinele
+              </div>
+            </div>
+            <div>
+              <p class="muted">
+                De aici vei putea rula verificări și sincronizări pentru produse (create / update / delete)
+                pe baza datelor din Google Sheets + Shopify.
+              </p>
+              <p class="muted">
+                Momentan, consola completă este disponibilă într-o pagină dedicată.
+                Poți deschide consola veche într-un tab nou; ulterior o putem integra nativ aici.
+              </p>
+              <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="/shopify" target="_blank" rel="noopener" class="btn btn-primary">
+                  Deschide consola de sincronizare
+                </a>
+                <button class="btn" type="button" disabled>
+                  Preview & sync direct aici (coming soon)
+                </button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- PLACEHOLDER VIEWS pentru restul meniului (deocamdată) -->
+        <section id="view-ads-overview" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Ads Overview</div>
+                <p class="panel-subtitle">
+                  Rezumat cross-channel (TikTok / Meta / Google) – în curând.
+                </p>
+              </div>
+            </div>
+            <div class="empty-state">
+              <strong>Coming soon.</strong>
+              Acest view va centraliza KPI de marketing din toate conturile conectate.
+            </div>
+          </section>
+        </section>
+
+        <section id="view-tiktok" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">TikTok Ads</div>
+                <p class="panel-subtitle">
+                  Modulul detaliat de TikTok Ads trăiește în prezent pe ruta <code>/marketing</code>.
+                </p>
+              </div>
+            </div>
+            <div class="empty-state">
+              <strong>Redirect manual pentru moment.</strong>
+              <a href="/marketing" target="_blank" rel="noopener" style="color:#93c5fd;text-decoration:none;">
+                Deschide pagina de TikTok Ads
+              </a>
+            </div>
+          </section>
+        </section>
+
+        <!-- celelalte view-uri (meta, google, orders etc.) pot fi umplute ulterior -->
+        <section id="view-meta" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Meta Ads</div>
+                <p class="panel-subtitle">Integrare viitoare cu Meta Ads Manager.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-google" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Google Ads</div>
+                <p class="panel-subtitle">Integrare viitoare cu Google Ads.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-orders" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Orders</div>
+                <p class="panel-subtitle">Overview comenzi – modul viitor.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-shipping" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Shipping</div>
+                <p class="panel-subtitle">Integrare viitoare cu curieri.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-inventory" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Inventory</div>
+                <p class="panel-subtitle">Stocuri cross-store – modul viitor.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-helpdesk" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Helpdesk</div>
+                <p class="panel-subtitle">Centralizare tichete suport – în curând.</p>
+              </div>
+            </div>
+            <div class="empty-state"><strong>Coming soon.</strong></div>
+          </section>
+        </section>
+
+        <section id="view-settings" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Settings</div>
+                <p class="panel-subtitle">Configurări generale pentru hub.</p>
+              </div>
+            </div>
+            <div class="empty-state">
+              <strong>Settings framework.</strong>
+              Aici vom adăuga editor pentru variabile (inclusiv ENV mirror), parole etc.
+            </div>
+          </section>
+        </section>
+
+      </div>
+    </main>
   </div>
 
   <script>
-    window.__DASHBOARD_PASSWORD = ${JSON.stringify(uiPassword)};
-
     (function () {
-      const state = {
-        stores: [],
-        selectedStoreId: 'ALL',
-        currentView: 'home',
-      };
+      const params = new URLSearchParams(window.location.search);
+      let currentView = params.get('view') || 'home';
+      let selectedStoreId = params.get('store_id') || 'all';
 
-      const appFrame = document.getElementById('app-frame');
-      const sidebar = document.getElementById('sidebar');
-      const burgerBtn = document.getElementById('burger-btn');
-      const nav = document.getElementById('sidebar-nav');
-      const storeFilter = document.getElementById('store-filter');
-      const viewRoot = document.getElementById('view-root');
-      const topbarTitle = document.getElementById('topbar-title');
-      const storeContextLabel = document.getElementById('store-context-label');
-      const badgeStoreContext = document.getElementById('badge-store-context');
-      const sectionSubtitle = document.getElementById('section-subtitle');
-      const timePill = document.getElementById('time-pill');
+      const contextLabelEl = document.getElementById('context-label');
+      const pageTitleEl = document.getElementById('page-title');
+      const pageSubtitleEl = document.getElementById('page-subtitle');
+      const storeContextSelect = document.getElementById('store-context-select');
+      const storeContextLive = document.getElementById('store-context-live');
 
-      const pwGate = document.getElementById('pw-gate');
-      const pwInput = document.getElementById('pw-input');
-      const pwSubmit = document.getElementById('pw-submit');
-      const pwError = document.getElementById('pw-error');
-      const passwordFromServer = window.__DASHBOARD_PASSWORD || '';
+      const navItems = document.querySelectorAll('.nav-item');
+      const views = document.querySelectorAll('.view');
 
-      function fmtNumber(value) {
-        if (value == null || isNaN(value)) return '—';
-        return new Intl.NumberFormat('ro-RO').format(Number(value));
+      const statActiveHome = document.getElementById('stat-active-home');
+      const statDraftHome = document.getElementById('stat-draft-home');
+      const statTodayHome = document.getElementById('stat-today-home');
+      const statYearHome = document.getElementById('stat-year-home');
+      const storesCountHome = document.getElementById('stores-count-home');
+      const homeTableWrapper = document.getElementById('home-table-wrapper');
+      const homeEmpty = document.getElementById('home-empty');
+
+      const storesCountMy = document.getElementById('stores-count-mystores');
+      const myGridWrapper = document.getElementById('mystores-grid-wrapper');
+      const myEmpty = document.getElementById('mystores-empty');
+      const execHeader = document.getElementById('exec-store-header');
+      const syncContextLabel = document.getElementById('sync-context-label');
+
+      function formatNumber(n) {
+        if (n == null || isNaN(n)) return '–';
+        return n.toLocaleString('ro-RO');
       }
 
-      function computeAggregates(stores) {
-        const agg = {
-          storeCount: stores.length,
-          active: 0,
-          draft: 0,
-          today: 0,
-          week: 0,
-          month: 0,
-          year: 0,
-        };
-        stores.forEach((s) => {
-          agg.active += Number(s.active_products || 0);
-          agg.draft += Number(s.draft_products || 0);
-          agg.today += Number(s.today_orders || 0);
-          agg.week += Number(s.week_orders || 0);
-          agg.month += Number(s.month_orders || 0);
-          agg.year += Number(s.year_orders || 0);
-        });
-        return agg;
-      }
+      function setView(view) {
+        currentView = view;
+        views.forEach((v) => v.classList.remove('active'));
+        const activeView = document.getElementById('view-' + view);
+        if (activeView) activeView.classList.add('active');
 
-      function getStoreLabel(id) {
-        if (id === 'ALL') return 'toate magazinele';
-        const store = state.stores.find((s) => s.store_id === id);
-        if (!store) return id;
-        return store.store_name || store.store_id;
-      }
+        navItems.forEach((n) =>
+          n.classList.toggle('active', n.getAttribute('data-view') === view)
+        );
 
-      function getStoresForContext() {
-        if (state.selectedStoreId === 'ALL') return state.stores;
-        return state.stores.filter((s) => s.store_id === state.selectedStoreId);
-      }
-
-      function updateContextLabels() {
-        const label = getStoreLabel(state.selectedStoreId);
-        storeContextLabel.innerHTML = 'Acum vezi date pentru <strong>' + label + '</strong>.';
-        badgeStoreContext.innerHTML =
-          'Context: <strong>' + (state.selectedStoreId === 'ALL' ? 'All stores' : label) + '</strong>';
-
-        if (state.selectedStoreId === 'ALL') {
-          sectionSubtitle.textContent = 'Sumare pentru toate magazinele conectate.';
+        if (view === 'home') {
+          pageTitleEl.textContent = 'Home';
+        } else if (view === 'stores') {
+          pageTitleEl.textContent = 'My Stores';
+        } else if (view === 'tiktok') {
+          pageTitleEl.textContent = 'TikTok Ads';
         } else {
-          sectionSubtitle.textContent = 'Sumare filtrată doar pentru magazinul selectat.';
+          pageTitleEl.textContent = view.charAt(0).toUpperCase() + view.slice(1);
         }
+
+        const label =
+          selectedStoreId === 'all' ? 'toate magazinele' : 'store-ul selectat';
+        pageSubtitleEl.innerHTML =
+          'Acum vezi date pentru <strong>' + label + '</strong>.';
+
+        const contextText =
+          selectedStoreId === 'all' ? 'All stores' : selectedStoreId;
+        contextLabelEl.textContent = contextText;
+        storeContextLive.textContent = contextText;
+
+        params.set('view', view);
+        params.set('store_id', selectedStoreId);
+        const newUrl =
+          window.location.pathname + '?' + params.toString() + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
       }
 
-      function renderHome() {
-        const stores = getStoresForContext();
+      navItems.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const v = btn.getAttribute('data-view');
+          setView(v);
+        });
+      });
+
+      function buildHomeTable(stores) {
         if (!stores.length) {
-          viewRoot.innerHTML =
-            '<div class="view-empty">Nu sunt magazine încărcate. Verifică foaia <strong>Stores</strong> sau conexiunea către Shopify.</div>';
+          homeEmpty.style.display = 'block';
+          homeTableWrapper.innerHTML = '';
+          homeTableWrapper.appendChild(homeEmpty);
           return;
         }
-        const agg = computeAggregates(stores);
-
-        const kpiHtml = [
-          {
-            label: 'Produse active',
-            value: fmtNumber(agg.active),
-            sub: agg.storeCount + ' store' + (agg.storeCount === 1 ? '' : 's'),
-            tag: 'catalog',
-          },
-          {
-            label: 'Produse draft',
-            value: fmtNumber(agg.draft),
-            sub: 'pregătite pentru listare',
-            tag: 'backlog',
-          },
-          {
-            label: 'Comenzi azi',
-            value: fmtNumber(agg.today),
-            sub: 'vs. ' + fmtNumber(agg.week) + ' în săptămâna curentă',
-            tag: 'azi',
-          },
-          {
-            label: 'Comenzi în acest an',
-            value: fmtNumber(agg.year),
-            sub: fmtNumber(agg.month) + ' în luna curentă',
-            tag: 'YTD',
-          },
-        ]
-          .map(function (k) {
-            return (
-              '<div class="kpi-card">' +
-                '<div class="kpi-label">' + k.label + '</div>' +
-                '<div class="kpi-value">' + k.value + '</div>' +
-                '<div class="kpi-sub">' + k.sub + '</div>' +
-                '<div class="kpi-tag kpi-tag-soft">' + k.tag + '</div>' +
-              '</div>'
-            );
-          })
-          .join('');
+        homeEmpty.style.display = 'none';
 
         const rowsHtml = stores
-          .map(function (s) {
+          .map((s) => {
             return (
               '<tr>' +
-                '<td>' + (s.store_name || s.store_id) + '</td>' +
-                '<td>' + (s.store_id || '') + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.active_products) + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.draft_products) + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.today_orders) + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.week_orders) + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.month_orders) + '</td>' +
-                '<td style="text-align:right;">' + fmtNumber(s.year_orders) + '</td>' +
+                '<td class="store-name-cell">' +
+                  (s.store_name || s.store_id || 'Store') +
+                '</td>' +
+                '<td class="numeric">' + formatNumber(s.active_products) + '</td>' +
+                '<td class="numeric">' + formatNumber(s.draft_products) + '</td>' +
+                '<td class="numeric">' + formatNumber(s.today_orders) + '</td>' +
+                '<td class="numeric">' + formatNumber(s.week_orders) + '</td>' +
+                '<td class="numeric">' + formatNumber(s.month_orders) + '</td>' +
+                '<td class="numeric">' + formatNumber(s.year_orders) + '</td>' +
               '</tr>'
             );
           })
           .join('');
 
-        viewRoot.innerHTML =
-          '<div class="kpi-grid">' +
-            kpiHtml +
-          '</div>' +
-          '<div>' +
-            '<div class="section-header" style="margin-top:4px;margin-bottom:6px;">' +
-              '<div class="section-title-wrap">' +
-                '<div class="section-title">Stores snapshot</div>' +
-                '<div class="section-subtitle">Detalii rapide pentru fiecare magazin ' +
-                  (state.selectedStoreId === 'ALL' ? '(toate)' : '(filtrate)') +
-                '</div>' +
-              '</div>' +
-            '</div>' +
-            '<div class="store-table-wrap">' +
-              '<table class="store-table">' +
-                '<thead>' +
-                  '<tr>' +
-                    '<th>Store</th>' +
-                    '<th>ID</th>' +
-                    '<th>Active</th>' +
-                    '<th>Draft</th>' +
-                    '<th>Today</th>' +
-                    '<th>This week</th>' +
-                    '<th>This month</th>' +
-                    '<th>This year</th>' +
-                  '</tr>' +
-                '</thead>' +
-                '<tbody>' +
-                  rowsHtml +
-                '</tbody>' +
-              '</table>' +
-            '</div>' +
-          '</div>';
+        const tableHtml =
+          '<table>' +
+            '<thead>' +
+              '<tr>' +
+                '<th>Store</th>' +
+                '<th class="numeric">Active</th>' +
+                '<th class="numeric">Draft</th>' +
+                '<th class="numeric">Azi</th>' +
+                '<th class="numeric">Săpt.</th>' +
+                '<th class="numeric">Lună</th>' +
+                '<th class="numeric">An</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' + rowsHtml + '</tbody>' +
+          '</table>';
+
+        homeTableWrapper.innerHTML = tableHtml;
       }
 
-      function renderMyStores() {
-        const stores = getStoresForContext();
-        if (!stores.length) {
-          viewRoot.innerHTML =
-            '<div class="view-empty">Nu sunt magazine încărcate. Adaugă magazine în foaia <strong>Stores</strong> și asigură-te că /stores răspunde corect.</div>';
+      function renderExecHeader(store) {
+        if (!store) {
+          execHeader.style.display = 'none';
+          execHeader.innerHTML = '';
           return;
         }
-        const agg = computeAggregates(stores);
-
-        const cardsHtml = stores
-          .map(function (s) {
-            return (
-              '<div class="kpi-card">' +
-                '<div class="kpi-label">' + (s.store_name || s.store_id) + '</div>' +
-                '<div class="kpi-sub" style="margin-bottom:6px;">' +
-                  (s.shopify_domain || '') +
-                '</div>' +
-                '<div style="display:flex;gap:8px;font-size:11px;">' +
-                  '<div><span class="tag-pill">active</span> ' + fmtNumber(s.active_products) + '</div>' +
-                  '<div><span class="tag-pill">draft</span> ' + fmtNumber(s.draft_products) + '</div>' +
-                '</div>' +
-                '<div style="display:flex;gap:8px;margin-top:4px;font-size:11px;">' +
-                  '<div><span class="tag-pill">azi</span> ' + fmtNumber(s.today_orders) + '</div>' +
-                  '<div><span class="tag-pill">luna</span> ' + fmtNumber(s.month_orders) + '</div>' +
-                '</div>' +
-              '</div>'
-            );
-          })
-          .join('');
-
-        const storeContextLabel =
-          state.selectedStoreId === 'ALL'
-            ? 'Toate magazinele'
-            : 'Doar magazinul: ' + getStoreLabel(state.selectedStoreId);
-
-        const iframeStoreParam =
-          state.selectedStoreId && state.selectedStoreId !== 'ALL'
-            ? '?store_id=' + encodeURIComponent(state.selectedStoreId)
-            : '';
-
-        viewRoot.innerHTML =
-          '<div class="kpi-grid">' +
-            cardsHtml +
+        execHeader.style.display = 'flex';
+        execHeader.innerHTML =
+          '<div class="exec-left">' +
+            '<h2>' + (store.store_name || store.store_id || 'Store') + '</h2>' +
+            '<p>Shopify: ' + (store.shopify_domain || '—') + '</p>' +
           '</div>' +
-          '<div class="iframe-shell">' +
-            '<div class="iframe-shell-header">' +
-              '<div>' +
-                '<strong>Product Sync Console</strong><br />' +
-                '<span>Funcționalitatea clasică de sincronizare Shopify, reutilizată aici.</span>' +
-              '</div>' +
-              '<div class="badge-store-context">Context iframe: <strong>' + storeContextLabel + '</strong></div>' +
+          '<div class="exec-right">' +
+            '<div class="exec-kpi">' +
+              '<div class="exec-kpi-label">Active</div>' +
+              '<div class="exec-kpi-value">' + formatNumber(store.active_products) + '</div>' +
             '</div>' +
-            '<iframe src="/shopify' + iframeStoreParam + '" loading="lazy"></iframe>' +
+            '<div class="exec-kpi">' +
+              '<div class="exec-kpi-label">Draft</div>' +
+              '<div class="exec-kpi-value">' + formatNumber(store.draft_products) + '</div>' +
+            '</div>' +
+            '<div class="exec-kpi">' +
+              '<div class="exec-kpi-label">Comenzi azi</div>' +
+              '<div class="exec-kpi-value">' + formatNumber(store.today_orders) + '</div>' +
+            '</div>' +
           '</div>';
       }
 
-      function renderPlaceholder(title, description) {
-        viewRoot.innerHTML =
-          '<div class="view-empty">' +
-            '<strong>' + title + '</strong><br />' +
-            description +
-          '</div>';
-      }
-
-      function renderCurrentView() {
-        updateContextLabels();
-        if (state.currentView === 'home') {
-          renderHome();
-        } else if (state.currentView === 'my-stores') {
-          renderMyStores();
-        } else if (state.currentView === 'ads') {
-          renderPlaceholder(
-            'Ads overview',
-            'Aici vom agrega performanța campaniilor din TikTok / Meta / Google pentru magazinul selectat.'
-          );
-        } else if (state.currentView === 'ads-tiktok') {
-          renderPlaceholder(
-            'TikTok Ads',
-            'Tablou de control pentru conturile și Business Center-ele TikTok Ads. Modul în lucru.'
-          );
-        } else if (state.currentView === 'ads-meta') {
-          renderPlaceholder(
-            'Meta Ads',
-            'Tablou de control pentru Facebook / Instagram Ads. Modul în lucru.'
-          );
-        } else if (state.currentView === 'ads-google') {
-          renderPlaceholder(
-            'Google Ads',
-            'Tablou de control pentru Google Ads. Modul în lucru.'
-          );
-        } else if (state.currentView === 'orders') {
-          renderPlaceholder(
-            'Orders',
-            'Aici vei vedea comenzi cross-store filtrabile după magazinul selectat.'
-          );
-        } else if (state.currentView === 'shipping') {
-          renderPlaceholder(
-            'Shipping',
-            'Integrare cu curieri (Fan, GLS, Sameday etc.) – modul pregătit, urmează integrarea.'
-          );
-        } else if (state.currentView === 'inventory') {
-          renderPlaceholder(
-            'Inventory',
-            'Stocuri consolidate pe toate magazinele – modul în lucru.'
-          );
-        } else if (state.currentView === 'helpdesk') {
-          renderPlaceholder(
-            'Helpdesk',
-            'Centralizare tichete și mesaje clienți din toate canalele – modul în lucru.'
-          );
-        } else if (state.currentView === 'settings') {
-          renderPlaceholder(
-            'Settings',
-            'Aici vom expune variabilele critice (inclusiv cele de Railway) pentru a fi editate rapid.'
-          );
-        } else {
-          renderPlaceholder('Unknown view', 'Nu există view pentru: ' + state.currentView);
+      function renderMyStoresCards(stores) {
+        if (!stores.length) {
+          myEmpty.style.display = 'block';
+          myGridWrapper.innerHTML = '';
+          myGridWrapper.appendChild(myEmpty);
+          renderExecHeader(null);
+          return;
         }
-      }
+        myEmpty.style.display = 'none';
 
-      function setActiveNav(view) {
-        const buttons = nav.querySelectorAll('.nav-item');
-        buttons.forEach(function (btn) {
-          if (btn.dataset.view === view) {
-            btn.classList.add('active');
-          } else {
-            btn.classList.remove('active');
-          }
+        if (stores.length === 1) {
+          renderExecHeader(stores[0]);
+        } else {
+          renderExecHeader(null);
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'stores-grid';
+
+        stores.forEach((s) => {
+          const card = document.createElement('article');
+          card.className = 'store-card';
+          card.innerHTML =
+            '<div class="store-card-header">' +
+              '<div>' +
+                '<div class="store-name">' + (s.store_name || s.store_id || 'Store') + '</div>' +
+                '<div class="store-domain">' + (s.shopify_domain || '—') + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="store-stats-row">' +
+              '<div class="stat-chip-store">' +
+                '<div class="stat-chip-label">Active</div>' +
+                '<div class="stat-chip-value">' + formatNumber(s.active_products) + '</div>' +
+              '</div>' +
+              '<div class="stat-chip-store">' +
+                '<div class="stat-chip-label">Draft</div>' +
+                '<div class="stat-chip-value">' + formatNumber(s.draft_products) + '</div>' +
+              '</div>' +
+              '<div class="stat-chip-store">' +
+                '<div class="stat-chip-label">Comenzi azi</div>' +
+                '<div class="stat-chip-value">' + formatNumber(s.today_orders) + '</div>' +
+              '</div>' +
+            '</div>';
+          grid.appendChild(card);
         });
-      }
 
-      function handleNavClick(evt) {
-        const btn = evt.target.closest('.nav-item');
-        if (!btn) return;
-        const view = btn.dataset.view;
-        if (!view) return;
-        state.currentView = view;
-        setActiveNav(view);
-
-        const titleMap = {
-          'home': 'Home',
-          'my-stores': 'My Stores',
-          'ads': 'Ads Overview',
-          'ads-tiktok': 'TikTok Ads',
-          'ads-meta': 'Meta Ads',
-          'ads-google': 'Google Ads',
-          'orders': 'Orders',
-          'shipping': 'Shipping',
-          'inventory': 'Inventory',
-          'helpdesk': 'Helpdesk',
-          'settings': 'Settings',
-        };
-        topbarTitle.textContent = titleMap[view] || 'Dashboard';
-        renderCurrentView();
-      }
-
-      function handleStoreFilterChange() {
-        const value = storeFilter.value || 'ALL';
-        state.selectedStoreId = value;
-        localStorage.setItem('dashboard_selected_store', value);
-        renderCurrentView();
-      }
-
-      function toggleSidebar() {
-        const isOpen = sidebar.classList.contains('open');
-        if (isOpen) {
-          sidebar.classList.remove('open');
-          appFrame.classList.remove('blurred-main');
-        } else {
-          sidebar.classList.add('open');
-          appFrame.classList.add('blurred-main');
-        }
-      }
-
-      function updateTime() {
-        try {
-          const now = new Date();
-          const formatter = new Intl.DateTimeFormat('ro-RO', {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          timePill.textContent = formatter.format(now);
-        } catch (e) {
-          timePill.textContent = 'live';
-        }
+        myGridWrapper.innerHTML = '';
+        myGridWrapper.appendChild(grid);
       }
 
       async function loadStores() {
@@ -1173,76 +1128,89 @@ function dashboardPage() {
           const res = await fetch('/stores');
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
-          state.stores = Array.isArray(data) ? data : [];
+          const allStores = Array.isArray(data) ? data : [];
 
-          while (storeFilter.options.length > 1) {
-            storeFilter.remove(1);
-          }
-          state.stores.forEach(function (s) {
+          // populate dropdown
+          allStores.forEach((s) => {
             const opt = document.createElement('option');
             opt.value = s.store_id;
             opt.textContent = s.store_name || s.store_id;
-            storeFilter.appendChild(opt);
+            storeContextSelect.appendChild(opt);
           });
 
-          const saved = localStorage.getItem('dashboard_selected_store');
-          if (saved && (saved === 'ALL' || state.stores.some(function (s) { return s.store_id === saved; }))) {
-            state.selectedStoreId = saved;
-            storeFilter.value = saved;
-          } else {
-            state.selectedStoreId = 'ALL';
-            storeFilter.value = 'ALL';
+          if (!selectedStoreId) selectedStoreId = 'all';
+          storeContextSelect.value = selectedStoreId;
+
+          let visibleStores = allStores;
+          let contextText = 'All stores';
+          if (selectedStoreId !== 'all') {
+            visibleStores = allStores.filter(
+              (s) => String(s.store_id) === String(selectedStoreId)
+            );
+            if (visibleStores.length) {
+              contextText = visibleStores[0].store_name || selectedStoreId;
+            } else {
+              contextText = selectedStoreId;
+            }
           }
 
-          renderCurrentView();
+          contextLabelEl.textContent = contextText;
+          storeContextLive.textContent = contextText;
+          syncContextLabel.textContent =
+            'Context: ' +
+            (selectedStoreId === 'all'
+              ? 'toate magazinele'
+              : 'magazin ' + contextText);
+
+          // sort by name
+          visibleStores.sort((a, b) => {
+            const na = (a.store_name || a.store_id || '').toLowerCase();
+            const nb = (b.store_name || b.store_id || '').toLowerCase();
+            return na.localeCompare(nb);
+          });
+
+          // totals for home
+          const totals = visibleStores.reduce(
+            (acc, s) => {
+              acc.active += s.active_products || 0;
+              acc.draft += s.draft_products || 0;
+              acc.today += s.today_orders || 0;
+              acc.year += s.year_orders || 0;
+              return acc;
+            },
+            { active: 0, draft: 0, today: 0, year: 0 }
+          );
+
+          statActiveHome.textContent = formatNumber(totals.active);
+          statDraftHome.textContent = formatNumber(totals.draft);
+          statTodayHome.textContent = formatNumber(totals.today);
+          statYearHome.textContent = formatNumber(totals.year);
+
+          storesCountHome.textContent =
+            visibleStores.length + (visibleStores.length === 1 ? ' store' : ' stores');
+          storesCountMy.textContent = storesCountHome.textContent;
+
+          buildHomeTable(visibleStores);
+          renderMyStoresCards(visibleStores);
         } catch (err) {
-          console.error('Eroare loadStores', err);
-          viewRoot.innerHTML =
-            '<div class="view-empty">Nu am putut încărca /api/stores (' +
-            (err.message || err) +
-            ').</div>';
+          console.error('Error /stores', err);
+          homeEmpty.style.display = 'block';
+          homeEmpty.innerHTML =
+            '<strong>Eroare la încărcarea magazinelor.</strong><br />' +
+            (err.message || String(err));
+          myEmpty.style.display = 'block';
         }
       }
 
-      function initPasswordGate() {
-        const key = 'dashboard_pw_ok';
-        if (!passwordFromServer) {
-          pwGate.classList.add('hidden');
-          return;
-        }
-        if (localStorage.getItem(key) === '1') {
-          pwGate.classList.add('hidden');
-          return;
-        }
-        pwGate.classList.remove('hidden');
+      // change context
+      storeContextSelect.addEventListener('change', () => {
+        selectedStoreId = storeContextSelect.value || 'all';
+        loadStores();
+        setView(currentView);
+      });
 
-        function tryLogin() {
-          const val = (pwInput.value || '').trim();
-          if (val && val === passwordFromServer) {
-            localStorage.setItem(key, '1');
-            pwError.classList.add('hidden');
-            pwGate.classList.add('hidden');
-          } else {
-            pwError.classList.remove('hidden');
-          }
-        }
-
-        pwSubmit.addEventListener('click', tryLogin);
-        pwInput.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') {
-            tryLogin();
-          }
-        });
-      }
-
-      burgerBtn.addEventListener('click', toggleSidebar);
-      nav.addEventListener('click', handleNavClick);
-      storeFilter.addEventListener('change', handleStoreFilterChange);
-
-      updateTime();
-      setInterval(updateTime, 1000 * 60);
-
-      initPasswordGate();
+      // init
+      setView(currentView);
       loadStores();
     })();
   </script>
