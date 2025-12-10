@@ -566,6 +566,298 @@ function dashboardPage() {
     .view.active {
       display: block;
     }
+
+    /* ORDERS */
+
+    .orders-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .orders-search {
+      flex: 1;
+      min-width: 220px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .orders-search input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.92);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .filter-chip input,
+    .filter-chip select {
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .filter-chip select option {
+      background: #0b0f19;
+      color: #e5e7eb;
+    }
+
+    .orders-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .orders-table-wrapper {
+      position: relative;
+    }
+
+    .orders-table-wrapper table tbody tr {
+      cursor: pointer;
+    }
+
+    .orders-table-wrapper table tbody tr:active {
+      background: rgba(79, 140, 255, 0.3);
+    }
+
+    .orders-table-shell {
+      display: none;
+    }
+
+    .order-customer {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .order-sub {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.85);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status-pill.status-paid,
+    .status-pill.status-fulfilled,
+    .status-pill.status-success {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.12);
+      color: #bbf7d0;
+    }
+
+    .status-pill.status-open {
+      border-color: rgba(79, 140, 255, 0.5);
+      background: rgba(79, 140, 255, 0.12);
+      color: #bfdbfe;
+    }
+
+    .status-pill.status-cancelled,
+    .status-pill.status-voided {
+      border-color: rgba(251, 113, 133, 0.5);
+      background: rgba(251, 113, 133, 0.16);
+      color: #fecdd3;
+    }
+
+    .status-pill.status-pending {
+      border-color: rgba(234, 179, 8, 0.5);
+      background: rgba(234, 179, 8, 0.12);
+      color: #fef3c7;
+    }
+
+    .orders-empty-inline {
+      text-align: center;
+      padding: 20px 10px;
+      color: var(--muted);
+    }
+
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.6);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 20;
+    }
+
+    .drawer-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .details-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100vh;
+      width: 420px;
+      max-width: 92vw;
+      background: rgba(11, 15, 25, 0.98);
+      border-left: 1px solid var(--border);
+      box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+      transform: translateX(100%);
+      transition: transform 0.28s ease;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .details-drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .drawer-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .drawer-body {
+      padding: 14px 16px 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .drawer-section {
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .drawer-section:last-child {
+      border-bottom: 0;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .section-heading {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      font-size: 11px;
+    }
+
+    .line-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .line-item:last-child {
+      border-bottom: 0;
+    }
+
+    .line-item-title {
+      font-weight: 500;
+      font-size: 12px;
+    }
+
+    .link-inline {
+      background: none;
+      border: 0;
+      padding: 0;
+      color: #93c5fd;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .drawer-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .stat-card-mini {
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 8px 9px;
+      background: rgba(15, 23, 42, 0.92);
+    }
+
+    .stat-card-mini .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .stat-card-mini .value {
+      font-size: 14px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -859,10 +1151,76 @@ function dashboardPage() {
             <div class="panel-header">
               <div class="panel-title-block">
                 <div class="panel-title">Orders</div>
-                <p class="panel-subtitle">Overview comenzi – modul viitor.</p>
+                <p class="panel-subtitle">
+                  Centralizează și filtrează comenzile Shopify pentru contextul selectat.
+                  Click pe un rând pentru detalii în panoul din dreapta.
+                </p>
+              </div>
+              <div class="badge-soft" id="orders-count-label">0 orders</div>
+            </div>
+
+            <div class="orders-toolbar">
+              <div class="orders-search">
+                <span class="muted" aria-hidden="true" style="font-size:12px;">🔎</span>
+                <input
+                  id="orders-search"
+                  type="search"
+                  placeholder="Search orders, products, customers"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="filter-group">
+                <label class="filter-chip">
+                  <span>From</span>
+                  <input id="orders-from" type="date" />
+                </label>
+                <label class="filter-chip">
+                  <span>To</span>
+                  <input id="orders-to" type="date" />
+                </label>
+                <label class="filter-chip">
+                  <span>Status</span>
+                  <select id="orders-status">
+                    <option value="all">All</option>
+                    <option value="open">Open</option>
+                    <option value="paid">Paid</option>
+                    <option value="fulfilled">Fulfilled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
               </div>
             </div>
-            <div class="empty-state"><strong>Coming soon.</strong></div>
+
+            <div class="orders-meta" id="orders-meta">
+              Afișăm ultimele comenzi pentru contextul curent.
+            </div>
+
+            <div class="orders-table-wrapper">
+              <div id="orders-loading" class="empty-state" style="display:none;">
+                <strong>Se încarcă...</strong>
+                Pregătim lista de comenzi.
+              </div>
+              <div id="orders-empty" class="empty-state" style="display:none;">
+                <strong>Nicio comandă găsită.</strong>
+                Ajustează filtrele sau schimbă contextul.
+              </div>
+              <div id="orders-table-shell" class="orders-table-shell">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Date</th>
+                      <th>Store</th>
+                      <th>Customer</th>
+                      <th>Items</th>
+                      <th class="numeric">Total</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="orders-tbody"></tbody>
+                </table>
+              </div>
+            </div>
           </section>
         </section>
 
@@ -921,6 +1279,15 @@ function dashboardPage() {
     </main>
   </div>
 
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="details-drawer" class="details-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title" id="drawer-title">Details</div>
+      <button id="drawer-close" class="btn">Close</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
   <script>
     (function () {
       const params = new URLSearchParams(window.location.search);
@@ -949,10 +1316,120 @@ function dashboardPage() {
       const myEmpty = document.getElementById('mystores-empty');
       const execHeader = document.getElementById('exec-store-header');
       const syncContextLabel = document.getElementById('sync-context-label');
+      const ordersCountLabel = document.getElementById('orders-count-label');
+      const ordersSearchInput = document.getElementById('orders-search');
+      const ordersStatusSelect = document.getElementById('orders-status');
+      const ordersFromInput = document.getElementById('orders-from');
+      const ordersToInput = document.getElementById('orders-to');
+      const ordersMeta = document.getElementById('orders-meta');
+      const ordersLoading = document.getElementById('orders-loading');
+      const ordersEmpty = document.getElementById('orders-empty');
+      const ordersTableShell = document.getElementById('orders-table-shell');
+      const ordersTableBody = document.getElementById('orders-tbody');
+      const defaultOrdersEmptyHTML = ordersEmpty ? ordersEmpty.innerHTML : '';
+
+      const drawerEl = document.getElementById('details-drawer');
+      const drawerBackdrop = document.getElementById('drawer-backdrop');
+      const drawerTitleEl = document.getElementById('drawer-title');
+      const drawerBodyEl = document.getElementById('drawer-body');
+      const drawerCloseBtn = document.getElementById('drawer-close');
+
+      const ordersState = {
+        items: [],
+        loading: false,
+        filters: {
+          q: '',
+          status: 'all',
+          from: '',
+          to: '',
+          limit: 50,
+        },
+        error: '',
+      };
+      let ordersDirty = true;
+      const orderDetailsCache = new Map();
+      let activeOrderDetail = null;
 
       function formatNumber(n) {
         if (n == null || isNaN(n)) return '–';
         return n.toLocaleString('ro-RO');
+      }
+
+      function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function formatMoney(amount, currency) {
+        const num = Number(amount);
+        if (Number.isNaN(num)) return '–';
+        const curr = currency || 'RON';
+        try {
+          return new Intl.NumberFormat('ro-RO', {
+            style: 'currency',
+            currency: curr,
+            minimumFractionDigits: 2,
+          }).format(num);
+        } catch (err) {
+          return num.toFixed(2) + ' ' + curr;
+        }
+      }
+
+      function formatDateTime(value) {
+        if (!value) return '—';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return String(value);
+        return d.toLocaleString('ro-RO', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
+      function statusClass(value) {
+        if (!value) return '';
+        return (
+          'status-' +
+          String(value)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+        );
+      }
+
+      function statusPill(value) {
+        if (!value) return '<span class="muted">–</span>';
+        const cls = 'status-pill ' + statusClass(value);
+        const label = escapeHtml(String(value).replace(/_/g, ' '));
+        return '<span class="' + cls + '">' + label + '</span>';
+      }
+
+      function formatAddress(address) {
+        if (!address) return '—';
+        const parts = [
+          address.name || '',
+          address.address1 || '',
+          address.address2 || '',
+          address.city || '',
+          address.country || '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        return parts || '—';
+      }
+
+      function countOrdersForProduct(title) {
+        if (!title) return 0;
+        const needle = String(title).toLowerCase();
+        return ordersState.items.filter((o) =>
+          String(o.items_summary || '').toLowerCase().includes(needle)
+        ).length;
       }
 
       function setView(view) {
@@ -984,6 +1461,10 @@ function dashboardPage() {
           selectedStoreId === 'all' ? 'All stores' : selectedStoreId;
         contextLabelEl.textContent = contextText;
         storeContextLive.textContent = contextText;
+
+        if (view === 'orders' && ordersDirty) {
+          loadOrders();
+        }
 
         params.set('view', view);
         params.set('store_id', selectedStoreId);
@@ -1073,7 +1554,7 @@ function dashboardPage() {
           '</div>';
       }
 
-            function renderMyStoresCards(stores) {
+      function renderMyStoresCards(stores) {
         if (!stores.length) {
           myEmpty.style.display = 'block';
           myGridWrapper.innerHTML = '';
@@ -1138,7 +1619,445 @@ function dashboardPage() {
         myGridWrapper.appendChild(grid);
       }
 
-            async function loadStores() {
+      function updateOrdersMeta(count) {
+        const contextText =
+          selectedStoreId === 'all'
+            ? 'toate magazinele'
+            : 'store ' +
+              (storeContextSelect.selectedOptions[0]?.textContent || selectedStoreId);
+        const statusText =
+          ordersState.filters.status && ordersState.filters.status !== 'all'
+            ? ' · status: ' + ordersState.filters.status
+            : '';
+        const searchText = ordersState.filters.q
+          ? ' · search: "' + ordersState.filters.q + '"'
+          : '';
+        ordersMeta.textContent =
+          'Afișăm ' + (count || 0) + ' comenzi pentru ' + contextText + statusText + searchText;
+      }
+
+      function renderOrdersTable() {
+        if (!ordersMeta) return;
+
+        ordersLoading.style.display = ordersState.loading ? 'block' : 'none';
+
+        if (ordersState.loading) {
+          ordersEmpty.style.display = 'none';
+          ordersTableShell.style.display = 'none';
+          updateOrdersMeta(0);
+          ordersCountLabel.textContent = 'Loading...';
+          return;
+        }
+
+        if (ordersEmpty && defaultOrdersEmptyHTML) {
+          ordersEmpty.innerHTML = defaultOrdersEmptyHTML;
+        }
+
+        if (ordersState.error) {
+          ordersEmpty.style.display = 'block';
+          ordersEmpty.innerHTML =
+            '<strong>Eroare la încărcarea comenzilor.</strong><br />' +
+            escapeHtml(ordersState.error);
+          ordersTableShell.style.display = 'none';
+          ordersCountLabel.textContent = '0 orders';
+          updateOrdersMeta(0);
+          return;
+        }
+
+        const count = ordersState.items.length;
+        ordersCountLabel.textContent = count + (count === 1 ? ' order' : ' orders');
+        updateOrdersMeta(count);
+
+        if (!count) {
+          ordersEmpty.style.display = 'block';
+          ordersTableShell.style.display = 'none';
+          return;
+        }
+
+        ordersEmpty.style.display = 'none';
+        ordersTableShell.style.display = 'block';
+
+        const rowsHtml = ordersState.items
+          .map((order) => {
+            const financial = order.financial_status ? statusPill(order.financial_status) : '';
+            const fulfillment = order.fulfillment_status
+              ? statusPill(order.fulfillment_status)
+              : '';
+            return (
+              '<tr data-id="' +
+              order.id +
+              '" data-store="' +
+              escapeHtml(order.store_id) +
+              '">' +
+                '<td>' +
+                  '<div class="order-id">' +
+                    escapeHtml(order.name || ('#' + order.id)) +
+                  '</div>' +
+                  '<div class="order-sub">#' + escapeHtml(String(order.id)) + '</div>' +
+                '</td>' +
+                '<td>' + formatDateTime(order.created_at) + '</td>' +
+                '<td class="store-name-cell">' +
+                  escapeHtml(order.store_name || order.store_id || 'Store') +
+                '</td>' +
+                '<td>' +
+                  '<div class="order-customer">' +
+                    '<span>' + escapeHtml(order.customer_name || 'Guest') + '</span>' +
+                    (order.customer_email
+                      ? '<span class="order-sub">' + escapeHtml(order.customer_email) + '</span>'
+                      : '') +
+                  '</div>' +
+                '</td>' +
+                '<td>' + escapeHtml(order.items_summary || '') + '</td>' +
+                '<td class="numeric">' + formatMoney(order.total_price, order.currency) + '</td>' +
+                '<td>' +
+                  (financial || fulfillment
+                    ? (financial || '') +
+                      (fulfillment
+                        ? '<span style="margin-left:6px;">' + fulfillment + '</span>'
+                        : '')
+                    : '<span class="muted">—</span>') +
+                '</td>' +
+              '</tr>'
+            );
+          })
+          .join('');
+
+        ordersTableBody.innerHTML = rowsHtml;
+        ordersTableBody.querySelectorAll('tr').forEach((tr) => {
+          tr.addEventListener('click', () => {
+            const orderId = tr.getAttribute('data-id');
+            const storeId = tr.getAttribute('data-store');
+            openOrderDrawer(orderId, storeId);
+          });
+        });
+      }
+
+      function openDrawer() {
+        drawerEl.classList.add('open');
+        drawerBackdrop.classList.add('visible');
+        drawerEl.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeDrawer() {
+        drawerEl.classList.remove('open');
+        drawerBackdrop.classList.remove('visible');
+        drawerEl.setAttribute('aria-hidden', 'true');
+        drawerTitleEl.textContent = 'Details';
+        drawerBodyEl.innerHTML = '';
+      }
+
+      function renderOrderDetail(detail) {
+        activeOrderDetail = detail;
+        drawerTitleEl.textContent = detail.name || 'Order';
+        const statusHtml = [
+          detail.financial_status ? statusPill(detail.financial_status) : '',
+          detail.fulfillment_status ? statusPill(detail.fulfillment_status) : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const shippingLine =
+          (detail.shipping_lines && detail.shipping_lines[0]) || null;
+        const shippingText = shippingLine
+          ? (shippingLine.title || 'Shipping') +
+            ' · ' +
+            formatMoney(shippingLine.price, detail.currency)
+          : 'No shipping line';
+        const gateway =
+          Array.isArray(detail.payment_gateway_names) &&
+          detail.payment_gateway_names.length
+            ? detail.payment_gateway_names.join(', ')
+            : '—';
+
+        const itemsHtml =
+          (detail.line_items || [])
+            .map((li) => {
+              const total = li.total || li.price * (li.quantity || 0);
+              return (
+                '<div class="line-item">' +
+                  '<div>' +
+                    '<div class="line-item-title">' +
+                      '<button class="link-inline order-product-link" ' +
+                        'data-product-id="' + escapeHtml(li.product_id || '') + '" ' +
+                        'data-product-title="' + escapeHtml(li.title || '') + '" ' +
+                        'data-product-sku="' + escapeHtml(li.sku || '') + '" ' +
+                        'data-product-price="' + (li.price || 0) + '"' +
+                      '>' +
+                        escapeHtml(li.title || 'Product') +
+                      '</button>' +
+                      (li.sku ? '<div class="order-sub">SKU: ' + escapeHtml(li.sku) + '</div>' : '') +
+                    '</div>' +
+                  '</div>' +
+                  '<div style="text-align:right;">' +
+                    '<div class="pill">' + (li.quantity || 0) + ' pcs</div>' +
+                    '<div class="order-sub">' + formatMoney(total, detail.currency) + '</div>' +
+                  '</div>' +
+                '</div>'
+              );
+            })
+            .join('') || '<div class="order-sub">No items.</div>';
+
+        const customerBlock = detail.customer
+          ? '<div>' +
+              '<button class="link-inline" data-action="view-customer">' +
+                (escapeHtml(
+                  (detail.customer.first_name || '') + ' ' + (detail.customer.last_name || '')
+                ).trim() ||
+                  escapeHtml(detail.customer.email || 'Customer')) +
+              '</button>' +
+              (detail.customer.email
+                ? '<div class="order-sub">' + escapeHtml(detail.customer.email) + '</div>'
+                : '') +
+              (detail.customer.phone
+                ? '<div class="order-sub">' + escapeHtml(detail.customer.phone) + '</div>'
+                : '') +
+            '</div>'
+          : '<div class="order-sub">Guest checkout</div>';
+
+        drawerBodyEl.innerHTML =
+          '<div class="drawer-section">' +
+            '<div class="kv-row"><span>Store</span><strong>' +
+              escapeHtml(detail.store_name || detail.store_id || '') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Placed</span><strong>' +
+              formatDateTime(detail.created_at) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Total</span><strong>' +
+              formatMoney(detail.total_price, detail.currency) +
+            '</strong></div>' +
+            (statusHtml
+              ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
+                statusHtml +
+                '</div>'
+              : '') +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Customer</div>' +
+            customerBlock +
+            '<div class="order-sub" style="margin-top:6px;">' +
+              escapeHtml(formatAddress(detail.shipping_address || detail.billing_address)) +
+            '</div>' +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Items</div>' +
+            itemsHtml +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Shipping & Payment</div>' +
+            '<div class="kv-row"><span>Shipping</span><strong>' +
+              escapeHtml(shippingText) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Payment</span><strong>' +
+              escapeHtml(gateway) +
+            '</strong></div>' +
+          '</div>';
+
+        const customerBtn = drawerBodyEl.querySelector('[data-action="view-customer"]');
+        if (customerBtn) {
+          customerBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            openCustomerPanel(detail);
+          });
+        }
+        drawerBodyEl.querySelectorAll('.order-product-link').forEach((btn) => {
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const product = {
+              id: btn.getAttribute('data-product-id'),
+              title: btn.getAttribute('data-product-title') || '',
+              sku: btn.getAttribute('data-product-sku') || '',
+              price: parseFloat(btn.getAttribute('data-product-price') || '0'),
+            };
+            openProductPanel(product, detail);
+          });
+        });
+
+        openDrawer();
+      }
+
+      function openCustomerPanel(detail) {
+        const customer = detail.customer;
+        drawerTitleEl.textContent = 'Customer';
+        if (!customer) {
+          drawerBodyEl.innerHTML =
+            '<div class="drawer-section"><div class="order-sub">Guest checkout</div></div>';
+          openDrawer();
+          return;
+        }
+
+        const addressText = formatAddress(detail.shipping_address || detail.billing_address);
+        const email = customer.email || detail.contact_email || '';
+        const relatedOrders = ordersState.items.filter(
+          (o) =>
+            email &&
+            String(o.customer_email || '').toLowerCase() === String(email).toLowerCase()
+        );
+        const totalSpend = relatedOrders.reduce(
+          (sum, o) => sum + (Number(o.total_price) || 0),
+          0
+        );
+        const lastOrderDate =
+          relatedOrders.length && relatedOrders[0].created_at
+            ? relatedOrders[0].created_at
+            : null;
+
+        drawerBodyEl.innerHTML =
+          '<div class="drawer-section">' +
+            '<button class="link-inline" data-action="back-to-order">← Back to order</button>' +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Contact</div>' +
+            '<div class="kv-row"><span>Name</span><strong>' +
+              escapeHtml(
+                (customer.first_name || '') + ' ' + (customer.last_name || '')
+              ) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Email</span><strong>' +
+              escapeHtml(email || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Phone</span><strong>' +
+              escapeHtml(customer.phone || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Address</span><strong>' +
+              escapeHtml(addressText) +
+            '</strong></div>' +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Orders summary</div>' +
+            '<div class="drawer-stats">' +
+              '<div class="stat-card-mini">' +
+                '<span class="label">Orders</span>' +
+                '<div class="value">' + relatedOrders.length + '</div>' +
+              '</div>' +
+              '<div class="stat-card-mini">' +
+                '<span class="label">Total</span>' +
+                '<div class="value">' + formatMoney(totalSpend, detail.currency) + '</div>' +
+              '</div>' +
+              '<div class="stat-card-mini">' +
+                '<span class="label">Last order</span>' +
+                '<div class="value">' +
+                  (lastOrderDate ? formatDateTime(lastOrderDate) : '—') +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+
+        const backBtn = drawerBodyEl.querySelector('[data-action="back-to-order"]');
+        if (backBtn) {
+          backBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            renderOrderDetail(detail);
+          });
+        }
+
+        openDrawer();
+      }
+
+      function openProductPanel(product, detail) {
+        drawerTitleEl.textContent = 'Product';
+        const count = countOrdersForProduct(product.title);
+        drawerBodyEl.innerHTML =
+          '<div class="drawer-section">' +
+            '<button class="link-inline" data-action="back-to-order">← Back to order</button>' +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Product</div>' +
+            '<div class="kv-row"><span>Title</span><strong>' +
+              escapeHtml(product.title || 'Product') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>SKU</span><strong>' +
+              escapeHtml(product.sku || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Price</span><strong>' +
+              formatMoney(product.price, detail.currency) +
+            '</strong></div>' +
+          '</div>' +
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Context</div>' +
+            '<div class="kv-row"><span>Orders in view</span><strong>' +
+              count +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Last seen</span><strong>' +
+              escapeHtml(detail.name || '') +
+            '</strong></div>' +
+          '</div>';
+
+        const backBtn = drawerBodyEl.querySelector('[data-action="back-to-order"]');
+        if (backBtn) {
+          backBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            renderOrderDetail(detail);
+          });
+        }
+
+        openDrawer();
+      }
+
+      async function openOrderDrawer(orderId, storeId) {
+        if (!orderId || !storeId) return;
+        const cacheKey = storeId + '::' + orderId;
+        drawerTitleEl.textContent = 'Order #' + orderId;
+        drawerBodyEl.innerHTML =
+          '<div class="orders-empty-inline">Se încarcă detaliile comenzii...</div>';
+        openDrawer();
+
+        if (orderDetailsCache.has(cacheKey)) {
+          renderOrderDetail(orderDetailsCache.get(cacheKey));
+          return;
+        }
+
+        try {
+          const res = await fetch(
+            '/orders/' +
+              encodeURIComponent(storeId) +
+              '/' +
+              encodeURIComponent(orderId)
+          );
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          const detail = data.order;
+          if (!detail) throw new Error('Order missing in response');
+          orderDetailsCache.set(cacheKey, detail);
+          renderOrderDetail(detail);
+        } catch (err) {
+          console.error('Error loading order', err);
+          drawerBodyEl.innerHTML =
+            '<div class="orders-empty-inline">Nu am putut încărca comanda.<br />' +
+            escapeHtml(err.message || String(err)) +
+            '</div>';
+        }
+      }
+
+      async function loadOrders() {
+        ordersState.loading = true;
+        ordersState.error = '';
+        renderOrdersTable();
+
+        const qs = new URLSearchParams();
+        qs.set('store_id', selectedStoreId || 'all');
+        qs.set('limit', ordersState.filters.limit);
+        if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
+        if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
+        if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
+        if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
+
+        try {
+          const res = await fetch('/orders?' + qs.toString());
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          ordersState.items = Array.isArray(data.orders) ? data.orders : [];
+        } catch (err) {
+          console.error('Error /orders', err);
+          ordersState.items = [];
+          ordersState.error = err.message || String(err);
+        } finally {
+          ordersState.loading = false;
+          ordersDirty = false;
+          renderOrdersTable();
+        }
+      }
+
+      async function loadStores(prevStoreId = selectedStoreId) {
         try {
           const res = await fetch('/stores');
           if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1168,6 +2087,11 @@ function dashboardPage() {
               ))
           ) {
             selectedStoreId = 'all';
+          }
+
+          if (prevStoreId !== selectedStoreId) {
+            ordersDirty = true;
+            orderDetailsCache.clear();
           }
 
           storeContextSelect.value = selectedStoreId;
@@ -1223,6 +2147,10 @@ function dashboardPage() {
 
           buildHomeTable(visibleStores);
           renderMyStoresCards(visibleStores);
+
+          if (prevStoreId !== selectedStoreId) {
+            setView(currentView);
+          }
         } catch (err) {
           console.error('Error /stores', err);
           homeEmpty.style.display = 'block';
@@ -1233,11 +2161,57 @@ function dashboardPage() {
         }
       }
 
+      let searchDebounce = null;
+      if (ordersSearchInput) {
+        ordersSearchInput.addEventListener('input', () => {
+          clearTimeout(searchDebounce);
+          searchDebounce = setTimeout(() => {
+            ordersState.filters.q = ordersSearchInput.value.trim();
+            loadOrders();
+          }, 260);
+        });
+      }
+
+      if (ordersStatusSelect) {
+        ordersStatusSelect.value = ordersState.filters.status;
+      }
+
+      if (ordersStatusSelect) {
+        ordersStatusSelect.addEventListener('change', () => {
+          ordersState.filters.status = ordersStatusSelect.value || 'all';
+          loadOrders();
+        });
+      }
+
+      if (ordersFromInput) {
+        ordersFromInput.addEventListener('change', () => {
+          ordersState.filters.from = ordersFromInput.value;
+          loadOrders();
+        });
+      }
+
+      if (ordersToInput) {
+        ordersToInput.addEventListener('change', () => {
+          ordersState.filters.to = ordersToInput.value;
+          loadOrders();
+        });
+      }
+
+      drawerCloseBtn.addEventListener('click', closeDrawer);
+      drawerBackdrop.addEventListener('click', closeDrawer);
+
       // change context
       storeContextSelect.addEventListener('change', () => {
-        selectedStoreId = storeContextSelect.value || 'all';
-        loadStores();
-        setView(currentView);
+        const previousStoreId = selectedStoreId;
+        const nextStoreId = storeContextSelect.value || 'all';
+        if (previousStoreId === nextStoreId) {
+          return;
+        }
+        selectedStoreId = nextStoreId;
+        ordersDirty = true;
+        orderDetailsCache.clear();
+        closeDrawer();
+        loadStores(previousStoreId);
       });
 
       // init

@@ -11,6 +11,8 @@ const {
   createProductInStore,
   updateProductInStore,
   deleteProductInStore,
+  fetchOrdersList,
+  fetchOrderDetail,
 } = require('../lib/shopify');
 const {
   buildProductPayload,
@@ -318,6 +320,212 @@ async function fetchStoreOrdersForStore(store, daysBack = 30, limit = 50) {
   }
 }
 
+function safePrice(value) {
+  const num = parseFloat(value);
+  return Number.isNaN(num) ? 0 : num;
+}
+
+function parseDateParam(raw, endOfDay = false) {
+  if (!raw) return null;
+  const isoCandidate = raw.includes('T') ? raw : `${raw}T00:00:00Z`;
+  const d = new Date(isoCandidate);
+  if (Number.isNaN(d.getTime())) return null;
+  if (endOfDay) {
+    d.setUTCHours(23, 59, 59, 999);
+  }
+  return d.toISOString();
+}
+
+function orderMatchesQuery(order, queryText) {
+  if (!queryText) return true;
+  const needle = queryText.toLowerCase();
+  const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+  const customerName = order.customer
+    ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`
+    : '';
+  const emails = [order.email, order.customer && order.customer.email]
+    .filter(Boolean)
+    .join(' ');
+  const productNames = lineItems.map((li) => li.title || '').join(' ');
+  const billingName = order.billing_address ? order.billing_address.name || '' : '';
+  const shippingName = order.shipping_address
+    ? order.shipping_address.name ||
+      order.shipping_address.first_name ||
+      order.shipping_address.last_name ||
+      ''
+    : '';
+
+  const haystack = [
+    order.name,
+    order.order_number,
+    customerName,
+    emails,
+    productNames,
+    billingName,
+    shippingName,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return haystack.includes(needle);
+}
+
+function normalizeOrderListEntry(order, store) {
+  const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+  const qtyTotal = lineItems.reduce((acc, li) => acc + (li.quantity || 0), 0);
+
+  const summaryParts = lineItems.slice(0, 3).map((li) => {
+    const qty = li.quantity || 1;
+    const title = li.title || 'Item';
+    return `${qty} × ${title}`;
+  });
+  if (lineItems.length > 3) {
+    summaryParts.push(`+${lineItems.length - 3} more`);
+  }
+  const itemsSummary =
+    summaryParts.join(', ') || (lineItems[0] && lineItems[0].title) || '—';
+
+  const customerName =
+    (order.customer &&
+      `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()) ||
+    (order.shipping_address && order.shipping_address.name) ||
+    (order.billing_address && order.billing_address.name) ||
+    'Guest';
+
+  return {
+    id: order.id,
+    store_id: store.store_id,
+    store_name: store.store_name || store.store_id,
+    name: order.name || `#${order.order_number || order.id}`,
+    created_at: order.created_at,
+    customer_name: customerName || 'Guest',
+    customer_email: order.email || (order.customer && order.customer.email) || '',
+    items_count: qtyTotal || lineItems.length || 0,
+    items_summary: itemsSummary,
+    total_price: safePrice(order.total_price),
+    currency: order.currency || store.currency || 'RON',
+    financial_status: order.financial_status || null,
+    fulfillment_status: order.fulfillment_status || null,
+  };
+}
+
+async function fetchOrdersForStoreWithFilters(store, filters) {
+  const storeId = store.store_id;
+  const domain = String(store.shopify_domain || '').trim();
+
+  if (!domain) {
+    console.warn('[orders] shopify_domain lipsă pentru store', storeId);
+    return [];
+  }
+
+  let accessToken = null;
+  try {
+    accessToken = getShopifyAccessTokenForStore(storeId);
+  } catch (err) {
+    console.error('[orders] acces token lipsă pentru store', storeId, err.message);
+    return [];
+  }
+
+  const { status, from, to, limit, q } = filters;
+  const query = {
+    limit,
+    order: 'created_at desc',
+    status: 'any',
+    fields:
+      'id,name,order_number,created_at,total_price,currency,customer,email,financial_status,fulfillment_status,line_items,billing_address,shipping_address',
+  };
+
+  if (status === 'open') {
+    query.status = 'open';
+  } else if (status === 'cancelled') {
+    query.status = 'cancelled';
+  } else {
+    query.status = 'any';
+  }
+
+  if (status === 'paid') {
+    query.financial_status = 'paid';
+  } else if (status === 'fulfilled') {
+    query.fulfillment_status = 'fulfilled';
+  }
+
+  const minDate = parseDateParam(from, false);
+  const maxDate = parseDateParam(to, true);
+  if (minDate) query.created_at_min = minDate;
+  if (maxDate) query.created_at_max = maxDate;
+
+  try {
+    const data = await fetchOrdersList(domain, accessToken, query);
+    const orders = data.orders || [];
+    return orders
+      .filter((o) => orderMatchesQuery(o, q))
+      .map((o) => normalizeOrderListEntry(o, store));
+  } catch (err) {
+    console.error('[orders] eroare la fetch pentru store', storeId, err);
+    return [];
+  }
+}
+
+async function loadStoresRows() {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+  if (!spreadsheetId) {
+    throw new Error('Missing GOOGLE_SHEETS_ID env var');
+  }
+  const storesSheet = await loadSheet(spreadsheetId, 'Stores');
+  return storesSheet.rows || [];
+}
+
+function normalizeOrderDetail(order, store) {
+  const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
+  const mappedLineItems = lineItems.map((li) => ({
+    id: li.id,
+    product_id: li.product_id,
+    variant_id: li.variant_id,
+    title: li.title,
+    sku: li.sku,
+    quantity: li.quantity || 0,
+    price: safePrice(li.price),
+    total: safePrice(li.price) * (li.quantity || 0),
+    fulfillment_status: li.fulfillment_status || null,
+  }));
+  const itemsCount = mappedLineItems.reduce((acc, li) => acc + (li.quantity || 0), 0);
+
+  return {
+    id: order.id,
+    name: order.name || `#${order.order_number || order.id}`,
+    order_number: order.order_number,
+    store_id: store.store_id,
+    store_name: store.store_name || store.store_id,
+    created_at: order.created_at,
+    processed_at: order.processed_at,
+    currency: order.currency || store.currency || 'RON',
+    subtotal_price: safePrice(order.subtotal_price || order.current_subtotal_price),
+    total_price: safePrice(order.total_price || order.current_total_price),
+    total_tax: safePrice(order.total_tax || order.current_total_tax),
+    total_discounts: safePrice(order.total_discounts),
+    financial_status: order.financial_status || null,
+    fulfillment_status: order.fulfillment_status || null,
+    payment_gateway_names: order.payment_gateway_names || [],
+    billing_address: order.billing_address || null,
+    shipping_address: order.shipping_address || null,
+    shipping_lines: order.shipping_lines || [],
+    customer: order.customer
+      ? {
+          id: order.customer.id,
+          first_name: order.customer.first_name || '',
+          last_name: order.customer.last_name || '',
+          email: order.customer.email || order.email || '',
+          phone: order.customer.phone || order.phone || '',
+        }
+      : null,
+    contact_email: order.contact_email || order.email || null,
+    phone: order.phone || null,
+    line_items: mappedLineItems,
+    items_count: itemsCount,
+    fulfillments: order.fulfillments || [],
+    tags: order.tags || '',
+  };
+}
 
 // /stores
 router.get('/stores', async (req, res) => {
@@ -362,61 +570,104 @@ router.get('/stores', async (req, res) => {
   }
 });
 
-// /orders – listă de comenzi centralizată (all stores sau 1 store)
+// /orders – listă centralizată cu filtre și search
 // Query params:
-//   store_id (opțional)  – dacă lipsește, ia toate magazinele
-//   days     (opțional)  – câte zile în urmă (default 30)
-//   limit    (opțional)  – limit per store, max 250
+//   store_id = "all" | store id
+//   q        = text (order #, customer, produs)
+//   status   = all | open | paid | fulfilled | cancelled
+//   from/to  = YYYY-MM-DD
+//   limit    = max 250 (default 50)
 router.get('/orders', async (req, res) => {
   try {
-    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-    if (!spreadsheetId) {
-      throw new Error('Missing GOOGLE_SHEETS_ID env var');
-    }
+    const storeIdFilter = req.query.store_id || 'all';
+    const statusFilter = (req.query.status || 'all').toLowerCase();
+    const searchQuery = (req.query.q || '').trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 250);
+    const dateFrom = req.query.from || null;
+    const dateTo = req.query.to || null;
 
-    const storeIdFilter = req.query.store_id || null;
-    const daysBack = parseInt(req.query.days || '30', 10) || 30;
-    const perStoreLimit =
-      Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 250);
-
-    const storesSheet = await loadSheet(spreadsheetId, 'Stores');
-    const stores = storesSheet.rows || [];
-
-    const targetStores = stores.filter((s) =>
-      storeIdFilter ? String(s.store_id) === String(storeIdFilter) : true
-    );
+    const stores = await loadStoresRows();
+    const targetStores =
+      storeIdFilter && storeIdFilter !== 'all'
+        ? stores.filter((s) => String(s.store_id) === String(storeIdFilter))
+        : stores;
 
     if (!targetStores.length) {
-      return res.json({ count: 0, orders: [] });
+      return res.json({ orders: [] });
     }
 
+    const filters = {
+      status: statusFilter,
+      from: dateFrom,
+      to: dateTo,
+      limit,
+      q: searchQuery,
+    };
+
     const allOrdersNested = await Promise.all(
-      targetStores.map((s) =>
-        fetchStoreOrdersForStore(s, daysBack, perStoreLimit)
-      )
+      targetStores.map((s) => fetchOrdersForStoreWithFilters(s, filters))
     );
 
-    // flatten
     const allOrders = allOrdersNested.reduce(
       (acc, arr) => acc.concat(arr || []),
       []
     );
 
-    // sort desc by created_at
     allOrders.sort((a, b) => {
       const ta = a.created_at ? Date.parse(a.created_at) : 0;
       const tb = b.created_at ? Date.parse(b.created_at) : 0;
       return tb - ta;
     });
 
+    const limited = allOrders.slice(0, limit);
+
     res.json({
-      count: allOrders.length,
-      orders: allOrders,
+      orders: limited,
+      count: limited.length,
     });
   } catch (err) {
     console.error('/orders error', err);
     res.status(500).json({
       error: 'Failed to load orders',
+      message: err.message || String(err),
+    });
+  }
+});
+
+// /orders/:store_id/:order_id – detalii complete
+router.get('/orders/:store_id/:order_id', async (req, res) => {
+  const { store_id: storeId, order_id: orderId } = req.params;
+
+  try {
+    const stores = await loadStoresRows();
+    const store = stores.find((s) => String(s.store_id) === String(storeId));
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+
+    const domain = String(store.shopify_domain || '').trim();
+    if (!domain) {
+      return res
+        .status(400)
+        .json({ error: 'Missing shopify_domain for store ' + storeId });
+    }
+
+    const accessToken = getShopifyAccessTokenForStore(storeId);
+    const data = await fetchOrderDetail(domain, accessToken, orderId);
+    const detail = data.order;
+
+    if (!detail) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const normalized = normalizeOrderDetail(detail, store);
+    res.json({ order: normalized });
+  } catch (err) {
+    console.error('/orders detail error', { storeId, orderId, err });
+    const status =
+      err && err.message && String(err.message).includes('404') ? 404 : 500;
+    res.status(status).json({
+      error: 'Failed to load order details',
       message: err.message || String(err),
     });
   }
