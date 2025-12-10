@@ -1170,7 +1170,7 @@ function dashboardPage() {
 
       async function loadStores() {
         try {
-          const res = await fetch('/api/stores');
+          const res = await fetch('/stores');
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           state.stores = Array.isArray(data) ? data : [];
