@@ -144,16 +144,19 @@ async function fetchOrders(filters = {}) {
   // For single store: use Shopify pagination directly
   if (targetStores.length === 1) {
     const store = targetStores[0];
-    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
 
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // Apply client-side search filter if needed
-    let orders = result.orders;
-    if (searchQuery) {
+    // If there's a search query, fetch multiple pages to search comprehensively
+    // Ignore page_info cursor when searching
+    if (searchQuery && !page_info) {
+      // Fetch more orders to enable comprehensive search
+      const searchLimit = 500; // Fetch more orders for better search results
+      const result = await fetchOrdersForStore(store, { from, to, status, limit: searchLimit });
+
       const needle = searchQuery.toLowerCase();
-      orders = orders.filter(order => {
+      const filtered = result.orders.filter(order => {
         const haystack = [
           order.name,
           order.customer_name,
@@ -162,13 +165,32 @@ async function fetchOrders(filters = {}) {
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(needle);
       });
+
+      // Return first page of search results
+      const limitNum = parseInt(limit, 10) || 100;
+      const sliced = filtered.slice(0, limitNum);
+
+      return {
+        orders: sliced,
+        page: 1,
+        limit: limitNum,
+        total: filtered.length,
+        hasNext: filtered.length > limitNum,
+        hasPrev: false,
+        nextPageInfo: null, // Disable cursor pagination during search
+        prevPageInfo: null,
+        totalTodayOrders: todayCount,
+      };
     }
 
+    // Normal pagination (no search)
+    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
+
     return {
-      orders,
+      orders: result.orders,
       page: 1, // With cursor pagination, page numbers are less meaningful
       limit: parseInt(limit, 10) || 100,
-      total: orders.length, // We don't know total without fetching all pages
+      total: result.orders.length, // We don't know total without fetching all pages
       hasNext: !!result.nextPageInfo,
       hasPrev: !!result.prevPageInfo,
       nextPageInfo: result.nextPageInfo,

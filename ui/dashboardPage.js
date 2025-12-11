@@ -2374,6 +2374,7 @@ function dashboardPage() {
             // Use nextPageInfo cursor for forward navigation
             ordersState.page += 1;
             ordersState.currentPageInfo = ordersState.nextPageInfo;
+            console.log('[orders] Next clicked, using cursor:', ordersState.currentPageInfo?.substring(0, 20) + '...');
             loadOrders();
           });
         }
@@ -3071,6 +3072,8 @@ function dashboardPage() {
           ordersState.hasPrev = data.hasPrev || false;
           // Clear current page info after using it (we now have fresh cursors)
           ordersState.currentPageInfo = null;
+
+          console.log('[orders] Response cursors - next:', data.nextPageInfo?.substring(0, 20), 'prev:', data.prevPageInfo?.substring(0, 20), 'hasNext:', ordersState.hasNext);
 
           // Store today's count for the metric
           ordersState.totalTodayOrders = data.totalTodayOrders || 0;

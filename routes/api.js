@@ -399,6 +399,7 @@ router.get('/orders', async (req, res) => {
       to: dateTo,
       limit,
       hasPageInfo: !!pageInfo,
+      pageInfoPreview: pageInfo?.substring(0, 30),
     });
 
     const result = await fetchOrders({
@@ -411,7 +412,7 @@ router.get('/orders', async (req, res) => {
       page_info: pageInfo,
     });
 
-    console.log('[orders][LIVE] returned', result.orders.length, 'orders, today:', result.totalTodayOrders);
+    console.log('[orders][LIVE] returned', result.orders.length, 'orders, hasNext:', result.hasNext, 'nextPageInfo:', result.nextPageInfo?.substring(0, 30));
 
     res.json({
       orders: result.orders,
