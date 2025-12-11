@@ -561,31 +561,51 @@ function normalizeOrderDetail(order, store) {
 function aggregateCustomersFromOrders(orders) {
   const map = new Map();
   orders.forEach((o) => {
-    if (!o.customer || !o.customer.id) return;
-    const key = String(o.customer.id) + '::' + String(o.store_id);
+    const key =
+      (o.customer_id && `${o.store_id}:${o.customer_id}`) ||
+      (o.customer_email && `${o.store_id}:${o.customer_email}`);
+    if (!key) return;
+
+    const fullName = o.customer_name || null;
+    let firstName = null;
+    let lastName = null;
+    if (fullName) {
+      const parts = String(fullName).split(' ');
+      firstName = parts[0] || null;
+      lastName = parts.slice(1).join(' ') || null;
+    }
+
     const existing = map.get(key) || {
-      customer_id: o.customer.id,
       store_id: o.store_id,
       store_name: o.store_name || o.store_id,
-      shopify_domain: o.shopify_domain || '',
-      first_name: o.customer.first_name || '',
-      last_name: o.customer.last_name || '',
-      email: o.customer.email || o.email || '',
-      phone: o.customer.phone || '',
-      total_orders: 0,
+      shopify_customer_id: o.customer_id || null,
+      email: o.customer_email || null,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName,
+      orders_count: 0,
       total_spent: 0,
+      first_order_date: null,
       last_order_date: null,
-      created_at: o.created_at,
-      default_address: o.shipping_address || o.billing_address || null,
-      tags: o.customer.tags || '',
     };
-    existing.total_orders += 1;
-    existing.total_spent += safePrice(o.total_price);
-    const t = o.created_at ? Date.parse(o.created_at) : 0;
-    const lastT = existing.last_order_date ? Date.parse(existing.last_order_date) : 0;
-    if (t > lastT) {
-      existing.last_order_date = o.created_at;
+
+    existing.orders_count += 1;
+
+    const priceNumber = o.total_price ? Number(o.total_price) : 0;
+    if (!Number.isNaN(priceNumber)) {
+      existing.total_spent += priceNumber;
     }
+
+    const createdAt = o.created_at ? new Date(o.created_at) : null;
+    if (createdAt) {
+      if (!existing.first_order_date || createdAt < new Date(existing.first_order_date)) {
+        existing.first_order_date = createdAt.toISOString();
+      }
+      if (!existing.last_order_date || createdAt > new Date(existing.last_order_date)) {
+        existing.last_order_date = createdAt.toISOString();
+      }
+    }
+
     map.set(key, existing);
   });
   return Array.from(map.values());
