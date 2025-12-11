@@ -743,6 +743,14 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
 router.post('/tasks/sync-logs', async (req, res) => {
   try {
     const result = await syncLogs();
+    if (!result.success) {
+      return res.status(500).json({
+        ok: false,
+        success: false,
+        message: 'All stores failed to sync',
+        ...result,
+      });
+    }
     res.json({ ok: true, success: true, ...result });
   } catch (err) {
     console.error('/tasks/sync-logs error', err);
@@ -750,6 +758,7 @@ router.post('/tasks/sync-logs', async (req, res) => {
       success: false,
       error: 'Failed to run sync',
       message: err.message || String(err),
+      details: err.summary || null,
     });
   }
 });

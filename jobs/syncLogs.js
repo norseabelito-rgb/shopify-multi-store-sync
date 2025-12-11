@@ -89,16 +89,14 @@ function buildCustomersFromOrdersLog(orderRows = []) {
 async function fetchAllOrdersForStore(store) {
   const domain = String(store.shopify_domain || '').trim();
   if (!domain) {
-    console.warn('[syncLogs] Missing shopify_domain for store', store.store_id);
-    return [];
+    throw new Error('Missing shopify_domain for store');
   }
 
   let accessToken;
   try {
     accessToken = getShopifyAccessTokenForStore(store.store_id);
   } catch (err) {
-    console.warn('[syncLogs] Missing access token for store', store.store_id, err.message);
-    return [];
+    throw new Error(`Missing access token for store: ${err.message || err}`);
   }
 
   const query = {
@@ -116,6 +114,7 @@ async function syncLogs() {
   const stores = await loadStoresRows();
   const perStore = [];
   const orderRows = [];
+  let successfulStores = 0;
 
   for (const store of stores) {
     try {
@@ -134,6 +133,7 @@ async function syncLogs() {
         shopify_domain: store.shopify_domain,
         orders_fetched: filteredOrders.length,
       });
+      successfulStores += 1;
       console.log(
         `[syncLogs] ${store.store_id} (${store.shopify_domain}) fetched ${filteredOrders.length} orders`
       );
@@ -176,9 +176,18 @@ async function syncLogs() {
     customers_written: customersWriteResult.total,
     customers_updated: customersWriteResult.updated,
     customers_appended: customersWriteResult.appended,
+    success: successfulStores > 0,
+    partial: successfulStores > 0 && perStore.some((s) => s.error),
   };
 
   console.log('[syncLogs] Sync finished', summary);
+
+  if (!summary.success) {
+    const error = new Error('All stores failed to sync');
+    error.summary = summary;
+    throw error;
+  }
+
   return summary;
 }
 
