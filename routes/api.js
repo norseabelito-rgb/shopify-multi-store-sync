@@ -763,7 +763,7 @@ router.get('/preview', async (req, res) => {
 
     const storeId = req.query.store_id;
     if (!storeId) {
-      return res.status(400).json({ error: 'Missing store_id query param' });
+      return res.status(400).json({ error: 'Missingg store_id query param' });
     }
 
     const [productsSheet, storesSheet, psSheet] = await Promise.all([
