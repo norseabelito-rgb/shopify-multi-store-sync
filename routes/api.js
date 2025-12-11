@@ -751,6 +751,18 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
 // /customers – listă derivată din comenzi (pentru context curent)
 router.get('/customers', async (req, res) => {
   try {
+    const { store_id, search, page } = req.query;
+    console.log('[CUSTOMERS] query =', { store_id, search, page });
+
+    const result = await getCustomersForContext({ storeId: store_id, search, page });
+
+    console.log('[CUSTOMERS] result length =', result.customers?.length);
+    res.json(result);
+  } catch (err) {
+    console.error('[CUSTOMERS] error:', err);
+    next(err);
+  }
+  try {
     const storeIdFilter = req.query.store_id || 'all';
     const searchQuery = (req.query.q || '').trim().toLowerCase();
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
