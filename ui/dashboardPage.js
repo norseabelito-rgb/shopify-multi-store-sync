@@ -1050,7 +1050,7 @@ function dashboardPage() {
     .orders-pagination {
       margin-top: 12px;
       display: flex;
-      justify-content: center;
+      justify-content: flex-end;
       align-items: center;
       gap: 6px;
       font-size: 12px;
@@ -2339,83 +2339,41 @@ function dashboardPage() {
 
       function renderPagination() {
         if (!ordersPagination) return;
-        const totalPages = Math.max(
-          1,
-          Math.ceil((ordersState.total || ordersState.items.length || 0) / ordersState.filters.limit)
-        );
-        const current = Math.min(ordersState.page, totalPages);
 
-        const prevDisabled = current <= 1;
-        const nextDisabled = current >= totalPages;
-
-        function pageButton(page, label, isActive = false, disabled = false) {
-          return (
-            '<button class="' +
-            'pagination-page' +
-            (isActive ? ' active' : '') +
-            '" data-page="' +
-            page +
-            '" ' +
-            (disabled ? 'disabled' : '') +
-            '>' +
-            label +
-            '</button>'
-          );
-        }
-
-        const pages = [];
-        if (totalPages <= 7) {
-          for (let i = 1; i <= totalPages; i++) {
-            pages.push(pageButton(i, i, i === current));
-          }
-        } else {
-          const addPage = (p) => pages.push(pageButton(p, p, p === current));
-          addPage(1);
-          addPage(2);
-          if (current > 4) pages.push('<span class="pagination-ellipsis">…</span>');
-          const start = Math.max(3, current - 1);
-          const end = Math.min(totalPages - 2, current + 1);
-          for (let i = start; i <= end; i++) {
-            addPage(i);
-          }
-          if (current < totalPages - 3) pages.push('<span class="pagination-ellipsis">…</span>');
-          addPage(totalPages - 1);
-          addPage(totalPages);
-        }
+        // Simplified pagination: just Prev and Next buttons, no page numbers
+        const prevDisabled = !ordersState.hasPrev;
+        const nextDisabled = !ordersState.hasNext;
 
         ordersPagination.innerHTML =
           '<button class="pagination-btn" id="orders-prev" ' +
           (prevDisabled ? 'disabled' : '') +
           '>Prev</button>' +
-          pages.join('') +
           '<button class="pagination-btn" id="orders-next" ' +
           (nextDisabled ? 'disabled' : '') +
           '>Next</button>';
 
         const prevBtn = document.getElementById('orders-prev');
         const nextBtn = document.getElementById('orders-next');
+
         if (prevBtn) {
           prevBtn.addEventListener('click', () => {
             if (prevDisabled) return;
+            // For backward navigation, we would need prevPageInfo support
+            // For now, just reset and go back to first page
             ordersState.page = Math.max(1, ordersState.page - 1);
+            ordersState.nextPageInfo = null;
             loadOrders();
           });
         }
+
         if (nextBtn) {
           nextBtn.addEventListener('click', () => {
             if (nextDisabled) return;
-            ordersState.page = Math.min(totalPages, ordersState.page + 1);
+            // nextPageInfo is already set, loadOrders will use it
+            ordersState.page += 1;
             loadOrders();
           });
         }
-        ordersPagination.querySelectorAll('.pagination-page').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const page = parseInt(btn.getAttribute('data-page'), 10);
-            if (Number.isNaN(page) || page === current) return;
-            ordersState.page = page;
-            loadOrders();
-          });
-        });
       }
 
       function buildShopifyUrl(type, payload, domainOverride) {
@@ -3107,9 +3065,17 @@ function dashboardPage() {
           ordersState.nextPageInfo = data.nextPageInfo || null;
           ordersState.prevPageInfo = data.prevPageInfo || null;
           ordersState.hasNext = data.hasNext || !!data.nextPageInfo;
-          ordersState.hasPrev = data.hasPrev || false; // Shopify doesn't support backward cursor pagination easily
+          ordersState.hasPrev = data.hasPrev || false;
 
-          console.log('[orders] Loaded', ordersState.items.length, 'orders, hasNext:', ordersState.hasNext);
+          // Store today's count for the metric
+          ordersState.totalTodayOrders = data.totalTodayOrders || 0;
+
+          // Update today's metric in the top card
+          if (statTodayHome) {
+            statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
+          }
+
+          console.log('[orders] Loaded', ordersState.items.length, 'orders, hasNext:', ordersState.hasNext, 'today:', ordersState.totalTodayOrders);
         } catch (err) {
           console.error('Error /orders', err);
           ordersState.items = [];
@@ -3143,25 +3109,19 @@ function dashboardPage() {
           const data = await res.json();
           customersState.items = Array.isArray(data.customers) ? data.customers : [];
           customersState.page = data.page || customersState.page;
-          customersState.total =
-            data.total != null ? data.total : customersState.items.length;
+          customersState.total = data.totalCustomers || data.total || customersState.items.length;
           customersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
-          const totalPages = Math.max(
-            1,
-            Math.ceil(
-              (customersState.total || customersState.items.length || 0) /
-                customersState.filters.limit
-            )
-          );
-          customersState.hasNext = customersState.page < totalPages;
-          customersState.hasPrev = customersState.page > 1;
+          customersState.hasNext = data.hasNext || false;
+          customersState.hasPrev = data.hasPrev || false;
+
+          console.log('[customers] Loaded', customersState.items.length, 'customers, total:', customersState.total);
         } catch (err) {
           console.error('Error /customers', err);
           customersState.items = [];
           customersState.error = err.message || String(err);
           customersState.total = 0;
           customersState.hasNext = false;
-          customersState.hasPrev = customersState.page > 1;
+          customersState.hasPrev = false;
         } finally {
           customersState.loading = false;
           customersDirty = false;

@@ -1,7 +1,7 @@
 // services/ordersService.js
 // Service for fetching and managing orders from Shopify (live queries, no Google Sheets cache)
 
-const { fetchOrdersPage, getShopifyAccessTokenForStore } = require('../lib/shopify');
+const { fetchOrdersPage, fetchOrdersCount, getShopifyAccessTokenForStore } = require('../lib/shopify');
 const { normalizeOrderListEntry, parseDateParam } = require('../lib/orderUtils');
 const { loadStoresRows } = require('../lib/stores');
 
@@ -50,7 +50,7 @@ async function fetchOrdersForStore(store, filters = {}) {
   }
 
   try {
-    const { orders: rawOrders, nextPageInfo } = await fetchOrdersPage(domain, accessToken, query);
+    const { orders: rawOrders, nextPageInfo, prevPageInfo } = await fetchOrdersPage(domain, accessToken, query);
 
     // Normalize orders
     const normalized = (rawOrders || []).map(order =>
@@ -65,11 +65,44 @@ async function fetchOrdersForStore(store, filters = {}) {
     return {
       orders: normalized,
       nextPageInfo,
-      prevPageInfo: null, // Shopify cursor pagination is forward-only
+      prevPageInfo,
     };
   } catch (err) {
     console.error('[ordersService] Error fetching orders for store', store.store_id, err.message);
     throw err;
+  }
+}
+
+/**
+ * Get count of orders created today for a store
+ */
+async function getTodayOrdersCount(store) {
+  const domain = String(store.shopify_domain || '').trim();
+  if (!domain) return 0;
+
+  let accessToken;
+  try {
+    accessToken = getShopifyAccessTokenForStore(store.store_id);
+  } catch (err) {
+    console.error('[ordersService] Missing access token for store', store.store_id);
+    return 0;
+  }
+
+  // Get today's date range in ISO format
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+
+  try {
+    const count = await fetchOrdersCount(domain, accessToken, {
+      status: 'any',
+      created_at_min: todayStart.toISOString(),
+      created_at_max: todayEnd.toISOString(),
+    });
+    return count;
+  } catch (err) {
+    console.error('[ordersService] Error fetching today count for store', store.store_id, err.message);
+    return 0;
   }
 }
 
@@ -113,6 +146,9 @@ async function fetchOrders(filters = {}) {
     const store = targetStores[0];
     const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
 
+    // Get today's count for this store
+    const todayCount = await getTodayOrdersCount(store);
+
     // Apply client-side search filter if needed
     let orders = result.orders;
     if (searchQuery) {
@@ -134,19 +170,26 @@ async function fetchOrders(filters = {}) {
       limit: parseInt(limit, 10) || 100,
       total: orders.length, // We don't know total without fetching all pages
       hasNext: !!result.nextPageInfo,
-      hasPrev: false,
+      hasPrev: !!result.prevPageInfo,
       nextPageInfo: result.nextPageInfo,
-      prevPageInfo: null,
+      prevPageInfo: result.prevPageInfo,
+      totalTodayOrders: todayCount,
     };
   }
 
   // For multiple stores: fetch from each and combine
   // Note: This doesn't support cross-store pagination perfectly, but works for small datasets
   const allOrders = [];
+  let totalTodayOrders = 0;
+
   for (const store of targetStores) {
     try {
       const result = await fetchOrdersForStore(store, { from, to, status, limit });
       allOrders.push(...result.orders);
+
+      // Get today's count for each store
+      const todayCount = await getTodayOrdersCount(store);
+      totalTodayOrders += todayCount;
     } catch (err) {
       console.error('[ordersService] Failed to fetch orders for store', store.store_id, err.message);
       // Continue with other stores
@@ -188,10 +231,12 @@ async function fetchOrders(filters = {}) {
     hasPrev: false,
     nextPageInfo: null,
     prevPageInfo: null,
+    totalTodayOrders,
   };
 }
 
 module.exports = {
   fetchOrders,
   fetchOrdersForStore,
+  getTodayOrdersCount,
 };

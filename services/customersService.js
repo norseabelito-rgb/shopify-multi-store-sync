@@ -72,6 +72,7 @@ function buildCustomersFromOrders(orders = []) {
 /**
  * Fetch customers by deriving them from current orders
  * Uses the same filters as orders (store, date range, search)
+ * Supports page-based pagination
  */
 async function fetchCustomers(filters = {}) {
   const {
@@ -80,10 +81,12 @@ async function fetchCustomers(filters = {}) {
     to = null,
     q: searchQuery = '',
     limit = 100,
+    page = 1,
   } = filters;
 
-  // Fetch orders with a higher limit to get more customer data
-  const ordersLimit = Math.min(parseInt(limit, 10) * 2, 500);
+  // Fetch a large batch of orders to get comprehensive customer data
+  // This is practical for recent order histories (last 500-1000 orders)
+  const ordersLimit = 1000;
   const ordersResult = await fetchOrders({
     store_id: storeIdFilter,
     from,
@@ -117,17 +120,22 @@ async function fetchCustomers(filters = {}) {
     return tb - ta;
   });
 
-  // Apply limit
+  // Calculate pagination
   const limitNum = parseInt(limit, 10) || 100;
-  const sliced = filtered.slice(0, limitNum);
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const totalCustomers = filtered.length;
+  const startIndex = (pageNum - 1) * limitNum;
+  const endIndex = startIndex + limitNum;
+  const sliced = filtered.slice(startIndex, endIndex);
 
   return {
     customers: sliced,
-    page: 1,
+    page: pageNum,
     limit: limitNum,
-    total: filtered.length,
-    hasNext: filtered.length > limitNum,
-    hasPrev: false,
+    total: totalCustomers,
+    totalCustomers,  // Add explicit totalCustomers field
+    hasNext: endIndex < totalCustomers,
+    hasPrev: pageNum > 1,
   };
 }
 

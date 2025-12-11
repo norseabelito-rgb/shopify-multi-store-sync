@@ -411,7 +411,7 @@ router.get('/orders', async (req, res) => {
       page_info: pageInfo,
     });
 
-    console.log('[orders][LIVE] returned', result.orders.length, 'orders');
+    console.log('[orders][LIVE] returned', result.orders.length, 'orders, today:', result.totalTodayOrders);
 
     res.json({
       orders: result.orders,
@@ -423,6 +423,7 @@ router.get('/orders', async (req, res) => {
       hasPrev: result.hasPrev,
       nextPageInfo: result.nextPageInfo,
       prevPageInfo: result.prevPageInfo,
+      totalTodayOrders: result.totalTodayOrders || 0,
       source: 'SHOPIFY_LIVE',
     });
   } catch (err) {
@@ -479,11 +480,13 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
 //   q        = text (name, email, customer id)
 //   from/to  = YYYY-MM-DD
 //   limit    = max 200 (default 100)
+//   page     = page number (default 1)
 router.get('/customers', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const searchQuery = (req.query.q || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
 
@@ -493,6 +496,7 @@ router.get('/customers', async (req, res) => {
       from: dateFrom,
       to: dateTo,
       limit,
+      page,
     });
 
     const result = await fetchCustomers({
@@ -501,15 +505,17 @@ router.get('/customers', async (req, res) => {
       from: dateFrom,
       to: dateTo,
       limit,
+      page,
     });
 
-    console.log('[customers][LIVE] returned', result.customers.length, 'customers');
+    console.log('[customers][LIVE] returned', result.customers.length, 'customers, total:', result.totalCustomers);
 
     res.json({
       customers: result.customers,
       page: result.page,
       limit: result.limit,
       total: result.total,
+      totalCustomers: result.totalCustomers || result.total,
       hasNext: result.hasNext,
       hasPrev: result.hasPrev,
       source: 'SHOPIFY_LIVE',
