@@ -758,13 +758,26 @@ router.get('/customers', async (req, res) => {
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
 
+    console.log('\n=== [CUSTOMERS] Incoming request ===');
+    console.log({
+      storeIdFilter,
+      searchQuery,
+      limit,
+      page,
+      dateFrom,
+      dateTo
+    });
+
     const stores = await loadStoresRows();
     const targetStores =
       storeIdFilter && storeIdFilter !== 'all'
         ? stores.filter((s) => String(s.store_id) === String(storeIdFilter))
         : stores;
 
+    console.log('[CUSTOMERS] targetStores =', targetStores.map(s => s.store_name || s.store_id));
+
     if (!targetStores.length) {
+      console.log('[CUSTOMERS] No stores matched storeIdFilter');
       return res.json({ customers: [], page, limit, total: 0 });
     }
 
@@ -776,12 +789,29 @@ router.get('/customers', async (req, res) => {
       q: '',
     };
 
+    console.log('[CUSTOMERS] Fetching orders with filters:', filters);
+
     const allOrdersNested = await Promise.all(
       targetStores.map((s) => fetchOrdersForStoreWithFilters(s, filters))
     );
     const allOrders = allOrdersNested.flat();
 
+    console.log(`[CUSTOMERS] Total orders fetched: ${allOrders.length}`);
+
+    // ---- SAMPLE ORDER PREVIEW ----
+    if (allOrders.length > 0) {
+      console.log('[CUSTOMERS] Sample order keys:', Object.keys(allOrders[0]));
+      console.log('[CUSTOMERS] Sample order.customer:', allOrders[0].customer);
+      console.log('[CUSTOMERS] Sample order.customer_email:', allOrders[0].customer_email);
+    } else {
+      console.log('[CUSTOMERS] No orders fetched → cannot build customers.');
+    }
+    // ------------------------------
+
     const customers = aggregateCustomersFromOrders(allOrders);
+
+    console.log(`[CUSTOMERS] Customers aggregated: ${customers.length}`);
+
     const filtered = searchQuery
       ? customers.filter((c) => {
           const hay = [
@@ -798,6 +828,8 @@ router.get('/customers', async (req, res) => {
         })
       : customers;
 
+    console.log(`[CUSTOMERS] After search filter: ${filtered.length}`);
+
     filtered.sort((a, b) => {
       const ta = a.last_order_date ? Date.parse(a.last_order_date) : 0;
       const tb = b.last_order_date ? Date.parse(b.last_order_date) : 0;
@@ -806,6 +838,8 @@ router.get('/customers', async (req, res) => {
 
     const start = (page - 1) * limit;
     const limited = filtered.slice(start, start + limit);
+
+    console.log(`[CUSTOMERS] Returning ${limited.length} customers (page ${page}) of ${filtered.length}`);
 
     res.json({
       customers: limited,
