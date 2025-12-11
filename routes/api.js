@@ -558,6 +558,39 @@ function normalizeOrderDetail(order, store) {
   };
 }
 
+function aggregateCustomersFromOrders(orders) {
+  const map = new Map();
+  orders.forEach((o) => {
+    if (!o.customer || !o.customer.id) return;
+    const key = String(o.customer.id) + '::' + String(o.store_id);
+    const existing = map.get(key) || {
+      customer_id: o.customer.id,
+      store_id: o.store_id,
+      store_name: o.store_name || o.store_id,
+      shopify_domain: o.shopify_domain || '',
+      first_name: o.customer.first_name || '',
+      last_name: o.customer.last_name || '',
+      email: o.customer.email || o.email || '',
+      phone: o.customer.phone || '',
+      total_orders: 0,
+      total_spent: 0,
+      last_order_date: null,
+      created_at: o.created_at,
+      default_address: o.shipping_address || o.billing_address || null,
+      tags: o.customer.tags || '',
+    };
+    existing.total_orders += 1;
+    existing.total_spent += safePrice(o.total_price);
+    const t = o.created_at ? Date.parse(o.created_at) : 0;
+    const lastT = existing.last_order_date ? Date.parse(existing.last_order_date) : 0;
+    if (t > lastT) {
+      existing.last_order_date = o.created_at;
+    }
+    map.set(key, existing);
+  });
+  return Array.from(map.values());
+}
+
 // /stores
 router.get('/stores', async (req, res) => {
   try {
@@ -710,6 +743,125 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
       err && err.message && String(err.message).includes('404') ? 404 : 500;
     res.status(status).json({
       error: 'Failed to load order details',
+      message: err.message || String(err),
+    });
+  }
+});
+
+// /customers – listă derivată din comenzi (pentru context curent)
+router.get('/customers', async (req, res) => {
+  try {
+    const storeIdFilter = req.query.store_id || 'all';
+    const searchQuery = (req.query.q || '').trim().toLowerCase();
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const dateFrom = req.query.from || null;
+    const dateTo = req.query.to || null;
+
+    const stores = await loadStoresRows();
+    const targetStores =
+      storeIdFilter && storeIdFilter !== 'all'
+        ? stores.filter((s) => String(s.store_id) === String(storeIdFilter))
+        : stores;
+
+    if (!targetStores.length) {
+      return res.json({ customers: [], page, limit, total: 0 });
+    }
+
+    const filters = {
+      status: 'all',
+      from: dateFrom,
+      to: dateTo,
+      limit: Math.min(limit * page, 250),
+      q: '',
+    };
+
+    const allOrdersNested = await Promise.all(
+      targetStores.map((s) => fetchOrdersForStoreWithFilters(s, filters))
+    );
+    const allOrders = allOrdersNested.flat();
+
+    const customers = aggregateCustomersFromOrders(allOrders);
+    const filtered = searchQuery
+      ? customers.filter((c) => {
+          const hay = [
+            c.first_name,
+            c.last_name,
+            c.email,
+            c.phone,
+            c.store_name,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return hay.includes(searchQuery);
+        })
+      : customers;
+
+    filtered.sort((a, b) => {
+      const ta = a.last_order_date ? Date.parse(a.last_order_date) : 0;
+      const tb = b.last_order_date ? Date.parse(b.last_order_date) : 0;
+      return tb - ta;
+    });
+
+    const start = (page - 1) * limit;
+    const limited = filtered.slice(start, start + limit);
+
+    res.json({
+      customers: limited,
+      page,
+      limit,
+      total: filtered.length,
+      hasNext: start + limited.length < filtered.length,
+      hasPrev: page > 1 && start > 0,
+    });
+  } catch (err) {
+    console.error('/customers error', err);
+    res.status(500).json({
+      error: 'Failed to load customers',
+      message: err.message || String(err),
+    });
+  }
+});
+
+// /customers/:store_id/:customer_id – detalii + comenzi asociate
+router.get('/customers/:store_id/:customer_id', async (req, res) => {
+  const { store_id: storeId, customer_id: customerId } = req.params;
+  const dateFrom = req.query.from || null;
+  const dateTo = req.query.to || null;
+  try {
+    const stores = await loadStoresRows();
+    const store = stores.find((s) => String(s.store_id) === String(storeId));
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+
+    const filters = {
+      status: 'all',
+      from: dateFrom,
+      to: dateTo,
+      limit: 250,
+      q: '',
+    };
+    const orders = await fetchOrdersForStoreWithFilters(store, filters);
+    const ordersForCustomer = orders.filter(
+      (o) => o.customer && String(o.customer.id) === String(customerId)
+    );
+
+    if (!ordersForCustomer.length) {
+      return res.status(404).json({ error: 'Customer not found in this store' });
+    }
+
+    const summary = aggregateCustomersFromOrders(ordersForCustomer)[0];
+
+    res.json({
+      customer: summary,
+      orders: ordersForCustomer.map((o) => normalizeOrderListEntry(o, store)),
+    });
+  } catch (err) {
+    console.error('/customers detail error', { storeId, customerId, err });
+    res.status(500).json({
+      error: 'Failed to load customer details',
       message: err.message || String(err),
     });
   }

@@ -1128,6 +1128,9 @@ function dashboardPage() {
           <button class="nav-item" data-view="orders">
             <span>Orders</span>
           </button>
+          <button class="nav-item" data-view="customers">
+            <span>Customers</span>
+          </button>
           <button class="nav-item" data-view="shipping">
             <span>Shipping</span>
           </button>
@@ -1444,6 +1447,64 @@ function dashboardPage() {
           </section>
         </section>
 
+        <section id="view-customers" class="view">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title-block">
+                <div class="panel-title">Customers</div>
+                <p class="panel-subtitle">
+                  Clienți centralizați pentru contextul selectat. Click pe un rând pentru detalii.
+                </p>
+              </div>
+              <div class="badge-soft" id="customers-count-label">0 customers</div>
+            </div>
+
+            <div class="orders-toolbar">
+              <div class="orders-search">
+                <span class="muted" aria-hidden="true" style="font-size:12px;">🔎</span>
+                <input
+                  id="customers-search"
+                  type="search"
+                  placeholder="Search customers (name, email)"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+
+            <div class="orders-meta" id="customers-meta">
+              Afișăm clienții pentru contextul curent.
+            </div>
+
+            <div class="orders-table-wrapper">
+              <div id="customers-loading" class="empty-state" style="display:none;">
+                <strong>Se încarcă...</strong>
+                Pregătim lista de clienți.
+              </div>
+              <div id="customers-empty" class="empty-state" style="display:none;">
+                <strong>Niciun client găsit.</strong>
+                Ajustează filtrele sau schimbă contextul.
+              </div>
+              <div id="customers-table-shell" class="orders-table-shell">
+                <table class="orders-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Total orders</th>
+                      <th class="numeric">Total spent</th>
+                      <th>Last order</th>
+                      <th>Store</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody id="customers-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="customers-pagination" class="orders-pagination"></div>
+          </section>
+        </section>
+
         <section id="view-shipping" class="view">
           <section class="panel">
             <div class="panel-header">
@@ -1542,6 +1603,14 @@ function dashboardPage() {
       const ordersTableBody = document.getElementById('orders-tbody');
       const defaultOrdersEmptyHTML = ordersEmpty ? ordersEmpty.innerHTML : '';
       const ordersPagination = document.getElementById('orders-pagination');
+      const customersCountLabel = document.getElementById('customers-count-label');
+      const customersSearchInput = document.getElementById('customers-search');
+      const customersMeta = document.getElementById('customers-meta');
+      const customersLoading = document.getElementById('customers-loading');
+      const customersEmpty = document.getElementById('customers-empty');
+      const customersTableShell = document.getElementById('customers-table-shell');
+      const customersTableBody = document.getElementById('customers-tbody');
+      const customersPagination = document.getElementById('customers-pagination');
 
       const drawerStackEl = document.getElementById('drawer-stack');
       const drawerBackdrop = document.getElementById('drawer-backdrop');
@@ -1566,13 +1635,30 @@ function dashboardPage() {
         hasPrev: false,
         sort: { by: 'created_at', dir: 'desc' },
       };
+      const customersState = {
+        items: [],
+        loading: false,
+        filters: {
+          q: '',
+          from: todayStr,
+          to: todayStr,
+          limit: ORDER_PAGE_SIZE,
+        },
+        error: '',
+        page: 1,
+        total: 0,
+        hasNext: false,
+        hasPrev: false,
+      };
       let ordersDirty = true;
+      let customersDirty = true;
       const orderDetailsCache = new Map();
       const drawerState = {
         open: false,
         mode: 'order',
         order: null,
         product: null,
+        customer: null,
       };
 
       if (ordersFromInput && !ordersFromInput.value) ordersFromInput.value = todayStr;
@@ -1742,6 +1828,9 @@ function dashboardPage() {
 
         if (view === 'orders' && ordersDirty) {
           loadOrders();
+        }
+        if (view === 'customers' && customersDirty) {
+          loadCustomers();
         }
 
         params.set('view', view);
@@ -2057,6 +2146,173 @@ function dashboardPage() {
         });
       }
 
+      function updateCustomersMeta(count) {
+        if (!customersMeta) return;
+        const contextText =
+          selectedStoreId === 'all'
+            ? 'toate magazinele'
+            : 'store ' +
+              (storeContextSelect.selectedOptions[0]?.textContent || selectedStoreId);
+        customersMeta.textContent =
+          'Afișăm ' + (count || 0) + ' clienți pentru ' + contextText;
+      }
+
+      function updateCustomersBadge() {
+        if (!customersCountLabel) return;
+        customersCountLabel.textContent =
+          formatNumber(customersState.total || customersState.items.length) + ' customers';
+      }
+
+      function renderCustomersTable() {
+        if (!customersMeta) return;
+        customersLoading.style.display = customersState.loading ? 'block' : 'none';
+
+        if (customersState.loading) {
+          customersEmpty.style.display = 'none';
+          customersTableShell.style.display = 'none';
+          updateCustomersMeta(0);
+          customersCountLabel.textContent = 'Loading...';
+          return;
+        }
+
+        if (customersState.error) {
+          customersEmpty.style.display = 'block';
+          customersEmpty.innerHTML =
+            '<strong>Eroare la încărcarea clienților.</strong><br />' +
+            escapeHtml(customersState.error);
+          customersTableShell.style.display = 'none';
+          customersCountLabel.textContent = '0 customers';
+          updateCustomersMeta(0);
+          return;
+        }
+
+        const count = customersState.total || customersState.items.length;
+        updateCustomersMeta(count);
+        updateCustomersBadge();
+
+        if (!customersState.items.length) {
+          customersEmpty.style.display = 'block';
+          customersTableShell.style.display = 'none';
+          return;
+        }
+
+        customersEmpty.style.display = 'none';
+        customersTableShell.style.display = 'block';
+
+        const rowsHtml = customersState.items
+          .map((c) => {
+            return (
+              '<tr data-store="' +
+                escapeHtml(c.store_id) +
+                '" data-id="' +
+                escapeHtml(c.customer_id) +
+              '">' +
+                '<td><button class="link-inline customer-open">' +
+                  escapeHtml((c.first_name || '') + ' ' + (c.last_name || '') || 'Customer') +
+                '</button></td>' +
+                '<td>' + escapeHtml(c.email || '—') + '</td>' +
+                '<td>' + formatNumber(c.total_orders || 0) + '</td>' +
+                '<td class="numeric">' + formatMoney(c.total_spent || 0, 'RON') + '</td>' +
+                '<td>' + (c.last_order_date ? formatDateTime(c.last_order_date) : '—') + '</td>' +
+                '<td class="store-name-cell">' + escapeHtml(c.store_name || c.store_id || '') + '</td>' +
+                '<td>' + (c.created_at ? formatDateTime(c.created_at) : '—') + '</td>' +
+              '</tr>'
+            );
+          })
+          .join('');
+
+        customersTableBody.innerHTML = rowsHtml;
+        customersTableBody.querySelectorAll('tr').forEach((tr) => {
+          tr.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const storeId = tr.getAttribute('data-store');
+            const customerId = tr.getAttribute('data-id');
+            openCustomerDetail(storeId, customerId);
+          });
+        });
+
+        renderCustomersPagination();
+      }
+
+      function renderCustomersPagination() {
+        if (!customersPagination) return;
+        const totalPages = Math.max(
+          1,
+          Math.ceil(
+            (customersState.total || customersState.items.length || 0) /
+              (customersState.filters.limit || ORDER_PAGE_SIZE)
+          )
+        );
+        const current = Math.min(customersState.page, totalPages);
+        const prevDisabled = current <= 1;
+        const nextDisabled = current >= totalPages;
+
+        function pageButton(page, label, isActive = false, disabled = false) {
+          return (
+            '<button class="' +
+            'pagination-page' +
+            (isActive ? ' active' : '') +
+            '" data-page="' +
+            page +
+            '" ' +
+            (disabled ? 'disabled' : '') +
+            '>' +
+            label +
+            '</button>'
+          );
+        }
+
+        const pages = [];
+        if (totalPages <= 7) {
+          for (let i = 1; i <= totalPages; i++) pages.push(pageButton(i, i, i === current));
+        } else {
+          const addPage = (p) => pages.push(pageButton(p, p, p === current));
+          addPage(1);
+          addPage(2);
+          if (current > 4) pages.push('<span class="pagination-ellipsis">…</span>');
+          const start = Math.max(3, current - 1);
+          const end = Math.min(totalPages - 2, current + 1);
+          for (let i = start; i <= end; i++) addPage(i);
+          if (current < totalPages - 3) pages.push('<span class="pagination-ellipsis">…</span>');
+          addPage(totalPages - 1);
+          addPage(totalPages);
+        }
+
+        customersPagination.innerHTML =
+          '<button class="pagination-btn" id="customers-prev" ' +
+          (prevDisabled ? 'disabled' : '') +
+          '>Prev</button>' +
+          pages.join('') +
+          '<button class="pagination-btn" id="customers-next" ' +
+          (nextDisabled ? 'disabled' : '') +
+          '>Next</button>';
+
+        const prevBtn = document.getElementById('customers-prev');
+        const nextBtn = document.getElementById('customers-next');
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => {
+            if (prevDisabled) return;
+            customersState.page = Math.max(1, customersState.page - 1);
+            loadCustomers();
+          });
+        }
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => {
+            if (nextDisabled) return;
+            customersState.page = Math.min(totalPages, customersState.page + 1);
+            loadCustomers();
+          });
+        }
+        customersPagination.querySelectorAll('.pagination-page').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const page = parseInt(btn.getAttribute('data-page'), 10);
+            if (Number.isNaN(page) || page === current) return;
+            customersState.page = page;
+            loadCustomers();
+          });
+        });
+      }
+
       function renderPagination() {
         if (!ordersPagination) return;
         const totalPages = Math.max(
@@ -2366,6 +2622,82 @@ function dashboardPage() {
         };
       }
 
+      function buildCustomerFullContent(data) {
+        const detail = (data && data.customer) || {};
+        const orders = (data && data.orders) || [];
+        const orderRows = orders
+          .map((o) => {
+            return (
+              '<tr>' +
+                '<td><button class="link-inline customer-order-link" data-order-id="' +
+                  escapeHtml(o.id) +
+                  '" data-store-id="' +
+                  escapeHtml(o.store_id) +
+                '">#' +
+                  escapeHtml(o.name || o.id) +
+                '</button></td>' +
+                '<td>' + formatDateTime(o.created_at) + '</td>' +
+                '<td class="store-name-cell">' + escapeHtml(o.store_name || o.store_id || '') + '</td>' +
+                '<td class="numeric">' + formatMoney(o.total_price, o.currency) + '</td>' +
+                '<td>' +
+                  (o.financial_status ? statusPill(o.financial_status) : '<span class="muted">—</span>') +
+                '</td>' +
+              '</tr>'
+            );
+          })
+          .join('');
+        const tableHtml =
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Orders (context)</div>' +
+            (orders.length
+              ? '<table class="orders-table" style="width:100%;">' +
+                  '<thead><tr><th>Order</th><th>Date</th><th>Store</th><th class="numeric">Total</th><th>Status</th></tr></thead>' +
+                  '<tbody>' + orderRows + '</tbody>' +
+                '</table>'
+              : '<div class="order-sub">Nu există comenzi în context.</div>') +
+          '</div>';
+
+        const summary =
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Contact</div>' +
+            '<div class="kv-row"><span>Nume</span><strong>' +
+              escapeHtml(
+                (detail.first_name || '') + ' ' + (detail.last_name || '')
+              ) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Email</span><strong>' +
+              escapeHtml(detail.email || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Telefon</span><strong>' +
+              escapeHtml(detail.phone || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Adresă</span><strong>' +
+              escapeHtml(formatAddress(detail.default_address)) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Total orders</span><strong>' +
+              formatNumber(detail.total_orders || 0) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Total spent</span><strong>' +
+              formatMoney(detail.total_spent || 0, 'RON') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Last order</span><strong>' +
+              (detail.last_order_date ? formatDateTime(detail.last_order_date) : '—') +
+            '</strong></div>' +
+          '</div>';
+
+        const customerUrl = buildShopifyUrl('customer', { customer: { id: detail.customer_id }, shopify_domain: detail.shopify_domain });
+
+        return {
+          title:
+            (detail.first_name || detail.last_name
+              ? (detail.first_name || '') + ' ' + (detail.last_name || '')
+              : 'Customer'),
+          subtitle: escapeHtml(detail.email || detail.store_name || ''),
+          bodyHtml: summary + tableHtml,
+          shopifyUrl: customerUrl,
+        };
+      }
+
       function buildProductContent(product, detail) {
         const hasProduct = !!product;
         const productOrders = hasProduct
@@ -2481,6 +2813,8 @@ function dashboardPage() {
             ? buildCustomerContent(detail)
             : drawerState.mode === 'product'
             ? buildProductContent(drawerState.product, detail)
+            : drawerState.mode === 'customer-full'
+            ? buildCustomerFullContent(drawerState.customer || {})
             : buildOrderContent(detail);
 
         const tabsHtml = tabs
@@ -2502,24 +2836,42 @@ function dashboardPage() {
           .join('');
 
         const panelHtml =
-          '<div class="drawer-panel order-panel">' +
-            '<div class="drawer-tabs">' + tabsHtml + '</div>' +
-            '<div class="drawer-header">' +
-              '<button class="drawer-close" data-action="close-panel">Close</button>' +
-              '<div>' +
-                '<div class="drawer-title">' + escapeHtml(content.title || '') + '</div>' +
-                (content.subtitle ? '<div class="order-sub">' + content.subtitle + '</div>' : '') +
-              '</div>' +
-            '</div>' +
-            '<div class="drawer-body">' + content.bodyHtml + '</div>' +
-            '<div class="drawer-footer">' +
-              (content.shopifyUrl
-                ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
-                  escapeHtml(content.shopifyUrl) +
-                  '">DESCHIDE ÎN SHOPIFY</a>'
-                : '<button class="btn-shopify" disabled>DESCHIDE ÎN SHOPIFY</button>') +
-            '</div>' +
-          '</div>';
+          drawerState.mode === 'customer-full'
+            ? '<div class="drawer-panel order-panel">' +
+                '<div class="drawer-header">' +
+                  '<button class="drawer-close" data-action="close-panel">Close</button>' +
+                  '<div>' +
+                    '<div class="drawer-title">' + escapeHtml(content.title || '') + '</div>' +
+                    (content.subtitle ? '<div class="order-sub">' + content.subtitle + '</div>' : '') +
+                  '</div>' +
+                '</div>' +
+                '<div class="drawer-body">' + content.bodyHtml + '</div>' +
+                '<div class="drawer-footer">' +
+                  (content.shopifyUrl
+                    ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
+                      escapeHtml(content.shopifyUrl) +
+                      '">DESCHIDE ÎN SHOPIFY</a>'
+                    : '<button class="btn-shopify" disabled>DESCHIDE ÎN SHOPIFY</button>') +
+                '</div>' +
+              '</div>'
+            : '<div class="drawer-panel order-panel">' +
+                '<div class="drawer-tabs">' + tabsHtml + '</div>' +
+                '<div class="drawer-header">' +
+                  '<button class="drawer-close" data-action="close-panel">Close</button>' +
+                  '<div>' +
+                    '<div class="drawer-title">' + escapeHtml(content.title || '') + '</div>' +
+                    (content.subtitle ? '<div class="order-sub">' + content.subtitle + '</div>' : '') +
+                  '</div>' +
+                '</div>' +
+                '<div class="drawer-body">' + content.bodyHtml + '</div>' +
+                '<div class="drawer-footer">' +
+                  (content.shopifyUrl
+                    ? '<a class="btn-shopify" target="_blank" rel="noopener" href="' +
+                      escapeHtml(content.shopifyUrl) +
+                      '">DESCHIDE ÎN SHOPIFY</a>'
+                    : '<button class="btn-shopify" disabled>DESCHIDE ÎN SHOPIFY</button>') +
+                '</div>' +
+              '</div>';
 
         drawerStackEl.innerHTML = panelHtml;
         const panel = drawerStackEl.querySelector('.drawer-panel');
@@ -2527,17 +2879,19 @@ function dashboardPage() {
           if (panel) panel.classList.add('open');
         });
 
-        drawerStackEl.querySelectorAll('.drawer-tab').forEach((tab) => {
-          tab.addEventListener('click', () => {
-            if (tab.disabled) return;
-            const key = tab.getAttribute('data-tab');
-            drawerState.mode = key;
-            if (key === 'product' && hasProducts && !drawerState.product) {
-              drawerState.product = detail.line_items[0];
-            }
-            renderDrawer();
+        if (drawerState.mode !== 'customer-full') {
+          drawerStackEl.querySelectorAll('.drawer-tab').forEach((tab) => {
+            tab.addEventListener('click', () => {
+              if (tab.disabled) return;
+              const key = tab.getAttribute('data-tab');
+              drawerState.mode = key;
+              if (key === 'product' && hasProducts && !drawerState.product) {
+                drawerState.product = detail.line_items[0];
+              }
+              renderDrawer();
+            });
           });
-        });
+        }
 
         const closeBtn = drawerStackEl.querySelector('[data-action="close-panel"]');
         if (closeBtn) {
@@ -2566,6 +2920,15 @@ function dashboardPage() {
               shopify_domain: detail.shopify_domain,
             };
             renderDrawer();
+          });
+        });
+
+        drawerStackEl.querySelectorAll('.customer-order-link').forEach((btn) => {
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const orderId = btn.getAttribute('data-order-id');
+            const storeId = btn.getAttribute('data-store-id');
+            openOrderDrawer(orderId, storeId);
           });
         });
 
@@ -2641,6 +3004,54 @@ function dashboardPage() {
         }
       }
 
+      async function openCustomerDetail(storeId, customerId) {
+        if (!storeId || !customerId) return;
+        drawerState.open = true;
+        drawerState.mode = 'customer-full';
+        drawerState.customer = {
+          customer: {
+            customer_id: customerId,
+            store_id: storeId,
+            first_name: '',
+            last_name: '',
+            email: '',
+            total_orders: 0,
+            total_spent: 0,
+          },
+          orders: [],
+          _loading: true,
+        };
+        renderDrawer();
+        try {
+          const qs = new URLSearchParams();
+          if (customersState.filters.from) qs.set('from', customersState.filters.from);
+          if (customersState.filters.to) qs.set('to', customersState.filters.to);
+          const res = await fetch(
+            '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId) + '?' + qs.toString()
+          );
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          drawerState.customer = data;
+        } catch (err) {
+          console.error('Customer detail error', err);
+          drawerState.customer = {
+            customer: {
+              first_name: 'Customer',
+              last_name: '',
+              email: '',
+              total_orders: 0,
+              total_spent: 0,
+              store_name: storeId,
+            },
+            orders: [],
+            error: err.message || String(err),
+          };
+        } finally {
+          drawerState.mode = 'customer-full';
+          renderDrawer();
+        }
+      }
+
       async function loadOrders() {
         ordersState.loading = true;
         ordersState.error = '';
@@ -2680,6 +3091,51 @@ function dashboardPage() {
           ordersState.loading = false;
           ordersDirty = false;
           renderOrdersTable();
+        }
+      }
+
+      async function loadCustomers() {
+        customersState.loading = true;
+        customersState.error = '';
+        renderCustomersTable();
+
+        const qs = new URLSearchParams();
+        qs.set('store_id', selectedStoreId || 'all');
+        qs.set('limit', customersState.filters.limit || ORDER_PAGE_SIZE);
+        qs.set('page', customersState.page);
+        if (customersState.filters.q) qs.set('q', customersState.filters.q);
+        if (customersState.filters.from) qs.set('from', customersState.filters.from);
+        if (customersState.filters.to) qs.set('to', customersState.filters.to);
+
+        try {
+          const res = await fetch('/customers?' + qs.toString());
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          customersState.items = Array.isArray(data.customers) ? data.customers : [];
+          customersState.page = data.page || customersState.page;
+          customersState.total =
+            data.total != null ? data.total : customersState.items.length;
+          customersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
+          const totalPages = Math.max(
+            1,
+            Math.ceil(
+              (customersState.total || customersState.items.length || 0) /
+                customersState.filters.limit
+            )
+          );
+          customersState.hasNext = customersState.page < totalPages;
+          customersState.hasPrev = customersState.page > 1;
+        } catch (err) {
+          console.error('Error /customers', err);
+          customersState.items = [];
+          customersState.error = err.message || String(err);
+          customersState.total = 0;
+          customersState.hasNext = false;
+          customersState.hasPrev = customersState.page > 1;
+        } finally {
+          customersState.loading = false;
+          customersDirty = false;
+          renderCustomersTable();
         }
       }
 
@@ -2799,6 +3255,18 @@ function dashboardPage() {
         });
       }
 
+      let custSearchDebounce = null;
+      if (customersSearchInput) {
+        customersSearchInput.addEventListener('input', () => {
+          clearTimeout(custSearchDebounce);
+          custSearchDebounce = setTimeout(() => {
+            customersState.filters.q = customersSearchInput.value.trim();
+            customersState.page = 1;
+            loadCustomers();
+          }, 260);
+        });
+      }
+
       if (ordersStatusSelect) {
         ordersStatusSelect.value = ordersState.filters.status;
       }
@@ -2846,8 +3314,10 @@ function dashboardPage() {
         }
         selectedStoreId = nextStoreId;
         ordersDirty = true;
+        customersDirty = true;
         orderDetailsCache.clear();
         ordersState.page = 1;
+        customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
       });
