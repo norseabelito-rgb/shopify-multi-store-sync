@@ -742,23 +742,15 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
 // POST /tasks/sync-logs – full refresh of OrdersLog + CustomersLog
 router.post('/tasks/sync-logs', async (req, res) => {
   try {
-    const result = await syncLogs();
-    if (!result.success) {
-      return res.status(500).json({
-        ok: false,
-        success: false,
-        message: 'All stores failed to sync',
-        ...result,
-      });
-    }
-    res.json({ ok: true, success: true, ...result });
+    console.log('[syncLogs] HTTP trigger received');
+    const summary = await syncLogs();
+    console.log('[syncLogs] Sync finished', summary);
+    res.json({ success: summary.success, summary });
   } catch (err) {
     console.error('/tasks/sync-logs error', err);
     res.status(500).json({
       success: false,
-      error: 'Failed to run sync',
-      message: err.message || String(err),
-      details: err.summary || null,
+      error: err.message || String(err),
     });
   }
 });

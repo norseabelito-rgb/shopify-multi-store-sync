@@ -1877,6 +1877,7 @@ function dashboardPage() {
 
       async function runRefreshData() {
         if (refreshInProgress || !refreshActionBtn) return;
+        console.log('[UI] Refresh data clicked');
         const proceed = window.confirm(
           'This will refresh Orders and Customers logs from Shopify (since 2024-01-01). Continue?'
         );
@@ -1890,21 +1891,27 @@ function dashboardPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
-          const data = await res.json().catch(() => ({}));
-          const success = res.ok && (data.success === true || data.ok === true);
-          if (!success) {
-            throw new Error(data && data.message ? data.message : 'Sync failed');
+          if (!res.ok) {
+            console.error('Refresh data failed (HTTP)', res.status, res.statusText);
+            alert('Failed to refresh data. Check server logs.');
+            return;
           }
-
-          alert('Data refreshed successfully from Shopify into logs.');
-          ordersDirty = true;
-          customersDirty = true;
-          if (currentView === 'orders') {
-            await loadOrders();
-          } else if (currentView === 'customers') {
-            await loadCustomers();
+          const data = await res.json().catch(() => ({}));
+          if (data && data.success === true) {
+            console.log('[UI] Sync finished successfully', data.summary);
+            alert('Data refreshed successfully');
+            ordersDirty = true;
+            customersDirty = true;
+            if (currentView === 'orders') {
+              await loadOrders();
+            } else if (currentView === 'customers') {
+              await loadCustomers();
+            } else {
+              window.location.reload();
+            }
           } else {
-            window.location.reload();
+            console.error('[UI] Sync failed', data);
+            alert('Failed to refresh data. Check server logs.');
           }
         } catch (err) {
           console.error('Refresh data failed', err);
