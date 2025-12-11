@@ -144,6 +144,22 @@ function dashboardPage() {
       box-shadow: 0 10px 30px rgba(15, 23, 42, 0.9);
     }
 
+    .nav-action {
+      border-color: rgba(148, 163, 184, 0.25);
+      background: rgba(15, 23, 42, 0.8);
+      color: #cbd5e1;
+      font-size: 12px;
+    }
+
+    .nav-action:hover {
+      border-color: rgba(79, 140, 255, 0.45);
+    }
+
+    .nav-action.is-loading {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
     .sidebar-footer {
       margin-top: auto;
       padding-top: 10px;
@@ -1131,6 +1147,9 @@ function dashboardPage() {
           <button class="nav-item" data-view="customers">
             <span>Customers</span>
           </button>
+          <button class="nav-item nav-action" data-action="refresh-data">
+            <span>Refresh data</span>
+          </button>
           <button class="nav-item" data-view="shipping">
             <span>Shipping</span>
           </button>
@@ -1575,7 +1594,8 @@ function dashboardPage() {
       const storeContextSelect = document.getElementById('store-context-select');
       const storeContextLive = document.getElementById('store-context-live');
 
-      const navItems = document.querySelectorAll('.nav-item');
+      const navItems = document.querySelectorAll('.nav-item[data-view]');
+      const refreshActionBtn = document.querySelector('.nav-action[data-action="refresh-data"]');
       const views = document.querySelectorAll('.view');
 
       const statActiveHome = document.getElementById('stat-active-home');
@@ -1616,6 +1636,7 @@ function dashboardPage() {
       const drawerBackdrop = document.getElementById('drawer-backdrop');
 
       const todayStr = new Date().toISOString().slice(0, 10);
+      let refreshInProgress = false;
 
       const ORDER_PAGE_SIZE = 100;
       const ordersState = {
@@ -1846,6 +1867,61 @@ function dashboardPage() {
           setView(v);
         });
       });
+
+      function setRefreshButtonState(isLoading) {
+        if (!refreshActionBtn) return;
+        refreshActionBtn.disabled = !!isLoading;
+        refreshActionBtn.classList.toggle('is-loading', !!isLoading);
+        refreshActionBtn.querySelector('span').textContent = isLoading ? 'Refreshing...' : 'Refresh data';
+      }
+
+      async function runRefreshData() {
+        if (refreshInProgress || !refreshActionBtn) return;
+        const proceed = window.confirm(
+          'This will refresh Orders and Customers logs from Shopify (since 2024-01-01). Continue?'
+        );
+        if (!proceed) return;
+
+        refreshInProgress = true;
+        setRefreshButtonState(true);
+
+        try {
+          const res = await fetch('/tasks/sync-logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const data = await res.json().catch(() => ({}));
+          const success = res.ok && (data.success === true || data.ok === true);
+          if (!success) {
+            throw new Error(data && data.message ? data.message : 'Sync failed');
+          }
+
+          alert('Data refreshed successfully from Shopify into logs.');
+          ordersDirty = true;
+          customersDirty = true;
+          if (currentView === 'orders') {
+            await loadOrders();
+          } else if (currentView === 'customers') {
+            await loadCustomers();
+          } else {
+            window.location.reload();
+          }
+        } catch (err) {
+          console.error('Refresh data failed', err);
+          alert('Failed to refresh data. ' + (err && err.message ? err.message : ''));
+        } finally {
+          refreshInProgress = false;
+          setRefreshButtonState(false);
+        }
+      }
+
+      if (refreshActionBtn) {
+        refreshActionBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          if (refreshInProgress) return;
+          runRefreshData();
+        });
+      }
 
       function buildHomeTable(stores) {
         if (!stores.length) {

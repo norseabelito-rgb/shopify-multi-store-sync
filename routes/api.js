@@ -743,10 +743,11 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
 router.post('/tasks/sync-logs', async (req, res) => {
   try {
     const result = await syncLogs();
-    res.json({ ok: true, ...result });
+    res.json({ ok: true, success: true, ...result });
   } catch (err) {
     console.error('/tasks/sync-logs error', err);
     res.status(500).json({
+      success: false,
       error: 'Failed to run sync',
       message: err.message || String(err),
     });
