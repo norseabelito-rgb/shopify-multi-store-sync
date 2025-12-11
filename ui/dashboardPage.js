@@ -1640,8 +1640,8 @@ function dashboardPage() {
         loading: false,
         filters: {
           q: '',
-          from: todayStr,
-          to: todayStr,
+          from: null,
+          to: null,
           limit: ORDER_PAGE_SIZE,
         },
         error: '',
@@ -2201,21 +2201,25 @@ function dashboardPage() {
 
         const rowsHtml = customersState.items
           .map((c) => {
+            const fullName =
+              (c.first_name || c.last_name
+                ? (c.first_name || '') + ' ' + (c.last_name || '')
+                : c.name) || 'Customer';
             return (
               '<tr data-store="' +
                 escapeHtml(c.store_id) +
                 '" data-id="' +
-                escapeHtml(c.customer_id) +
+                escapeHtml(c.customer_id || c.email || '') +
               '">' +
                 '<td><button class="link-inline customer-open">' +
-                  escapeHtml((c.first_name || '') + ' ' + (c.last_name || '') || 'Customer') +
+                  escapeHtml(fullName) +
                 '</button></td>' +
                 '<td>' + escapeHtml(c.email || '—') + '</td>' +
                 '<td>' + formatNumber(c.total_orders || 0) + '</td>' +
                 '<td class="numeric">' + formatMoney(c.total_spent || 0, 'RON') + '</td>' +
                 '<td>' + (c.last_order_date ? formatDateTime(c.last_order_date) : '—') + '</td>' +
                 '<td class="store-name-cell">' + escapeHtml(c.store_name || c.store_id || '') + '</td>' +
-                '<td>' + (c.created_at ? formatDateTime(c.created_at) : '—') + '</td>' +
+                '<td>' + (c.created_at ? formatDateTime(c.created_at) : (c.first_order_date ? formatDateTime(c.first_order_date) : '—')) + '</td>' +
               '</tr>'
             );
           })

@@ -578,18 +578,20 @@ function aggregateCustomersFromOrders(orders) {
     const existing = map.get(key) || {
       store_id: o.store_id,
       store_name: o.store_name || o.store_id,
-      shopify_customer_id: o.customer_id || null,
+      customer_id: o.customer_id || o.customer_email || null,
       email: o.customer_email || null,
+      name: fullName,
       first_name: firstName,
       last_name: lastName,
-      full_name: fullName,
-      orders_count: 0,
+      total_orders: 0,
       total_spent: 0,
       first_order_date: null,
       last_order_date: null,
+      created_at: null,
+      default_address: o.shipping_address || o.billing_address || null,
     };
 
-    existing.orders_count += 1;
+    existing.total_orders += 1;
 
     const priceNumber = o.total_price ? Number(o.total_price) : 0;
     if (!Number.isNaN(priceNumber)) {
@@ -598,11 +600,13 @@ function aggregateCustomersFromOrders(orders) {
 
     const createdAt = o.created_at ? new Date(o.created_at) : null;
     if (createdAt) {
+      const iso = createdAt.toISOString();
       if (!existing.first_order_date || createdAt < new Date(existing.first_order_date)) {
-        existing.first_order_date = createdAt.toISOString();
+        existing.first_order_date = iso;
+        existing.created_at = iso;
       }
       if (!existing.last_order_date || createdAt > new Date(existing.last_order_date)) {
-        existing.last_order_date = createdAt.toISOString();
+        existing.last_order_date = iso;
       }
     }
 
@@ -898,9 +902,13 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
       q: '',
     };
     const orders = await fetchOrdersForStoreWithFilters(store, filters);
-    const ordersForCustomer = orders.filter(
-      (o) => o.customer && String(o.customer.id) === String(customerId)
-    );
+    const ordersForCustomer = orders.filter((o) => {
+      const byId = o.customer_id && String(o.customer_id) === String(customerId);
+      const byEmail =
+        o.customer_email &&
+        String(o.customer_email).toLowerCase() === String(customerId).toLowerCase();
+      return byId || byEmail;
+    });
 
     if (!ordersForCustomer.length) {
       return res.status(404).json({ error: 'Customer not found in this store' });
