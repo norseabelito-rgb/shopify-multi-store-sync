@@ -2157,8 +2157,8 @@ function dashboardPage() {
                 ordersState.sort.by = key;
                 ordersState.sort.dir = 'asc';
               }
-              ordersState.page = 1;  // Reset to page 1 when sort changes
-              loadOrders();
+              ordersState.nextPageInfo = null;  // Reset for fresh query
+              loadOrders(false);  // Replace, not append
             });
             th._sortingBound = true;
           }
@@ -2340,41 +2340,8 @@ function dashboardPage() {
 
       function renderPagination() {
         if (!ordersPagination) return;
-
-        // Simplified pagination: just Prev and Next buttons, no page numbers
-        const prevDisabled = !ordersState.hasPrev;
-        const nextDisabled = !ordersState.hasNext;
-
-        ordersPagination.innerHTML =
-          '<button class="pagination-btn" id="orders-prev" ' +
-          (prevDisabled ? 'disabled' : '') +
-          '>Prev</button>' +
-          '<button class="pagination-btn" id="orders-next" ' +
-          (nextDisabled ? 'disabled' : '') +
-          '>Next</button>';
-
-        const prevBtn = document.getElementById('orders-prev');
-        const nextBtn = document.getElementById('orders-next');
-
-        if (prevBtn) {
-          prevBtn.addEventListener('click', () => {
-            if (prevDisabled) return;
-            // Go to previous page
-            ordersState.page = Math.max(1, ordersState.page - 1);
-            console.log('[orders] Prev clicked, going to page:', ordersState.page);
-            loadOrders();
-          });
-        }
-
-        if (nextBtn) {
-          nextBtn.addEventListener('click', () => {
-            if (nextDisabled) return;
-            // Go to next page
-            ordersState.page += 1;
-            console.log('[orders] Next clicked, going to page:', ordersState.page);
-            loadOrders();
-          });
-        }
+        // Infinite scroll - no pagination buttons needed
+        ordersPagination.innerHTML = '';
       }
 
       function buildShopifyUrl(type, payload, domainOverride) {
@@ -3035,9 +3002,16 @@ function dashboardPage() {
         }
       }
 
-      async function loadOrders() {
+      async function loadOrders(append = false) {
+        // Prevent loading if already loading or if appending but no more data
+        if (ordersState.loading || (append && !ordersState.nextPageInfo)) {
+          return;
+        }
+
         ordersState.loading = true;
-        ordersState.error = '';
+        if (!append) {
+          ordersState.error = '';
+        }
         renderOrdersTable();
 
         const qs = new URLSearchParams();
@@ -3048,40 +3022,46 @@ function dashboardPage() {
         if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
         if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
 
-        // Use simple page-based pagination
-        if (ordersState.page > 1) {
-          qs.set('page_info', String(ordersState.page));
+        // Use cursor for infinite scroll
+        if (append && ordersState.nextPageInfo) {
+          qs.set('page_info', ordersState.nextPageInfo);
         }
 
         try {
           const res = await fetch('/orders?' + qs.toString());
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
-          ordersState.items = Array.isArray(data.orders) ? data.orders : [];
-          ordersState.page = data.page || ordersState.page;
-          ordersState.total = data.total != null ? data.total : ordersState.items.length;
-          ordersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
 
-          // Update pagination state (simple page-based)
-          ordersState.hasNext = data.hasNext || false;
-          ordersState.hasPrev = data.hasPrev || false;
+          const newOrders = Array.isArray(data.orders) ? data.orders : [];
 
-          // Store today's count for the metric
-          ordersState.totalTodayOrders = data.totalTodayOrders || 0;
-
-          // Update today's metric in the top card
-          if (statTodayHome) {
-            statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
+          // Append to existing items or replace
+          if (append) {
+            ordersState.items = [...ordersState.items, ...newOrders];
+            console.log('[orders] Appended', newOrders.length, 'orders, total now:', ordersState.items.length);
+          } else {
+            ordersState.items = newOrders;
+            console.log('[orders] Loaded', newOrders.length, 'orders');
           }
 
-          console.log('[orders] Loaded page', ordersState.page, ':', ordersState.items.length, 'orders, total:', ordersState.total, 'hasNext:', ordersState.hasNext, 'today:', ordersState.totalTodayOrders);
+          // Store cursor for next load
+          ordersState.nextPageInfo = data.nextPageInfo || null;
+          ordersState.hasNext = !!data.nextPageInfo;
+
+          // Store today's count for the metric (only on initial load)
+          if (!append) {
+            ordersState.totalTodayOrders = data.totalTodayOrders || 0;
+            if (statTodayHome) {
+              statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
+            }
+          }
         } catch (err) {
           console.error('Error /orders', err);
-          ordersState.items = [];
-          ordersState.error = err.message || String(err);
-          ordersState.total = 0;
+          if (!append) {
+            ordersState.items = [];
+            ordersState.error = err.message || String(err);
+          }
+          ordersState.nextPageInfo = null;
           ordersState.hasNext = false;
-          ordersState.hasPrev = false;
         } finally {
           ordersState.loading = false;
           ordersDirty = false;
@@ -3238,8 +3218,8 @@ function dashboardPage() {
           clearTimeout(searchDebounce);
           searchDebounce = setTimeout(() => {
             ordersState.filters.q = ordersSearchInput.value.trim();
-            ordersState.page = 1;  // Reset to page 1 when search changes
-            loadOrders();
+            ordersState.nextPageInfo = null;  // Reset for fresh query
+            loadOrders(false);  // Replace, not append
           }, 260);
         });
       }
@@ -3263,24 +3243,24 @@ function dashboardPage() {
       if (ordersStatusSelect) {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
-          ordersState.page = 1;  // Reset to page 1 when filter changes
-          loadOrders();
+          ordersState.nextPageInfo = null;  // Reset for fresh query
+          loadOrders(false);  // Replace, not append
         });
       }
 
       if (ordersFromInput) {
         ordersFromInput.addEventListener('change', () => {
           ordersState.filters.from = ordersFromInput.value;
-          ordersState.page = 1;  // Reset to page 1 when date changes
-          loadOrders();
+          ordersState.nextPageInfo = null;  // Reset for fresh query
+          loadOrders(false);  // Replace, not append
         });
       }
 
       if (ordersToInput) {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
-          ordersState.page = 1;  // Reset to page 1 when date changes
-          loadOrders();
+          ordersState.nextPageInfo = null;  // Reset for fresh query
+          loadOrders(false);  // Replace, not append
         });
       }
 
@@ -3305,11 +3285,28 @@ function dashboardPage() {
         ordersDirty = true;
         customersDirty = true;
         orderDetailsCache.clear();
-        ordersState.page = 1;  // Reset to page 1 when store changes
+        ordersState.nextPageInfo = null;  // Reset for fresh query
         customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
       });
+
+      // Infinite scroll for orders table
+      if (ordersTableShell) {
+        ordersTableShell.addEventListener('scroll', () => {
+          const scrollTop = ordersTableShell.scrollTop;
+          const scrollHeight = ordersTableShell.scrollHeight;
+          const clientHeight = ordersTableShell.clientHeight;
+
+          // Load more when scrolled to within 200px of bottom
+          if (scrollTop + clientHeight >= scrollHeight - 200) {
+            if (ordersState.hasNext && !ordersState.loading) {
+              console.log('[orders] Scroll triggered load more');
+              loadOrders(true); // append = true
+            }
+          }
+        });
+      }
 
       // init
       setView(currentView);

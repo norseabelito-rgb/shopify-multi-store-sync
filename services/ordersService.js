@@ -141,17 +141,15 @@ async function fetchOrders(filters = {}) {
     };
   }
 
-  // For single store: fetch a large batch and paginate in-memory
+  // For single store: use Shopify cursor pagination for infinite scroll
   if (targetStores.length === 1) {
     const store = targetStores[0];
 
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // Fetch a comprehensive batch of orders (500-1000) to enable proper pagination and search
-    // This is cached in-memory for the duration of the request
-    const batchLimit = 1000;
-    const result = await fetchOrdersForStore(store, { from, to, status, limit: batchLimit });
+    // Fetch orders using cursor pagination from Shopify
+    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
 
     let orders = result.orders;
 
@@ -169,23 +167,15 @@ async function fetchOrders(filters = {}) {
       });
     }
 
-    // Implement simple page-based pagination (like customers)
-    const limitNum = parseInt(limit, 10) || 100;
-    const pageNum = parseInt(page_info, 10) || 1; // Reuse page_info param as page number
-    const totalOrders = orders.length;
-    const startIndex = (pageNum - 1) * limitNum;
-    const endIndex = startIndex + limitNum;
-    const sliced = orders.slice(startIndex, endIndex);
-
     return {
-      orders: sliced,
-      page: pageNum,
-      limit: limitNum,
-      total: totalOrders,
-      hasNext: endIndex < totalOrders,
-      hasPrev: pageNum > 1,
-      nextPageInfo: endIndex < totalOrders ? String(pageNum + 1) : null,
-      prevPageInfo: pageNum > 1 ? String(pageNum - 1) : null,
+      orders,
+      page: 1,
+      limit: parseInt(limit, 10) || 100,
+      total: orders.length,
+      hasNext: !!result.nextPageInfo,
+      hasPrev: false,
+      nextPageInfo: result.nextPageInfo,
+      prevPageInfo: null,
       totalTodayOrders: todayCount,
     };
   }
