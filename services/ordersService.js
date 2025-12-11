@@ -148,15 +148,14 @@ async function fetchOrders(filters = {}) {
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // Fetch orders using cursor pagination from Shopify
-    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
+    // If there's a search query and no page_info, disable pagination and fetch more
+    if (searchQuery && !page_info) {
+      // Fetch a large batch for search
+      const searchLimit = 1000;
+      const result = await fetchOrdersForStore(store, { from, to, status, limit: searchLimit });
 
-    let orders = result.orders;
-
-    // Apply search filter if provided
-    if (searchQuery) {
       const needle = searchQuery.toLowerCase();
-      orders = orders.filter(order => {
+      const filtered = result.orders.filter(order => {
         const haystack = [
           order.name,
           order.customer_name,
@@ -165,13 +164,30 @@ async function fetchOrders(filters = {}) {
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(needle);
       });
+
+      return {
+        orders: filtered,
+        page: 1,
+        limit: filtered.length,
+        total: filtered.length,
+        hasNext: false, // No pagination during search
+        hasPrev: false,
+        nextPageInfo: null,
+        prevPageInfo: null,
+        totalTodayOrders: todayCount,
+      };
     }
 
+    // Normal infinite scroll (no search)
+    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
+
+    console.log('[ordersService] Fetched', result.orders.length, 'orders, hasNext:', !!result.nextPageInfo, 'cursor:', result.nextPageInfo?.substring(0, 30));
+
     return {
-      orders,
+      orders: result.orders,
       page: 1,
       limit: parseInt(limit, 10) || 100,
-      total: orders.length,
+      total: result.orders.length,
       hasNext: !!result.nextPageInfo,
       hasPrev: false,
       nextPageInfo: result.nextPageInfo,
