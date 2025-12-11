@@ -141,22 +141,24 @@ async function fetchOrders(filters = {}) {
     };
   }
 
-  // For single store: use Shopify pagination directly
+  // For single store: fetch a large batch and paginate in-memory
   if (targetStores.length === 1) {
     const store = targetStores[0];
 
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // If there's a search query, fetch multiple pages to search comprehensively
-    // Ignore page_info cursor when searching
-    if (searchQuery && !page_info) {
-      // Fetch more orders to enable comprehensive search
-      const searchLimit = 500; // Fetch more orders for better search results
-      const result = await fetchOrdersForStore(store, { from, to, status, limit: searchLimit });
+    // Fetch a comprehensive batch of orders (500-1000) to enable proper pagination and search
+    // This is cached in-memory for the duration of the request
+    const batchLimit = 1000;
+    const result = await fetchOrdersForStore(store, { from, to, status, limit: batchLimit });
 
+    let orders = result.orders;
+
+    // Apply search filter if provided
+    if (searchQuery) {
       const needle = searchQuery.toLowerCase();
-      const filtered = result.orders.filter(order => {
+      orders = orders.filter(order => {
         const haystack = [
           order.name,
           order.customer_name,
@@ -165,36 +167,25 @@ async function fetchOrders(filters = {}) {
         ].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(needle);
       });
-
-      // Return first page of search results
-      const limitNum = parseInt(limit, 10) || 100;
-      const sliced = filtered.slice(0, limitNum);
-
-      return {
-        orders: sliced,
-        page: 1,
-        limit: limitNum,
-        total: filtered.length,
-        hasNext: filtered.length > limitNum,
-        hasPrev: false,
-        nextPageInfo: null, // Disable cursor pagination during search
-        prevPageInfo: null,
-        totalTodayOrders: todayCount,
-      };
     }
 
-    // Normal pagination (no search)
-    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
+    // Implement simple page-based pagination (like customers)
+    const limitNum = parseInt(limit, 10) || 100;
+    const pageNum = parseInt(page_info, 10) || 1; // Reuse page_info param as page number
+    const totalOrders = orders.length;
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const sliced = orders.slice(startIndex, endIndex);
 
     return {
-      orders: result.orders,
-      page: 1, // With cursor pagination, page numbers are less meaningful
-      limit: parseInt(limit, 10) || 100,
-      total: result.orders.length, // We don't know total without fetching all pages
-      hasNext: !!result.nextPageInfo,
-      hasPrev: !!result.prevPageInfo,
-      nextPageInfo: result.nextPageInfo,
-      prevPageInfo: result.prevPageInfo,
+      orders: sliced,
+      page: pageNum,
+      limit: limitNum,
+      total: totalOrders,
+      hasNext: endIndex < totalOrders,
+      hasPrev: pageNum > 1,
+      nextPageInfo: endIndex < totalOrders ? String(pageNum + 1) : null,
+      prevPageInfo: pageNum > 1 ? String(pageNum - 1) : null,
       totalTodayOrders: todayCount,
     };
   }

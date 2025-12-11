@@ -2157,9 +2157,7 @@ function dashboardPage() {
                 ordersState.sort.by = key;
                 ordersState.sort.dir = 'asc';
               }
-              ordersState.page = 1;
-              ordersState.nextPageInfo = null;
-              ordersState.currentPageInfo = null;
+              ordersState.page = 1;  // Reset to page 1 when sort changes
               loadOrders();
             });
             th._sortingBound = true;
@@ -2361,9 +2359,9 @@ function dashboardPage() {
         if (prevBtn) {
           prevBtn.addEventListener('click', () => {
             if (prevDisabled) return;
-            // Use prevPageInfo cursor for backward navigation
+            // Go to previous page
             ordersState.page = Math.max(1, ordersState.page - 1);
-            ordersState.currentPageInfo = ordersState.prevPageInfo;
+            console.log('[orders] Prev clicked, going to page:', ordersState.page);
             loadOrders();
           });
         }
@@ -2371,10 +2369,9 @@ function dashboardPage() {
         if (nextBtn) {
           nextBtn.addEventListener('click', () => {
             if (nextDisabled) return;
-            // Use nextPageInfo cursor for forward navigation
+            // Go to next page
             ordersState.page += 1;
-            ordersState.currentPageInfo = ordersState.nextPageInfo;
-            console.log('[orders] Next clicked, using cursor:', ordersState.currentPageInfo?.substring(0, 20) + '...');
+            console.log('[orders] Next clicked, going to page:', ordersState.page);
             loadOrders();
           });
         }
@@ -3051,9 +3048,9 @@ function dashboardPage() {
         if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
         if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
 
-        // Use Shopify cursor pagination if available
-        if (ordersState.currentPageInfo) {
-          qs.set('page_info', ordersState.currentPageInfo);
+        // Use simple page-based pagination
+        if (ordersState.page > 1) {
+          qs.set('page_info', String(ordersState.page));
         }
 
         try {
@@ -3065,15 +3062,9 @@ function dashboardPage() {
           ordersState.total = data.total != null ? data.total : ordersState.items.length;
           ordersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
 
-          // Update pagination cursors
-          ordersState.nextPageInfo = data.nextPageInfo || null;
-          ordersState.prevPageInfo = data.prevPageInfo || null;
-          ordersState.hasNext = data.hasNext || !!data.nextPageInfo;
+          // Update pagination state (simple page-based)
+          ordersState.hasNext = data.hasNext || false;
           ordersState.hasPrev = data.hasPrev || false;
-          // Clear current page info after using it (we now have fresh cursors)
-          ordersState.currentPageInfo = null;
-
-          console.log('[orders] Response cursors - next:', data.nextPageInfo?.substring(0, 20), 'prev:', data.prevPageInfo?.substring(0, 20), 'hasNext:', ordersState.hasNext);
 
           // Store today's count for the metric
           ordersState.totalTodayOrders = data.totalTodayOrders || 0;
@@ -3083,7 +3074,7 @@ function dashboardPage() {
             statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
           }
 
-          console.log('[orders] Loaded', ordersState.items.length, 'orders, hasNext:', ordersState.hasNext, 'today:', ordersState.totalTodayOrders);
+          console.log('[orders] Loaded page', ordersState.page, ':', ordersState.items.length, 'orders, total:', ordersState.total, 'hasNext:', ordersState.hasNext, 'today:', ordersState.totalTodayOrders);
         } catch (err) {
           console.error('Error /orders', err);
           ordersState.items = [];
@@ -3247,9 +3238,7 @@ function dashboardPage() {
           clearTimeout(searchDebounce);
           searchDebounce = setTimeout(() => {
             ordersState.filters.q = ordersSearchInput.value.trim();
-            ordersState.page = 1;
-            ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
-            ordersState.currentPageInfo = null;
+            ordersState.page = 1;  // Reset to page 1 when search changes
             loadOrders();
           }, 260);
         });
@@ -3274,9 +3263,7 @@ function dashboardPage() {
       if (ordersStatusSelect) {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
-          ordersState.page = 1;
-          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
-          ordersState.currentPageInfo = null;
+          ordersState.page = 1;  // Reset to page 1 when filter changes
           loadOrders();
         });
       }
@@ -3284,9 +3271,7 @@ function dashboardPage() {
       if (ordersFromInput) {
         ordersFromInput.addEventListener('change', () => {
           ordersState.filters.from = ordersFromInput.value;
-          ordersState.page = 1;
-          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
-          ordersState.currentPageInfo = null;
+          ordersState.page = 1;  // Reset to page 1 when date changes
           loadOrders();
         });
       }
@@ -3294,9 +3279,7 @@ function dashboardPage() {
       if (ordersToInput) {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
-          ordersState.page = 1;
-          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
-          ordersState.currentPageInfo = null;
+          ordersState.page = 1;  // Reset to page 1 when date changes
           loadOrders();
         });
       }
@@ -3322,9 +3305,7 @@ function dashboardPage() {
         ordersDirty = true;
         customersDirty = true;
         orderDetailsCache.clear();
-        ordersState.page = 1;
-        ordersState.nextPageInfo = null;  // Reset pagination cursor when store context changes
-        ordersState.currentPageInfo = null;
+        ordersState.page = 1;  // Reset to page 1 when store changes
         customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
