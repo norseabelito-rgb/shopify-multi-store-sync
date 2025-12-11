@@ -18,21 +18,13 @@ const {
   diffProduct,
   determinePlannedActionForRow,
 } = require('../lib/mapping');
+const { fetchOrders } = require('../services/ordersService');
+const { fetchCustomers, getCustomerDetail } = require('../services/customersService');
 const {
-  readOrdersLog,
-  readCustomersLog,
-  loadOrdersLogSheet,
-  loadCustomersLogSheet,
-  appendTestOrdersLogRow,
-} = require('../lib/googleLogs');
-const {
-  safePrice,
-  parseDateParam,
-  normalizeOrderListEntry,
   normalizeOrderDetail,
 } = require('../lib/orderUtils');
 const { loadStoresRows } = require('../lib/stores');
-const { syncLogs } = require('../jobs/syncLogs');
+// syncLogs job removed - no longer needed for Orders/Customers
 
 const router = express.Router();
 
@@ -335,100 +327,8 @@ async function fetchStoreOrdersForStore(store, daysBack = 30, limit = 50) {
 }
 
 
-function safeParseJSON(value) {
-  if (!value) return null;
-  try {
-    return JSON.parse(value);
-  } catch (err) {
-    console.warn('[logs] Failed to parse raw_json', err.message);
-    return null;
-  }
-}
-
-function orderRowToListEntry(row) {
-  if (!row) return null;
-  const raw = safeParseJSON(row.raw_json) || {};
-  const store = {
-    store_id: row.store_id,
-    store_name: row.store_name || row.store_id,
-    shopify_domain: row.shopify_domain || '',
-    currency: row.currency || raw.currency || 'RON',
-  };
-  const baseOrder = { ...raw };
-  baseOrder.id = baseOrder.id || row.order_id;
-  baseOrder.name = baseOrder.name || row.order_name || `#${row.order_number || row.order_id}`;
-  baseOrder.order_number = baseOrder.order_number || row.order_number;
-  baseOrder.created_at = baseOrder.created_at || row.created_at;
-  baseOrder.updated_at = baseOrder.updated_at || row.updated_at;
-  baseOrder.financial_status = baseOrder.financial_status || row.financial_status;
-  baseOrder.fulfillment_status = baseOrder.fulfillment_status || row.fulfillment_status;
-  baseOrder.currency = baseOrder.currency || row.currency;
-  baseOrder.total_price =
-    baseOrder.total_price !== undefined && baseOrder.total_price !== null
-      ? baseOrder.total_price
-      : row.total_price;
-  baseOrder.email = baseOrder.email || row.customer_email;
-
-  if (!baseOrder.customer) {
-    const nameParts = String(row.customer_name || '').trim().split(' ').filter(Boolean);
-    baseOrder.customer = {
-      id: row.customer_id || null,
-      first_name: nameParts[0] || '',
-      last_name: nameParts.slice(1).join(' ') || '',
-      email: row.customer_email || '',
-    };
-  } else {
-    if (!baseOrder.customer.id && row.customer_id) baseOrder.customer.id = row.customer_id;
-    if (!baseOrder.customer.email && row.customer_email)
-      baseOrder.customer.email = row.customer_email;
-  }
-
-  const normalized = normalizeOrderListEntry(baseOrder, store);
-  normalized.items_summary = row.items_summary || normalized.items_summary;
-  normalized.items_count =
-    row.items_count !== undefined && row.items_count !== ''
-      ? Number(row.items_count) || normalized.items_count
-      : normalized.items_count;
-  normalized.total_price =
-    row.total_price !== undefined && row.total_price !== ''
-      ? safePrice(row.total_price)
-      : normalized.total_price;
-  normalized.customer_name = row.customer_name || normalized.customer_name;
-  normalized.customer_email = row.customer_email || normalized.customer_email;
-  normalized.financial_status = row.financial_status || normalized.financial_status;
-  normalized.fulfillment_status = row.fulfillment_status || normalized.fulfillment_status;
-
-  return normalized;
-}
-
-function splitName(fullName = '') {
-  const parts = String(fullName || '').trim().split(' ').filter(Boolean);
-  return {
-    first: parts[0] || '',
-    last: parts.slice(1).join(' ') || '',
-  };
-}
-
-function customerRowToCustomer(row, extras = {}) {
-  const { first, last } = splitName(row.customer_name || row.name || '');
-  const id = row.customer_id || row.customer_email || null;
-  return {
-    store_id: row.store_id,
-    store_name: row.store_name || row.store_id,
-    customer_id: id,
-    email: row.customer_email || '',
-    name: row.customer_name || '',
-    first_name: first,
-    last_name: last,
-    total_orders: Number(row.total_orders || 0),
-    total_spent: safePrice(row.total_spent),
-    first_order_date: row.first_order_date || null,
-    last_order_date: row.last_order_date || null,
-    created_at: row.created_at || row.first_order_date || null,
-    updated_at: row.updated_at || row.last_order_date || null,
-    ...extras,
-  };
-}
+// Old Google Sheets logs helper functions removed - no longer needed
+// Orders and Customers now use live Shopify data via services/
 
 // /stores
 router.get('/stores', async (req, res) => {
@@ -473,72 +373,57 @@ router.get('/stores', async (req, res) => {
   }
 });
 
-// /orders – listă centralizată cu filtre și search
+// /orders – live Shopify data with filters and pagination
 // Query params:
 //   store_id = "all" | store id
-//   q        = text (order #, customer, produs)
-//   status   = all | open | paid | fulfilled | cancelled
+//   q        = text (order #, customer, product)
+//   status   = all | any | open | paid | fulfilled | cancelled
 //   from/to  = YYYY-MM-DD
-//   limit    = max 200 (default 50)
-//   page     = default 1
+//   limit    = max 250 (default 100)
+//   page_info = Shopify cursor for pagination
 router.get('/orders', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
-    const statusFilter = (req.query.status || 'all').toLowerCase();
+    const statusFilter = (req.query.status || 'any').toLowerCase();
     const searchQuery = (req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
+    const pageInfo = req.query.page_info || null;
 
-    if (storeIdFilter && storeIdFilter !== 'all') {
-      const stores = await loadStoresRows();
-      const match = stores.find((s) => String(s.store_id) === String(storeIdFilter));
-      if (!match) {
-        return res.json({
-          orders: [],
-          count: 0,
-          page,
-          limit,
-          total: 0,
-          hasNext: false,
-          hasPrev: false,
-        });
-      }
-    }
-
-    const logsResult = await readOrdersLog({
-      storeId: storeIdFilter,
+    console.log('[orders][LIVE]', {
+      store: storeIdFilter,
       status: statusFilter,
+      search: searchQuery,
       from: dateFrom,
       to: dateTo,
-      q: searchQuery,
       limit,
-      page,
+      hasPageInfo: !!pageInfo,
     });
 
-    const limited = (logsResult.rows || []).map(orderRowToListEntry).filter(Boolean);
-    const total = logsResult.total || 0;
-    const hasNext = logsResult.hasNext;
-    const hasPrev = logsResult.hasPrev;
-
-    console.log('[orders][LOGS]', {
-      store: storeIdFilter,
-      returned: limited.length,
-      total,
-      page: logsResult.page,
-      limit: logsResult.limit,
+    const result = await fetchOrders({
+      store_id: storeIdFilter,
+      status: statusFilter,
+      q: searchQuery,
+      from: dateFrom,
+      to: dateTo,
+      limit,
+      page_info: pageInfo,
     });
+
+    console.log('[orders][LIVE] returned', result.orders.length, 'orders');
 
     res.json({
-      orders: limited,
-      count: limited.length,
-      page: logsResult.page,
-      limit: logsResult.limit,
-      total,
-      hasNext,
-      hasPrev,
-      source: 'LOGS',
+      orders: result.orders,
+      count: result.orders.length,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      hasNext: result.hasNext,
+      hasPrev: result.hasPrev,
+      nextPageInfo: result.nextPageInfo,
+      prevPageInfo: result.prevPageInfo,
+      source: 'SHOPIFY_LIVE',
     });
   } catch (err) {
     console.error('/orders error', err);
@@ -588,53 +473,46 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
   }
 });
 
-// /customers – listă derivată din comenzi (pentru context curent)
+// /customers – derived from live Shopify orders
+// Query params:
+//   store_id = "all" | store id
+//   q        = text (name, email, customer id)
+//   from/to  = YYYY-MM-DD
+//   limit    = max 200 (default 100)
 router.get('/customers', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const searchQuery = (req.query.q || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
 
-    if (storeIdFilter && storeIdFilter !== 'all') {
-      const stores = await loadStoresRows();
-      const match = stores.find((s) => String(s.store_id) === String(storeIdFilter));
-      if (!match) {
-        return res.json({ customers: [], page, limit, total: 0, hasNext: false, hasPrev: false });
-      }
-    }
-
-    const logsResult = await readCustomersLog({
-      storeId: storeIdFilter,
-      from: dateFrom || null,
-      to: dateTo || null,
-      q: searchQuery,
-      page,
+    console.log('[customers][LIVE]', {
+      store: storeIdFilter,
+      search: searchQuery,
+      from: dateFrom,
+      to: dateTo,
       limit,
     });
 
-    const customers = (logsResult.rows || []).map((row) =>
-      customerRowToCustomer(row, { shopify_domain: row.shopify_domain || '' })
-    );
-
-    console.log('[customers][LOGS]', {
-      store: storeIdFilter,
-      returned: customers.length,
-      total: logsResult.total || customers.length,
-      page: logsResult.page,
-      limit: logsResult.limit,
+    const result = await fetchCustomers({
+      store_id: storeIdFilter,
+      q: searchQuery,
+      from: dateFrom,
+      to: dateTo,
+      limit,
     });
 
+    console.log('[customers][LIVE] returned', result.customers.length, 'customers');
+
     res.json({
-      customers,
-      page: logsResult.page,
-      limit: logsResult.limit,
-      total: logsResult.total || customers.length,
-      hasNext: logsResult.hasNext,
-      hasPrev: logsResult.hasPrev,
-      source: 'LOGS',
+      customers: result.customers,
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      hasNext: result.hasNext,
+      hasPrev: result.hasPrev,
+      source: 'SHOPIFY_LIVE',
     });
   } catch (err) {
     console.error('/customers error', err);
@@ -645,92 +523,27 @@ router.get('/customers', async (req, res) => {
   }
 });
 
-// /customers/:store_id/:customer_id – detalii + comenzi asociate
+// /customers/:store_id/:customer_id – details + order history
 router.get('/customers/:store_id/:customer_id', async (req, res) => {
   const { store_id: storeId, customer_id: customerId } = req.params;
   const dateFrom = req.query.from || null;
   const dateTo = req.query.to || null;
+
   try {
-    const stores = await loadStoresRows();
-    const store = stores.find((s) => String(s.store_id) === String(storeId));
-    if (!store) {
-      return res.status(404).json({ error: 'Store not found' });
-    }
+    console.log('[customer-detail][LIVE]', { storeId, customerId, from: dateFrom, to: dateTo });
 
-    const [customersSheet, ordersSheet] = await Promise.all([
-      loadCustomersLogSheet(),
-      loadOrdersLogSheet(),
-    ]);
-
-    const customersRows = customersSheet.rows || [];
-    const targetCustomerRow = customersRows.find((row) => {
-      if (String(row.store_id) !== String(storeId)) return false;
-      const idMatch = row.customer_id && String(row.customer_id) === String(customerId);
-      const emailMatch =
-        row.customer_email &&
-        String(row.customer_email).toLowerCase() === String(customerId).toLowerCase();
-      return idMatch || emailMatch;
+    const result = await getCustomerDetail(storeId, customerId, {
+      from: dateFrom,
+      to: dateTo,
     });
 
-    if (!targetCustomerRow) {
+    if (!result) {
       return res.status(404).json({ error: 'Customer not found in this store' });
     }
 
-    const ordersRows = ordersSheet.rows || [];
-    const relevantOrders = ordersRows.filter((row) => {
-      if (String(row.store_id) !== String(storeId)) return false;
-      const idMatch = row.customer_id && String(row.customer_id) === String(customerId);
-      const emailMatch =
-        row.customer_email &&
-        String(row.customer_email).toLowerCase() === String(customerId).toLowerCase();
-      return idMatch || emailMatch;
-    });
+    console.log('[customer-detail][LIVE] found customer with', result.orders.length, 'orders');
 
-    const minDate = dateFrom ? parseDateParam(dateFrom, false) : null;
-    const maxDate = dateTo ? parseDateParam(dateTo, true) : null;
-    const minDateObj = minDate ? new Date(minDate) : null;
-    const maxDateObj = maxDate ? new Date(maxDate) : null;
-
-    const filteredByDate = relevantOrders.filter((row) => {
-      const created = row.created_at ? new Date(row.created_at) : null;
-      if (minDateObj && created && created < minDateObj) return false;
-      if (maxDateObj && created && created > maxDateObj) return false;
-      return true;
-    });
-
-    const ordersForCustomer = filteredByDate.map(orderRowToListEntry).filter(Boolean);
-    ordersForCustomer.sort((a, b) => {
-      const ta = a.created_at ? Date.parse(a.created_at) : 0;
-      const tb = b.created_at ? Date.parse(b.created_at) : 0;
-      return tb - ta;
-    });
-
-    const customer = customerRowToCustomer(targetCustomerRow, {
-      shopify_domain: store.shopify_domain || '',
-    });
-
-    const sortedSourceRows = [...filteredByDate].sort(
-      (a, b) => Date.parse(b.created_at || 0) - Date.parse(a.created_at || 0)
-    );
-    const primaryOrderRow = sortedSourceRows[0] || relevantOrders[0] || null;
-    const firstOrderRaw = safeParseJSON(primaryOrderRow && primaryOrderRow.raw_json) || {};
-    const defaultAddress =
-      firstOrderRaw.shipping_address || firstOrderRaw.billing_address || null;
-    const phone =
-      firstOrderRaw.phone ||
-      (firstOrderRaw.customer && firstOrderRaw.customer.phone) ||
-      (firstOrderRaw.billing_address && firstOrderRaw.billing_address.phone) ||
-      (firstOrderRaw.shipping_address && firstOrderRaw.shipping_address.phone) ||
-      null;
-
-    res.json({
-      customer: {
-        ...customer,
-        phone: phone || customer.phone || null,
-        default_address: defaultAddress || null,
-      },
-      orders: ordersForCustomer,
-    });
+    res.json(result);
   } catch (err) {
     console.error('/customers detail error', { storeId, customerId, err });
     res.status(500).json({
@@ -740,21 +553,8 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
   }
 });
 
-// POST /tasks/sync-logs – full refresh of OrdersLog + CustomersLog
-router.post('/tasks/sync-logs', async (req, res) => {
-  console.log('[syncLogs] HTTP trigger received');
-  try {
-    const summary = await syncLogs();
-    console.log('[syncLogs] HTTP trigger completed', summary);
-    return res.json({ success: true, summary });
-  } catch (err) {
-    console.error('[syncLogs] HTTP trigger error', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || String(err),
-    });
-  }
-});
+// POST /tasks/sync-logs endpoint removed - Orders/Customers now use live Shopify data
+// No longer needed to sync to Google Sheets logs
 
 // /preview
 router.get('/preview', async (req, res) => {

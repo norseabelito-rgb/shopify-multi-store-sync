@@ -6,7 +6,7 @@ const apiRouter = require('./routes/api');
 const dashboardRouter = require('./routes/dashboard');
 const marketingRouter = require('./routes/marketing');
 const shopifyRouter = require('./routes/shopify');
-const logsTestRouter = require('./routes/logsTest');
+// logsTestRouter removed - no longer needed
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -178,10 +178,9 @@ function authMiddleware(req, res, next) {
 app.use(authMiddleware);
 
 // routere
-app.use('/', apiRouter);           // /stores, /preview, /sync, /media etc.
+app.use('/', apiRouter);           // /stores, /orders, /customers, /preview, /sync, /media etc.
 app.use('/marketing', marketingRouter);
 app.use('/shopify', shopifyRouter);
-app.use('/', logsTestRouter);
 app.use('/', dashboardRouter);
 
 // 404

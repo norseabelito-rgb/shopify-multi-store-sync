@@ -1147,9 +1147,6 @@ function dashboardPage() {
           <button class="nav-item" data-view="customers">
             <span>Customers</span>
           </button>
-          <button class="nav-item nav-action" data-action="refresh-data">
-            <span>Refresh data</span>
-          </button>
           <button class="nav-item" data-view="shipping">
             <span>Shipping</span>
           </button>
@@ -1595,7 +1592,6 @@ function dashboardPage() {
       const storeContextLive = document.getElementById('store-context-live');
 
       const navItems = document.querySelectorAll('.nav-item[data-view]');
-      const refreshActionBtn = document.querySelector('.nav-action[data-action="refresh-data"]');
       const views = document.querySelectorAll('.view');
 
       const statActiveHome = document.getElementById('stat-active-home');
@@ -1636,7 +1632,6 @@ function dashboardPage() {
       const drawerBackdrop = document.getElementById('drawer-backdrop');
 
       const todayStr = new Date().toISOString().slice(0, 10);
-      let refreshInProgress = false;
 
       const ORDER_PAGE_SIZE = 100;
       const ordersState = {
@@ -1868,67 +1863,7 @@ function dashboardPage() {
         });
       });
 
-      function setRefreshButtonState(isLoading) {
-        if (!refreshActionBtn) return;
-        refreshActionBtn.disabled = !!isLoading;
-        refreshActionBtn.classList.toggle('is-loading', !!isLoading);
-        refreshActionBtn.querySelector('span').textContent = isLoading ? 'Refreshing...' : 'Refresh data';
-      }
-
-      async function runRefreshData() {
-        if (refreshInProgress || !refreshActionBtn) return;
-        console.log('[UI] Refresh data clicked');
-        const proceed = window.confirm(
-          'This will refresh Orders and Customers logs from Shopify (since 2024-01-01). Continue?'
-        );
-        if (!proceed) return;
-
-        refreshInProgress = true;
-        setRefreshButtonState(true);
-
-        try {
-          const res = await fetch('/tasks/sync-logs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          if (!res.ok) {
-            console.error('Refresh data failed (HTTP)', res.status, res.statusText);
-            alert('Failed to refresh data. Check server logs.');
-            return;
-          }
-          const data = await res.json().catch(() => ({}));
-          if (data && data.success === true) {
-            console.log('[UI] Sync finished successfully', data.summary);
-            alert('Data refreshed successfully');
-            ordersDirty = true;
-            customersDirty = true;
-            if (currentView === 'orders') {
-              await loadOrders();
-            } else if (currentView === 'customers') {
-              await loadCustomers();
-            } else {
-              window.location.reload();
-            }
-          } else {
-            console.error('[UI] Sync failed', data);
-            alert('Failed to refresh data. Check server logs.');
-          }
-        } catch (err) {
-          console.error('Refresh data failed', err);
-          alert('Failed to refresh data. ' + (err && err.message ? err.message : ''));
-        } finally {
-          refreshInProgress = false;
-          setRefreshButtonState(false);
-        }
-      }
-
-      if (refreshActionBtn) {
-        refreshActionBtn.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          if (refreshInProgress) return;
-          runRefreshData();
-        });
-      }
+      // "Refresh data" button and syncLogs removed - Orders/Customers now use live Shopify data
 
       function buildHomeTable(stores) {
         if (!stores.length) {
@@ -3149,11 +3084,15 @@ function dashboardPage() {
         const qs = new URLSearchParams();
         qs.set('store_id', selectedStoreId || 'all');
         qs.set('limit', ORDER_PAGE_SIZE);
-        qs.set('page', ordersState.page);
         if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
         if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
         if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
         if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
+
+        // Use Shopify cursor pagination if available
+        if (ordersState.nextPageInfo) {
+          qs.set('page_info', ordersState.nextPageInfo);
+        }
 
         try {
           const res = await fetch('/orders?' + qs.toString());
@@ -3163,19 +3102,21 @@ function dashboardPage() {
           ordersState.page = data.page || ordersState.page;
           ordersState.total = data.total != null ? data.total : ordersState.items.length;
           ordersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
-          const totalPages = Math.max(
-            1,
-            Math.ceil((ordersState.total || ordersState.items.length || 0) / ordersState.filters.limit)
-          );
-          ordersState.hasNext = ordersState.page < totalPages;
-          ordersState.hasPrev = ordersState.page > 1;
+
+          // Update pagination cursors
+          ordersState.nextPageInfo = data.nextPageInfo || null;
+          ordersState.prevPageInfo = data.prevPageInfo || null;
+          ordersState.hasNext = data.hasNext || !!data.nextPageInfo;
+          ordersState.hasPrev = data.hasPrev || false; // Shopify doesn't support backward cursor pagination easily
+
+          console.log('[orders] Loaded', ordersState.items.length, 'orders, hasNext:', ordersState.hasNext);
         } catch (err) {
           console.error('Error /orders', err);
           ordersState.items = [];
           ordersState.error = err.message || String(err);
           ordersState.total = 0;
           ordersState.hasNext = false;
-          ordersState.hasPrev = ordersState.page > 1;
+          ordersState.hasPrev = false;
         } finally {
           ordersState.loading = false;
           ordersDirty = false;
@@ -3339,6 +3280,7 @@ function dashboardPage() {
           searchDebounce = setTimeout(() => {
             ordersState.filters.q = ordersSearchInput.value.trim();
             ordersState.page = 1;
+            ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
             loadOrders();
           }, 260);
         });
@@ -3364,6 +3306,7 @@ function dashboardPage() {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
           ordersState.page = 1;
+          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
           loadOrders();
         });
       }
@@ -3372,6 +3315,7 @@ function dashboardPage() {
         ordersFromInput.addEventListener('change', () => {
           ordersState.filters.from = ordersFromInput.value;
           ordersState.page = 1;
+          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
           loadOrders();
         });
       }
@@ -3380,6 +3324,7 @@ function dashboardPage() {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
           ordersState.page = 1;
+          ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
           loadOrders();
         });
       }
@@ -3406,6 +3351,7 @@ function dashboardPage() {
         customersDirty = true;
         orderDetailsCache.clear();
         ordersState.page = 1;
+        ordersState.nextPageInfo = null;  // Reset pagination cursor when store context changes
         customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
