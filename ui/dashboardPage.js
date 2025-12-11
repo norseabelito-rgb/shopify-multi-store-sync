@@ -2208,7 +2208,9 @@ function dashboardPage() {
             return (
               '<tr data-store="' +
                 escapeHtml(c.store_id) +
-                '" data-id="' +
+                '" data-store-id="' +
+                escapeHtml(c.store_id) +
+                '" data-customer-id="' +
                 escapeHtml(c.customer_id || c.email || '') +
               '">' +
                 '<td><button class="link-inline customer-open">' +
@@ -2229,8 +2231,8 @@ function dashboardPage() {
         customersTableBody.querySelectorAll('tr').forEach((tr) => {
           tr.addEventListener('click', (ev) => {
             ev.preventDefault();
-            const storeId = tr.getAttribute('data-store');
-            const customerId = tr.getAttribute('data-id');
+            const storeId = tr.getAttribute('data-store-id');
+            const customerId = tr.getAttribute('data-customer-id');
             openCustomerDetail(storeId, customerId);
           });
         });

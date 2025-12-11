@@ -589,6 +589,7 @@ function aggregateCustomersFromOrders(orders) {
       last_order_date: null,
       created_at: null,
       default_address: o.shipping_address || o.billing_address || null,
+      created: null,
     };
 
     existing.total_orders += 1;
@@ -604,6 +605,7 @@ function aggregateCustomersFromOrders(orders) {
       if (!existing.first_order_date || createdAt < new Date(existing.first_order_date)) {
         existing.first_order_date = iso;
         existing.created_at = iso;
+        existing.created = iso;
       }
       if (!existing.last_order_date || createdAt > new Date(existing.last_order_date)) {
         existing.last_order_date = iso;
@@ -805,11 +807,12 @@ router.get('/customers', async (req, res) => {
       return res.json({ customers: [], page, limit, total: 0 });
     }
 
+    // pentru customers vrem să acoperim cât mai mult istoric; nu limităm artificial
     const filters = {
       status: 'all',
-      from: dateFrom,
-      to: dateTo,
-      limit: Math.min(limit * page, 250),
+      from: dateFrom || null,
+      to: dateTo || null,
+      limit: 10000, // fetchOrdersForStoreWithFilters va aplica limitele API Shopify, dar nu tăiem la 250 aici
       q: '',
     };
 
