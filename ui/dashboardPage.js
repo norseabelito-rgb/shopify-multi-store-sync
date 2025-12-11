@@ -731,17 +731,6 @@ function dashboardPage() {
       color: var(--muted);
     }
 
-    .orders-limit {
-      min-width: 120px;
-    }
-    .orders-limit select {
-      background: transparent;
-      border: 0;
-      outline: none;
-      color: var(--text);
-      font-size: 12px;
-    }
-
     .drawer-backdrop {
       position: fixed;
       inset: 0;
@@ -1047,7 +1036,7 @@ function dashboardPage() {
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
       font-size: 12px;
       color: var(--muted);
     }
@@ -1065,6 +1054,28 @@ function dashboardPage() {
     .pagination-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .pagination-page {
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15,23,42,0.9);
+      color: #e5e7eb;
+      padding: 6px 10px;
+      cursor: pointer;
+      min-width: 34px;
+      text-align: center;
+    }
+
+    .pagination-page.active {
+      border-color: rgba(79, 140, 255, 0.6);
+      background: rgba(79, 140, 255, 0.18);
+      color: #e5e7eb;
+    }
+
+    .pagination-ellipsis {
+      padding: 0 6px;
+      color: var(--muted);
     }
   </style>
 </head>
@@ -1396,15 +1407,6 @@ function dashboardPage() {
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </label>
-                <label class="filter-chip orders-limit">
-                  <span>Show</span>
-                  <select id="orders-limit">
-                    <option value="25">25</option>
-                    <option value="50" selected>50</option>
-                    <option value="100">100</option>
-                    <option value="200">200</option>
-                  </select>
-                </label>
               </div>
             </div>
 
@@ -1533,7 +1535,6 @@ function dashboardPage() {
       const ordersStatusSelect = document.getElementById('orders-status');
       const ordersFromInput = document.getElementById('orders-from');
       const ordersToInput = document.getElementById('orders-to');
-      const ordersLimitSelect = document.getElementById('orders-limit');
       const ordersMeta = document.getElementById('orders-meta');
       const ordersLoading = document.getElementById('orders-loading');
       const ordersEmpty = document.getElementById('orders-empty');
@@ -1547,6 +1548,7 @@ function dashboardPage() {
 
       const todayStr = new Date().toISOString().slice(0, 10);
 
+      const ORDER_PAGE_SIZE = 100;
       const ordersState = {
         items: [],
         loading: false,
@@ -1555,7 +1557,7 @@ function dashboardPage() {
           status: 'all',
           from: todayStr,
           to: todayStr,
-          limit: 50,
+          limit: ORDER_PAGE_SIZE,
         },
         error: '',
         page: 1,
@@ -1681,13 +1683,20 @@ function dashboardPage() {
         const sorted = [...items];
         const sign = dir === 'asc' ? 1 : -1;
         sorted.sort((a, b) => {
-          const va = a[by];
-          const vb = b[by];
+          const va = a ? a[by] : null;
+          const vb = b ? b[by] : null;
           if (by === 'total_price' || by === 'items_count') {
-            return (Number(va) - Number(vb)) * sign;
+            const na = Number(va) || 0;
+            const nb = Number(vb) || 0;
+            return (na - nb) * sign;
           }
           if (by === 'created_at') {
-            return (Date.parse(va || 0) - Date.parse(vb || 0)) * sign;
+            const na = Date.parse(va || 0);
+            const nb = Date.parse(vb || 0);
+            if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+            if (Number.isNaN(na)) return -1 * sign;
+            if (Number.isNaN(nb)) return 1 * sign;
+            return (na - nb) * sign;
           }
           const sa = (va || '').toString().toLowerCase();
           const sb = (vb || '').toString().toLowerCase();
@@ -1901,23 +1910,13 @@ function dashboardPage() {
         const searchText = ordersState.filters.q
           ? ' · search: "' + ordersState.filters.q + '"'
           : '';
-        const pageText =
-          ordersState.total && ordersState.total > ordersState.filters.limit
-            ? ' · pagina ' +
-              ordersState.page +
-              '/' +
-              Math.max(1, Math.ceil(ordersState.total / ordersState.filters.limit))
-            : '';
         ordersMeta.textContent =
           'Afișăm ' +
           (count || 0) +
           ' comenzi pentru ' +
           contextText +
           statusText +
-          searchText +
-          ' · limită ' +
-          ordersState.filters.limit +
-          pageText;
+          searchText;
       }
 
       function updateOrdersBadge() {
@@ -1957,7 +1956,7 @@ function dashboardPage() {
           return;
         }
 
-        const count = ordersState.items.length;
+        const count = ordersState.total || ordersState.items.length;
         updateOrdersMeta(count);
         updateOrdersBadge();
 
@@ -2036,19 +2035,25 @@ function dashboardPage() {
         headers.forEach((th, idx) => {
           const key = keys[idx];
           if (!key) return;
+          const baseLabel = th.getAttribute('data-label') || th.textContent.replace(/ ↑| ↓/g, '').trim();
+          th.setAttribute('data-label', baseLabel);
           th.style.cursor = 'pointer';
           const indicator =
             ordersState.sort.by === key ? (ordersState.sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
-          th.textContent = th.textContent.replace(/ ↑| ↓/g, '') + indicator;
-          th.addEventListener('click', () => {
-            if (ordersState.sort.by === key) {
-              ordersState.sort.dir = ordersState.sort.dir === 'asc' ? 'desc' : 'asc';
-            } else {
-              ordersState.sort.by = key;
-              ordersState.sort.dir = 'asc';
-            }
-            renderOrdersTable();
-          });
+          th.textContent = baseLabel + indicator;
+          if (!th._sortingBound) {
+            th.addEventListener('click', () => {
+              if (ordersState.sort.by === key) {
+                ordersState.sort.dir = ordersState.sort.dir === 'asc' ? 'desc' : 'asc';
+              } else {
+                ordersState.sort.by = key;
+                ordersState.sort.dir = 'asc';
+              }
+              ordersState.page = 1;
+              loadOrders();
+            });
+            th._sortingBound = true;
+          }
         });
       }
 
@@ -2058,20 +2063,51 @@ function dashboardPage() {
           1,
           Math.ceil((ordersState.total || ordersState.items.length || 0) / ordersState.filters.limit)
         );
-        const current = ordersState.page;
+        const current = Math.min(ordersState.page, totalPages);
 
         const prevDisabled = current <= 1;
         const nextDisabled = current >= totalPages;
+
+        function pageButton(page, label, isActive = false, disabled = false) {
+          return (
+            '<button class="' +
+            'pagination-page' +
+            (isActive ? ' active' : '') +
+            '" data-page="' +
+            page +
+            '" ' +
+            (disabled ? 'disabled' : '') +
+            '>' +
+            label +
+            '</button>'
+          );
+        }
+
+        const pages = [];
+        if (totalPages <= 7) {
+          for (let i = 1; i <= totalPages; i++) {
+            pages.push(pageButton(i, i, i === current));
+          }
+        } else {
+          const addPage = (p) => pages.push(pageButton(p, p, p === current));
+          addPage(1);
+          addPage(2);
+          if (current > 4) pages.push('<span class="pagination-ellipsis">…</span>');
+          const start = Math.max(3, current - 1);
+          const end = Math.min(totalPages - 2, current + 1);
+          for (let i = start; i <= end; i++) {
+            addPage(i);
+          }
+          if (current < totalPages - 3) pages.push('<span class="pagination-ellipsis">…</span>');
+          addPage(totalPages - 1);
+          addPage(totalPages);
+        }
 
         ordersPagination.innerHTML =
           '<button class="pagination-btn" id="orders-prev" ' +
           (prevDisabled ? 'disabled' : '') +
           '>Prev</button>' +
-          '<span>Page ' +
-          current +
-          ' of ' +
-          totalPages +
-          '</span>' +
+          pages.join('') +
           '<button class="pagination-btn" id="orders-next" ' +
           (nextDisabled ? 'disabled' : '') +
           '>Next</button>';
@@ -2088,10 +2124,18 @@ function dashboardPage() {
         if (nextBtn) {
           nextBtn.addEventListener('click', () => {
             if (nextDisabled) return;
-            ordersState.page = ordersState.page + 1;
+            ordersState.page = Math.min(totalPages, ordersState.page + 1);
             loadOrders();
           });
         }
+        ordersPagination.querySelectorAll('.pagination-page').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const page = parseInt(btn.getAttribute('data-page'), 10);
+            if (Number.isNaN(page) || page === current) return;
+            ordersState.page = page;
+            loadOrders();
+          });
+        });
       }
 
       function buildShopifyUrl(type, payload, domainOverride) {
@@ -2383,7 +2427,7 @@ function dashboardPage() {
               '</div>' +
               '<div class="drawer-section">' +
                 '<div class="section-heading">Context</div>' +
-                '<div class="kv-row"><span>Orders in view</span><strong>' +
+                '<div class="kv-row"><span>Orders (this view)</span><strong>' +
                   count +
                 '</strong></div>' +
                 '<div class="kv-row"><span>Last seen</span><strong>' +
@@ -2604,7 +2648,7 @@ function dashboardPage() {
 
         const qs = new URLSearchParams();
         qs.set('store_id', selectedStoreId || 'all');
-        qs.set('limit', ordersState.filters.limit);
+        qs.set('limit', ORDER_PAGE_SIZE);
         qs.set('page', ordersState.page);
         if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
         if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
@@ -2618,6 +2662,7 @@ function dashboardPage() {
           ordersState.items = Array.isArray(data.orders) ? data.orders : [];
           ordersState.page = data.page || ordersState.page;
           ordersState.total = data.total != null ? data.total : ordersState.items.length;
+          ordersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
           const totalPages = Math.max(
             1,
             Math.ceil((ordersState.total || ordersState.items.length || 0) / ordersState.filters.limit)
@@ -2777,16 +2822,6 @@ function dashboardPage() {
       if (ordersToInput) {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
-          ordersState.page = 1;
-          loadOrders();
-        });
-      }
-
-      if (ordersLimitSelect) {
-        ordersLimitSelect.value = String(ordersState.filters.limit);
-        ordersLimitSelect.addEventListener('change', () => {
-          const val = parseInt(ordersLimitSelect.value, 10);
-          ordersState.filters.limit = Number.isNaN(val) ? 50 : val;
           ordersState.page = 1;
           loadOrders();
         });
