@@ -913,6 +913,16 @@ function dashboardPage() {
       background: rgba(79, 140, 255, 0.18);
     }
 
+    .product-choice {
+      color: var(--text);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.9);
+      justify-content: flex-start;
+      text-align: left;
+      white-space: normal;
+      line-height: 1.3;
+    }
+
     .line-item {
       display: flex;
       justify-content: space-between;
@@ -930,6 +940,8 @@ function dashboardPage() {
       display: flex;
       gap: 8px;
       align-items: flex-start;
+      flex: 1;
+      min-width: 0;
     }
 
     .line-thumb {
@@ -948,6 +960,21 @@ function dashboardPage() {
       font-size: 12px;
       text-align: left;
       display: block;
+    }
+
+    .line-item-title .link-inline {
+      display: block;
+      text-align: left;
+      white-space: normal;
+    }
+
+    .line-item-left > div {
+      min-width: 0;
+    }
+
+    .line-item-right {
+      text-align: right;
+      flex-shrink: 0;
     }
 
     .link-inline {
@@ -2123,11 +2150,11 @@ function dashboardPage() {
                     : '';
                   const thumb =
                     '<div class="line-thumb"' +
-                    (safeImg ? ' style="background-image:url(\\'' + safeImg + '\\');"' : '') +
-                    '></div>';
-                  return (
-                    '<div class="line-item">' +
-                      '<div class="line-item-left">' +
+                (safeImg ? ' style="background-image:url(\\'' + safeImg + '\\');"' : '') +
+                '></div>';
+              return (
+                '<div class="line-item">' +
+                  '<div class="line-item-left">' +
                         thumb +
                         '<div>' +
                           '<div class="line-item-title">' +
@@ -2140,15 +2167,15 @@ function dashboardPage() {
                               escapeHtml(li.title || 'Product') +
                             '</button>' +
                           '</div>' +
-                          (li.sku ? '<div class="order-sub">SKU: ' + escapeHtml(li.sku) + '</div>' : '') +
-                        '</div>' +
-                      '</div>' +
-                      '<div style="text-align:right;">' +
-                        '<div class="pill">' + (li.quantity || 0) + ' pcs</div>' +
-                        '<div class="order-sub">' + formatMoney(total, detail.currency) + '</div>' +
-                      '</div>' +
-                    '</div>'
-                  );
+                      (li.sku ? '<div class="order-sub">SKU: ' + escapeHtml(li.sku) + '</div>' : '') +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="line-item-right">' +
+                    '<div class="pill">' + (li.quantity || 0) + ' pcs</div>' +
+                    '<div class="order-sub">' + formatMoney(total, detail.currency) + '</div>' +
+                  '</div>' +
+                '</div>'
+              );
                 })
                 .join('')
             : '<div class="order-sub">No items.</div>';

@@ -488,19 +488,36 @@ async function loadStoresRows() {
 
 function normalizeOrderDetail(order, store) {
   const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
-  const mappedLineItems = lineItems.map((li) => ({
-    id: li.id,
-    product_id: li.product_id,
-    variant_id: li.variant_id,
-    title: li.title,
-    sku: li.sku,
-    quantity: li.quantity || 0,
-    price: safePrice(li.price),
-    total: safePrice(li.price) * (li.quantity || 0),
-    fulfillment_status: li.fulfillment_status || null,
-    image_src:
-      (li.image && (li.image.src || li.image.original_src)) || li.image || null,
-  }));
+  const mappedLineItems = lineItems.map((li) => {
+    const imageFromProps =
+      li.properties && Array.isArray(li.properties)
+        ? (li.properties.find(
+            (p) =>
+              (p.name && (p.name === 'image' || p.name === 'image_src')) ||
+              (p.key && (p.key === 'image' || p.key === 'image_src'))
+          ) || {}).value
+        : null;
+    const imageSrc =
+      (li.image && (li.image.src || li.image.original_src)) ||
+      li.image ||
+      li.image_url ||
+      li.imageUrl ||
+      (li.variant && li.variant.image && (li.variant.image.src || li.variant.image.original_src)) ||
+      imageFromProps ||
+      null;
+    return {
+      id: li.id,
+      product_id: li.product_id,
+      variant_id: li.variant_id,
+      title: li.title,
+      sku: li.sku,
+      quantity: li.quantity || 0,
+      price: safePrice(li.price),
+      total: safePrice(li.price) * (li.quantity || 0),
+      fulfillment_status: li.fulfillment_status || null,
+      image_src: imageSrc,
+    };
+  });
   const itemsCount = mappedLineItems.reduce((acc, li) => acc + (li.quantity || 0), 0);
 
   return {
