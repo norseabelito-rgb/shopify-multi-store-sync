@@ -23,6 +23,7 @@ const {
   readCustomersLog,
   loadOrdersLogSheet,
   loadCustomersLogSheet,
+  appendTestOrdersLogRow,
 } = require('../lib/googleLogs');
 const {
   safePrice,
@@ -741,14 +742,14 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
 
 // POST /tasks/sync-logs – full refresh of OrdersLog + CustomersLog
 router.post('/tasks/sync-logs', async (req, res) => {
+  console.log('[syncLogs] HTTP trigger received');
   try {
-    console.log('[syncLogs] HTTP trigger received');
     const summary = await syncLogs();
-    console.log('[syncLogs] Sync finished', summary);
-    res.json({ success: summary.success, summary });
+    console.log('[syncLogs] HTTP trigger completed', summary);
+    return res.json({ success: true, summary });
   } catch (err) {
-    console.error('/tasks/sync-logs error', err);
-    res.status(500).json({
+    console.error('[syncLogs] HTTP trigger error', err);
+    return res.status(500).json({
       success: false,
       error: err.message || String(err),
     });

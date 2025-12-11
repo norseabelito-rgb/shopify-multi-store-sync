@@ -106,89 +106,104 @@ async function fetchAllOrdersForStore(store) {
     order: 'created_at desc',
   };
 
+  console.log('[syncLogs] Calling fetchAllOrdersPaginated for', domain, 'with query', query);
   const orders = await fetchAllOrdersPaginated(domain, accessToken, query);
+  console.log(
+    '[syncLogs] fetchAllOrdersPaginated returned',
+    Array.isArray(orders) ? orders.length : 0,
+    'orders for',
+    domain
+  );
   return orders || [];
 }
 
 async function syncLogs() {
-  const stores = await loadStoresRows();
-  const perStore = [];
-  const orderRows = [];
-  let successfulStores = 0;
+  console.log('[syncLogs] Starting syncLogs job');
+  try {
+    const stores = await loadStoresRows();
+    console.log('[syncLogs] Loaded stores rows:', stores.length);
+    const perStore = [];
+    const orderRows = [];
+    let successfulStores = 0;
 
-  for (const store of stores) {
-    try {
-      const orders = await fetchAllOrdersForStore(store);
-      const filteredOrders = orders.filter((o) => {
-        if (!o.created_at) return true;
-        const created = new Date(o.created_at);
-        if (Number.isNaN(created.getTime())) return true;
-        return created >= SYNC_START_DATE;
-      });
-      const normalizedRows = filteredOrders.map((o) => buildOrderLogRow(o, store));
-      orderRows.push(...normalizedRows);
-      perStore.push({
-        store_id: store.store_id,
-        store_name: store.store_name,
-        shopify_domain: store.shopify_domain,
-        orders_fetched: filteredOrders.length,
-      });
-      successfulStores += 1;
-      console.log(
-        `[syncLogs] ${store.store_id} (${store.shopify_domain}) fetched ${filteredOrders.length} orders`
-      );
-    } catch (err) {
-      console.error('[syncLogs] Error fetching orders for store', store.store_id, err);
-      perStore.push({
-        store_id: store.store_id,
-        store_name: store.store_name,
-        shopify_domain: store.shopify_domain,
-        orders_fetched: 0,
-        error: err.message || String(err),
-      });
+    for (const store of stores) {
+      console.log('[syncLogs] Fetching orders for store', store.store_id, store.shopify_domain);
+      try {
+        const orders = await fetchAllOrdersForStore(store);
+        const filteredOrders = orders.filter((o) => {
+          if (!o.created_at) return true;
+          const created = new Date(o.created_at);
+          if (Number.isNaN(created.getTime())) return true;
+          return created >= SYNC_START_DATE;
+        });
+        const normalizedRows = filteredOrders.map((o) => buildOrderLogRow(o, store));
+        orderRows.push(...normalizedRows);
+        perStore.push({
+          store_id: store.store_id,
+          store_name: store.store_name,
+          shopify_domain: store.shopify_domain,
+          orders_fetched: filteredOrders.length,
+        });
+        successfulStores += 1;
+        console.log(
+          `[syncLogs] ${store.store_id} (${store.shopify_domain}) fetched ${filteredOrders.length} orders`
+        );
+      } catch (err) {
+        console.error('[syncLogs] Error fetching orders for store', store.store_id, err);
+        perStore.push({
+          store_id: store.store_id,
+          store_name: store.store_name,
+          shopify_domain: store.shopify_domain,
+          orders_fetched: 0,
+          error: err.message || String(err),
+        });
+      }
     }
+
+    let ordersWriteResult = { total: 0, updated: 0, appended: 0 };
+    if (orderRows.length) {
+      ordersWriteResult = await upsertOrdersLogRows(orderRows);
+    }
+
+    const ordersSheet = await loadOrdersLogSheet();
+    const filteredOrders = (ordersSheet.rows || []).filter((row) => {
+      if (!row.created_at) return true;
+      const created = new Date(row.created_at);
+      if (Number.isNaN(created.getTime())) return true;
+      return created >= SYNC_START_DATE;
+    });
+    const customerRows = buildCustomersFromOrdersLog(filteredOrders);
+    const customersWriteResult = customerRows.length
+      ? await upsertCustomersLogRows(customerRows)
+      : { total: 0, updated: 0, appended: 0 };
+
+    const summary = {
+      stores_processed: stores.length,
+      per_store: perStore,
+      orders_fetched: orderRows.length,
+      orders_written: ordersWriteResult.total,
+      orders_updated: ordersWriteResult.updated,
+      orders_appended: ordersWriteResult.appended,
+      customers_written: customersWriteResult.total,
+      customers_updated: customersWriteResult.updated,
+      customers_appended: customersWriteResult.appended,
+      success: successfulStores > 0,
+      partial: successfulStores > 0 && perStore.some((s) => s.error),
+    };
+
+    console.log('[syncLogs] Sync finished', summary);
+
+    if (!summary.success) {
+      const error = new Error('All stores failed to sync');
+      error.summary = summary;
+      throw error;
+    }
+
+    return summary;
+  } catch (err) {
+    console.error('[syncLogs] Fatal error in syncLogs', err);
+    throw err;
   }
-
-  let ordersWriteResult = { total: 0, updated: 0, appended: 0 };
-  if (orderRows.length) {
-    ordersWriteResult = await upsertOrdersLogRows(orderRows);
-  }
-
-  const ordersSheet = await loadOrdersLogSheet();
-  const filteredOrders = (ordersSheet.rows || []).filter((row) => {
-    if (!row.created_at) return true;
-    const created = new Date(row.created_at);
-    if (Number.isNaN(created.getTime())) return true;
-    return created >= SYNC_START_DATE;
-  });
-  const customerRows = buildCustomersFromOrdersLog(filteredOrders);
-  const customersWriteResult = customerRows.length
-    ? await upsertCustomersLogRows(customerRows)
-    : { total: 0, updated: 0, appended: 0 };
-
-  const summary = {
-    stores_processed: stores.length,
-    per_store: perStore,
-    orders_fetched: orderRows.length,
-    orders_written: ordersWriteResult.total,
-    orders_updated: ordersWriteResult.updated,
-    orders_appended: ordersWriteResult.appended,
-    customers_written: customersWriteResult.total,
-    customers_updated: customersWriteResult.updated,
-    customers_appended: customersWriteResult.appended,
-    success: successfulStores > 0,
-    partial: successfulStores > 0 && perStore.some((s) => s.error),
-  };
-
-  console.log('[syncLogs] Sync finished', summary);
-
-  if (!summary.success) {
-    const error = new Error('All stores failed to sync');
-    error.summary = summary;
-    throw error;
-  }
-
-  return summary;
 }
 
 module.exports = {
