@@ -85,8 +85,9 @@ async function fetchCustomers(filters = {}) {
   } = filters;
 
   // Fetch a large batch of orders to get comprehensive customer data
-  // This is practical for recent order histories (last 500-1000 orders)
-  const ordersLimit = 1000;
+  // For single store: fetch 1000 orders
+  // For all stores: fetch more to ensure we get a representative sample from each store
+  const ordersLimit = storeIdFilter === 'all' ? 3000 : 1000;
   const ordersResult = await fetchOrders({
     store_id: storeIdFilter,
     from,

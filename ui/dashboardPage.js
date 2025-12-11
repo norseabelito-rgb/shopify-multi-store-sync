@@ -2028,11 +2028,12 @@ function dashboardPage() {
 
       function updateOrdersBadge() {
         if (!ordersCountLabel) return;
-        const total = ordersState.total || 0;
+        // Show the actual number of orders currently displayed, not a theoretical total
+        const displayedCount = ordersState.items.length || 0;
         const sameDay =
           ordersState.filters.from === todayStr && ordersState.filters.to === todayStr;
-        const rangeLabel = sameDay ? 'orders today' : 'orders in range';
-        ordersCountLabel.textContent = formatNumber(total) + ' ' + rangeLabel;
+        const rangeLabel = sameDay ? 'orders shown' : 'orders shown';
+        ordersCountLabel.textContent = formatNumber(displayedCount) + ' ' + rangeLabel;
       }
 
       function renderOrdersTable() {
@@ -2157,6 +2158,8 @@ function dashboardPage() {
                 ordersState.sort.dir = 'asc';
               }
               ordersState.page = 1;
+              ordersState.nextPageInfo = null;
+              ordersState.currentPageInfo = null;
               loadOrders();
             });
             th._sortingBound = true;
@@ -2358,10 +2361,9 @@ function dashboardPage() {
         if (prevBtn) {
           prevBtn.addEventListener('click', () => {
             if (prevDisabled) return;
-            // For backward navigation, we would need prevPageInfo support
-            // For now, just reset and go back to first page
+            // Use prevPageInfo cursor for backward navigation
             ordersState.page = Math.max(1, ordersState.page - 1);
-            ordersState.nextPageInfo = null;
+            ordersState.currentPageInfo = ordersState.prevPageInfo;
             loadOrders();
           });
         }
@@ -2369,8 +2371,9 @@ function dashboardPage() {
         if (nextBtn) {
           nextBtn.addEventListener('click', () => {
             if (nextDisabled) return;
-            // nextPageInfo is already set, loadOrders will use it
+            // Use nextPageInfo cursor for forward navigation
             ordersState.page += 1;
+            ordersState.currentPageInfo = ordersState.nextPageInfo;
             loadOrders();
           });
         }
@@ -3048,8 +3051,8 @@ function dashboardPage() {
         if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
 
         // Use Shopify cursor pagination if available
-        if (ordersState.nextPageInfo) {
-          qs.set('page_info', ordersState.nextPageInfo);
+        if (ordersState.currentPageInfo) {
+          qs.set('page_info', ordersState.currentPageInfo);
         }
 
         try {
@@ -3066,6 +3069,8 @@ function dashboardPage() {
           ordersState.prevPageInfo = data.prevPageInfo || null;
           ordersState.hasNext = data.hasNext || !!data.nextPageInfo;
           ordersState.hasPrev = data.hasPrev || false;
+          // Clear current page info after using it (we now have fresh cursors)
+          ordersState.currentPageInfo = null;
 
           // Store today's count for the metric
           ordersState.totalTodayOrders = data.totalTodayOrders || 0;
@@ -3241,6 +3246,7 @@ function dashboardPage() {
             ordersState.filters.q = ordersSearchInput.value.trim();
             ordersState.page = 1;
             ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
+            ordersState.currentPageInfo = null;
             loadOrders();
           }, 260);
         });
@@ -3267,6 +3273,7 @@ function dashboardPage() {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
           ordersState.page = 1;
           ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
+          ordersState.currentPageInfo = null;
           loadOrders();
         });
       }
@@ -3276,6 +3283,7 @@ function dashboardPage() {
           ordersState.filters.from = ordersFromInput.value;
           ordersState.page = 1;
           ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
+          ordersState.currentPageInfo = null;
           loadOrders();
         });
       }
@@ -3285,6 +3293,7 @@ function dashboardPage() {
           ordersState.filters.to = ordersToInput.value;
           ordersState.page = 1;
           ordersState.nextPageInfo = null;  // Reset pagination cursor when filters change
+          ordersState.currentPageInfo = null;
           loadOrders();
         });
       }
@@ -3312,6 +3321,7 @@ function dashboardPage() {
         orderDetailsCache.clear();
         ordersState.page = 1;
         ordersState.nextPageInfo = null;  // Reset pagination cursor when store context changes
+        ordersState.currentPageInfo = null;
         customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
