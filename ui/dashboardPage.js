@@ -64,24 +64,6 @@ function dashboardPage() {
       height: 100vh;
     }
 
-    .sidebar-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: auto;
-    }
-
-    .sidebar-force-btn {
-      width: 100%;
-      justify-content: center;
-      font-size: 12px;
-    }
-
-    .btn.is-loading {
-      opacity: 0.6;
-      cursor: wait;
-    }
-
     .sidebar-header {
       display: flex;
       justify-content: space-between;
@@ -1167,12 +1149,6 @@ function dashboardPage() {
         </div>
       </div>
 
-      <div class="sidebar-actions">
-        <button id="force-sync-btn" class="btn btn-primary sidebar-force-btn" type="button">
-          Sincronizează forțat
-        </button>
-      </div>
-
       <footer class="sidebar-footer">
         <div class="sidebar-footer-label">Store context</div>
         <select id="store-context-select" class="context-select">
@@ -1537,7 +1513,6 @@ function dashboardPage() {
       const pageSubtitleEl = document.getElementById('page-subtitle');
       const storeContextSelect = document.getElementById('store-context-select');
       const storeContextLive = document.getElementById('store-context-live');
-      const forceSyncBtn = document.getElementById('force-sync-btn');
 
       const navItems = document.querySelectorAll('.nav-item');
       const views = document.querySelectorAll('.view');
@@ -2877,49 +2852,9 @@ function dashboardPage() {
         loadStores(previousStoreId);
       });
 
-      function setupForceSync() {
-        if (!forceSyncBtn) return;
-        const originalText = forceSyncBtn.textContent;
-        let isSyncing = false;
-
-        forceSyncBtn.addEventListener('click', async () => {
-          if (isSyncing) return;
-          const ok = window.confirm(
-            'Ești sigur că vrei să sincronizezi acum toate datele din Shopify?'
-          );
-          if (!ok) return;
-          isSyncing = true;
-          forceSyncBtn.disabled = true;
-          forceSyncBtn.textContent = 'Se sincronizează...';
-          forceSyncBtn.classList.add('is-loading');
-          try {
-            const res = await fetch('/admin/force-sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({}),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data && data.success) {
-              window.alert('Sincronizarea cu Shopify s-a încheiat cu succes.');
-            } else {
-              window.alert('A apărut o eroare la sincronizare. Încearcă din nou.');
-            }
-          } catch (err) {
-            console.error('Force sync error:', err);
-            window.alert('A apărut o eroare la sincronizare. Încearcă din nou.');
-          } finally {
-            isSyncing = false;
-            forceSyncBtn.disabled = false;
-            forceSyncBtn.textContent = originalText;
-            forceSyncBtn.classList.remove('is-loading');
-          }
-        });
-      }
-
       // init
       setView(currentView);
       loadStores();
-      setupForceSync();
     })();
   </script>
 </body>

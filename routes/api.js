@@ -896,198 +896,179 @@ router.get('/preview', async (req, res) => {
   }
 });
 
-async function performFullSync(payload = {}) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-  if (!spreadsheetId) {
-    throw new Error('Missing GOOGLE_SHEETS_ID env var');
-  }
-
-  const { store_id: filterStoreId, internal_product_id: filterProductId, items } = payload;
-
-  const [productsSheet, storesSheet, psSheet] = await Promise.all([
-    loadSheet(spreadsheetId, 'Products'),
-    loadSheet(spreadsheetId, 'Stores'),
-    loadSheet(spreadsheetId, 'Product_Store'),
-  ]);
-
-  const products = productsSheet.rows;
-  const stores = storesSheet.rows;
-  const productStoreRows = psSheet.rows;
-
-  const productsById = {};
-  products.forEach((p) => {
-    productsById[p.internal_product_id] = p;
-  });
-
-  const storesById = {};
-  stores.forEach((s) => {
-    storesById[s.store_id] = s;
-  });
-
-  const validActions = ['create', 'update', 'delete'];
-
-  const selectedSet = new Set(
-    Array.isArray(items)
-      ? items.map(
-          (it) => (it.store_id || filterStoreId || '') + '::' + (it.internal_product_id || '')
-        )
-      : []
-  );
-
-  const toProcess = productStoreRows.filter((r) => {
-    const action = (r.sync_action || '').toLowerCase();
-    if (!validActions.includes(action)) return false;
-    if (filterStoreId && r.store_id !== filterStoreId) return false;
-    if (filterProductId && r.internal_product_id !== filterProductId) return false;
-    if (selectedSet.size) {
-      const key = (r.store_id || '') + '::' + (r.internal_product_id || '');
-      if (!selectedSet.has(key)) return false;
-    }
-    return true;
-  });
-
-  if (toProcess.length === 0) {
-    return { message: 'Nothing to sync', processed: 0, results: [] };
-  }
-
-  const results = [];
-
-  for (const row of toProcess) {
-    const rawAction = (row.sync_action || '').toLowerCase();
-    const internalId = row.internal_product_id;
-    const storeId = row.store_id;
-
-    const result = {
-      internal_product_id: internalId,
-      store_id: storeId,
-      action: rawAction,
-      status: 'pending',
-      error: null,
-      sku: row.store_sku || '',
-    };
-
-    try {
-      const product = productsById[internalId];
-      if (!product) {
-        throw new Error(`No product found in Products for internal_product_id=${internalId}`);
-      }
-
-      const store = storesById[storeId];
-      if (!store) {
-        throw new Error(`No store found in Stores for store_id=${storeId}`);
-      }
-
-      const accessToken = getShopifyAccessTokenForStore(storeId);
-
-      const classification = await determinePlannedActionForRow(
-        store,
-        accessToken,
-        product,
-        row
-      );
-      const plannedAction = classification.plannedAction;
-      const sku = row.store_sku || product.master_sku || product.internal_product_id;
-      result.sku = sku;
-      result.action = plannedAction;
-
-      if (plannedAction === 'skip') {
-        result.status = 'skipped';
-        result.error = classification.reason || 'Skipped by rule';
-        results.push(result);
-        continue;
-      }
-
-      if (plannedAction === 'create') {
-        let imageUrls = [];
-        if (product.media_folder_url) {
-          try {
-            imageUrls = await getImageUrlsFromDriveFolder(product.media_folder_url, 10);
-          } catch (e) {
-            console.error(
-              'Error getting images for product during create',
-              internalId,
-              e.message
-            );
-          }
-        }
-
-        const payload = buildProductPayload(product, store, row, imageUrls);
-        const created = await createProductInStore(store, accessToken, payload);
-        result.status = 'success';
-        result.shopify_product_id = created.id;
-      } else if (plannedAction === 'update') {
-        let productId = classification.existingProductId;
-
-        if (!productId && row.handle) {
-          productId = await findProductIdByHandle(store.shopify_domain, accessToken, row.handle);
-        }
-
-        if (!productId) {
-          const payload = buildProductPayload(product, store, row);
-          const created = await createProductInStore(store, accessToken, payload);
-          result.status = 'success';
-          result.shopify_product_id = created.id;
-          result.note = 'No existing product found for update, created new.';
-        } else {
-          const payload = buildProductPayload(product, store, row);
-          const updated = await updateProductInStore(store, accessToken, productId, payload);
-          result.status = 'success';
-          result.shopify_product_id = updated.id;
-        }
-      } else if (plannedAction === 'delete') {
-        let productId = classification.existingProductId;
-        if (!productId && row.handle) {
-          productId = await findProductIdByHandle(store.shopify_domain, accessToken, row.handle);
-        }
-
-        if (!productId) {
-          result.status = 'success';
-          result.note = 'Product not found in Shopify, nothing to delete';
-        } else {
-          await deleteProductInStore(store, accessToken, productId);
-          result.status = 'success';
-        }
-      }
-    } catch (err) {
-      console.error('Error syncing row', row, err);
-      result.status = 'error';
-      result.error = err.message;
-    }
-
-    results.push(result);
-  }
-
-  return {
-    message: 'Sync finished',
-    processed: results.length,
-    results,
-  };
-}
-
 // /sync
 router.post('/sync', async (req, res) => {
   try {
-    const data = await performFullSync(req.body || {});
-    return res.json(data);
+    const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+    if (!spreadsheetId) {
+      throw new Error('Missing GOOGLE_SHEETS_ID env var');
+    }
+
+    const { store_id: filterStoreId, internal_product_id: filterProductId, items } = req.body || {};
+
+    const [productsSheet, storesSheet, psSheet] = await Promise.all([
+      loadSheet(spreadsheetId, 'Products'),
+      loadSheet(spreadsheetId, 'Stores'),
+      loadSheet(spreadsheetId, 'Product_Store'),
+    ]);
+
+    const products = productsSheet.rows;
+    const stores = storesSheet.rows;
+    const productStoreRows = psSheet.rows;
+
+    const productsById = {};
+    products.forEach((p) => {
+      productsById[p.internal_product_id] = p;
+    });
+
+    const storesById = {};
+    stores.forEach((s) => {
+      storesById[s.store_id] = s;
+    });
+
+    const validActions = ['create', 'update', 'delete'];
+
+    const selectedSet = new Set(
+      Array.isArray(items)
+        ? items.map(
+            (it) => (it.store_id || filterStoreId || '') + '::' + (it.internal_product_id || '')
+          )
+        : []
+    );
+
+    const toProcess = productStoreRows.filter((r) => {
+      const action = (r.sync_action || '').toLowerCase();
+      if (!validActions.includes(action)) return false;
+      if (filterStoreId && r.store_id !== filterStoreId) return false;
+      if (filterProductId && r.internal_product_id !== filterProductId) return false;
+      if (selectedSet.size) {
+        const key = (r.store_id || '') + '::' + (r.internal_product_id || '');
+        if (!selectedSet.has(key)) return false;
+      }
+      return true;
+    });
+
+    if (toProcess.length === 0) {
+      return res.json({ message: 'Nothing to sync', processed: 0, results: [] });
+    }
+
+    const results = [];
+
+    for (const row of toProcess) {
+      const rawAction = (row.sync_action || '').toLowerCase();
+      const internalId = row.internal_product_id;
+      const storeId = row.store_id;
+
+      const result = {
+        internal_product_id: internalId,
+        store_id: storeId,
+        action: rawAction,
+        status: 'pending',
+        error: null,
+        sku: row.store_sku || '',
+      };
+
+      try {
+        const product = productsById[internalId];
+        if (!product) {
+          throw new Error(`No product found in Products for internal_product_id=${internalId}`);
+        }
+
+        const store = storesById[storeId];
+        if (!store) {
+          throw new Error(`No store found in Stores for store_id=${storeId}`);
+        }
+
+        const accessToken = getShopifyAccessTokenForStore(storeId);
+
+        const classification = await determinePlannedActionForRow(
+          store,
+          accessToken,
+          product,
+          row
+        );
+        const plannedAction = classification.plannedAction;
+        const sku = row.store_sku || product.master_sku || product.internal_product_id;
+        result.sku = sku;
+        result.action = plannedAction;
+
+        if (plannedAction === 'skip') {
+          result.status = 'skipped';
+          result.error = classification.reason || 'Skipped by rule';
+          results.push(result);
+          continue;
+        }
+
+        if (plannedAction === 'create') {
+          let imageUrls = [];
+          if (product.media_folder_url) {
+            try {
+              imageUrls = await getImageUrlsFromDriveFolder(product.media_folder_url, 10);
+            } catch (e) {
+              console.error(
+                'Error getting images for product during create',
+                internalId,
+                e.message
+              );
+            }
+          }
+
+          const payload = buildProductPayload(product, store, row, imageUrls);
+          const created = await createProductInStore(store, accessToken, payload);
+          result.status = 'success';
+          result.shopify_product_id = created.id;
+        } else if (plannedAction === 'update') {
+          let productId = classification.existingProductId;
+
+          if (!productId && row.handle) {
+            productId = await findProductIdByHandle(store.shopify_domain, accessToken, row.handle);
+          }
+
+          if (!productId) {
+            const payload = buildProductPayload(product, store, row);
+            const created = await createProductInStore(store, accessToken, payload);
+            result.status = 'success';
+            result.shopify_product_id = created.id;
+            result.note = 'No existing product found for update, created new.';
+          } else {
+            const payload = buildProductPayload(product, store, row);
+            const updated = await updateProductInStore(store, accessToken, productId, payload);
+            result.status = 'success';
+            result.shopify_product_id = updated.id;
+          }
+        } else if (plannedAction === 'delete') {
+          let productId = classification.existingProductId;
+          if (!productId && row.handle) {
+            productId = await findProductIdByHandle(store.shopify_domain, accessToken, row.handle);
+          }
+
+          if (!productId) {
+            result.status = 'success';
+            result.note = 'Product not found in Shopify, nothing to delete';
+          } else {
+            await deleteProductInStore(store, accessToken, productId);
+            result.status = 'success';
+          }
+        }
+      } catch (err) {
+        console.error('Error syncing row', row, err);
+        result.status = 'error';
+        result.error = err.message;
+      }
+
+      results.push(result);
+    }
+
+    return res.json({
+      message: 'Sync finished',
+      processed: results.length,
+      results,
+    });
   } catch (err) {
     console.error('Fatal /sync error:', err);
     return res.status(500).json({
       error: 'Sync failed',
       message: err.message || String(err),
-    });
-  }
-});
-
-// force sync trigger
-router.post('/admin/force-sync', async (req, res) => {
-  try {
-    const data = await performFullSync({});
-    return res.json({ success: true, data });
-  } catch (err) {
-    console.error('Fatal /admin/force-sync error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message || String(err),
     });
   }
 });
