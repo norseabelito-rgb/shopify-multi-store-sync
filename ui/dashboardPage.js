@@ -2214,27 +2214,35 @@ function dashboardPage() {
 
         const rowsHtml = customersState.items
           .map((c) => {
-            const fullName =
-              (c.first_name || c.last_name
+            // Use display_name from DB, or construct from first_name + last_name
+            const fullName = c.display_name ||
+              ((c.first_name || c.last_name)
                 ? (c.first_name || '') + ' ' + (c.last_name || '')
-                : c.name) || 'Customer';
+                : (c.name || c.email || 'Customer')).trim();
+
+            // Ensure customer_id is available for click handler
+            const customerId = c.customer_id;
+            if (!customerId) {
+              console.warn('[customers] Row missing customer_id:', c);
+            }
+
             return (
               '<tr data-store="' +
                 escapeHtml(c.store_id) +
                 '" data-store-id="' +
                 escapeHtml(c.store_id) +
                 '" data-customer-id="' +
-                escapeHtml(c.customer_id || c.email || '') +
+                escapeHtml(customerId || '') +
               '">' +
                 '<td><button class="link-inline customer-open">' +
                   escapeHtml(fullName) +
                 '</button></td>' +
                 '<td>' + escapeHtml(c.email || '—') + '</td>' +
-                '<td>' + formatNumber(c.total_orders || 0) + '</td>' +
-                '<td class="numeric">' + formatMoney(c.total_spent || 0, 'RON') + '</td>' +
-                '<td>' + (c.last_order_date ? formatDateTime(c.last_order_date) : '—') + '</td>' +
+                '<td>' + formatNumber(c.orders_count || 0) + '</td>' +
+                '<td class="numeric">' + formatMoney(c.total_spent || 0, c.currency || 'RON') + '</td>' +
+                '<td>' + (c.updated_at ? formatDateTime(c.updated_at) : '—') + '</td>' +
                 '<td class="store-name-cell">' + escapeHtml(c.store_name || c.store_id || '') + '</td>' +
-                '<td>' + (c.created_at ? formatDateTime(c.created_at) : (c.first_order_date ? formatDateTime(c.first_order_date) : '—')) + '</td>' +
+                '<td>' + (c.created_at ? formatDateTime(c.created_at) : '—') + '</td>' +
               '</tr>'
             );
           })
@@ -2774,76 +2782,146 @@ function dashboardPage() {
 
       function buildCustomerFullContent(data) {
         const detail = (data && data.customer) || {};
-        const orders = (data && data.orders) || [];
-        const orderRows = orders
-          .map((o) => {
-            return (
-              '<tr>' +
-                '<td><button class="link-inline customer-order-link" data-order-id="' +
-                  escapeHtml(o.id) +
-                  '" data-store-id="' +
-                  escapeHtml(o.store_id) +
-                '">#' +
-                  escapeHtml(o.name || o.id) +
-                '</button></td>' +
-                '<td>' + formatDateTime(o.created_at) + '</td>' +
-                '<td class="store-name-cell">' + escapeHtml(o.store_name || o.store_id || '') + '</td>' +
-                '<td class="numeric">' + formatMoney(o.total_price, o.currency) + '</td>' +
-                '<td>' +
-                  (o.financial_status ? statusPill(o.financial_status) : '<span class="muted">—</span>') +
-                '</td>' +
-              '</tr>'
-            );
-          })
-          .join('');
-        const tableHtml =
+        const loading = data && data._loading;
+
+        if (loading) {
+          return {
+            title: 'Loading...',
+            subtitle: '',
+            bodyHtml: '<div class="drawer-section"><div class="order-sub">Loading customer details...</div></div>',
+            shopifyUrl: null,
+          };
+        }
+
+        if (data && data.error) {
+          return {
+            title: 'Error',
+            subtitle: '',
+            bodyHtml: '<div class="drawer-section"><div class="order-sub" style="color:var(--error);">Error loading customer: ' + escapeHtml(data.error) + '</div></div>',
+            shopifyUrl: null,
+          };
+        }
+
+        // SECTION 1: OVERVIEW
+        const displayName = detail.first_name || detail.last_name
+          ? (detail.first_name || '') + ' ' + (detail.last_name || '')
+          : (detail.email || 'Customer');
+
+        const overviewSection =
           '<div class="drawer-section">' +
-            '<div class="section-heading">Orders (context)</div>' +
-            (orders.length
-              ? '<table class="orders-table" style="width:100%;">' +
-                  '<thead><tr><th>Order</th><th>Date</th><th>Store</th><th class="numeric">Total</th><th>Status</th></tr></thead>' +
-                  '<tbody>' + orderRows + '</tbody>' +
-                '</table>'
-              : '<div class="order-sub">Nu există comenzi în context.</div>') +
+            '<div class="section-heading">Overview</div>' +
+            '<div class="kv-row"><span>Customer ID</span><strong>' +
+              escapeHtml(detail.id || detail.customer_id || '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Created</span><strong>' +
+              (detail.created_at ? formatDateTime(detail.created_at) : '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Updated</span><strong>' +
+              (detail.updated_at ? formatDateTime(detail.updated_at) : '—') +
+            '</strong></div>' +
+            '<div class="kv-row"><span>State</span><strong>' +
+              (detail.state ? statusPill(detail.state) : '—') +
+            '</strong></div>' +
+            (detail.tags ? '<div class="kv-row"><span>Tags</span><strong>' + escapeHtml(detail.tags) + '</strong></div>' : '') +
+            (detail.note ? '<div class="kv-row"><span>Note</span><strong>' + escapeHtml(detail.note) + '</strong></div>' : '') +
           '</div>';
 
-        const summary =
+        // SECTION 2: CONTACT
+        const contactSection =
           '<div class="drawer-section">' +
             '<div class="section-heading">Contact</div>' +
-            '<div class="kv-row"><span>Nume</span><strong>' +
-              escapeHtml(
-                (detail.first_name || '') + ' ' + (detail.last_name || '')
-              ) +
+            '<div class="kv-row"><span>Name</span><strong>' +
+              escapeHtml(displayName) +
             '</strong></div>' +
             '<div class="kv-row"><span>Email</span><strong>' +
               escapeHtml(detail.email || '—') +
+              (detail.verified_email === true ? ' <span class="pill" style="background:var(--success);">Verified</span>' : '') +
             '</strong></div>' +
-            '<div class="kv-row"><span>Telefon</span><strong>' +
+            '<div class="kv-row"><span>Phone</span><strong>' +
               escapeHtml(detail.phone || '—') +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Adresă</span><strong>' +
-              escapeHtml(formatAddress(detail.default_address)) +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Total orders</span><strong>' +
-              formatNumber(detail.total_orders || 0) +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Total spent</span><strong>' +
-              formatMoney(detail.total_spent || 0, 'RON') +
-            '</strong></div>' +
-            '<div class="kv-row"><span>Last order</span><strong>' +
-              (detail.last_order_date ? formatDateTime(detail.last_order_date) : '—') +
             '</strong></div>' +
           '</div>';
 
-        const customerUrl = buildShopifyUrl('customer', { customer: { id: detail.customer_id }, shopify_domain: detail.shopify_domain });
+        // SECTION 3: ORDERS SUMMARY
+        const ordersSection =
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Orders Summary</div>' +
+            '<div class="kv-row"><span>Total Orders</span><strong>' +
+              formatNumber(detail.orders_count || 0) +
+            '</strong></div>' +
+            '<div class="kv-row"><span>Total Spent</span><strong>' +
+              formatMoney(detail.total_spent || 0, detail.currency || 'RON') +
+            '</strong></div>' +
+            (detail.last_order_name ? '<div class="kv-row"><span>Last Order</span><strong>' +
+              escapeHtml(detail.last_order_name) +
+            '</strong></div>' : '') +
+          '</div>';
+
+        // SECTION 4: DEFAULT ADDRESS
+        const defaultAddress = detail.default_address || {};
+        const addressSection = (defaultAddress && (defaultAddress.address1 || defaultAddress.city)) ?
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Default Address</div>' +
+            (defaultAddress.address1 ? '<div class="kv-row"><span>Address</span><strong>' +
+              escapeHtml(defaultAddress.address1) +
+              (defaultAddress.address2 ? ', ' + escapeHtml(defaultAddress.address2) : '') +
+            '</strong></div>' : '') +
+            (defaultAddress.city ? '<div class="kv-row"><span>City</span><strong>' +
+              escapeHtml(defaultAddress.city) +
+            '</strong></div>' : '') +
+            (defaultAddress.province ? '<div class="kv-row"><span>Province</span><strong>' +
+              escapeHtml(defaultAddress.province) +
+              (defaultAddress.province_code ? ' (' + escapeHtml(defaultAddress.province_code) + ')' : '') +
+            '</strong></div>' : '') +
+            (defaultAddress.zip ? '<div class="kv-row"><span>ZIP</span><strong>' +
+              escapeHtml(defaultAddress.zip) +
+            '</strong></div>' : '') +
+            (defaultAddress.country ? '<div class="kv-row"><span>Country</span><strong>' +
+              escapeHtml(defaultAddress.country) +
+              (defaultAddress.country_code ? ' (' + escapeHtml(defaultAddress.country_code) + ')' : '') +
+            '</strong></div>' : '') +
+          '</div>'
+          : '';
+
+        // SECTION 5: MARKETING
+        const marketingSection = (detail.email_marketing_consent || detail.sms_marketing_consent) ?
+          '<div class="drawer-section">' +
+            '<div class="section-heading">Marketing</div>' +
+            (detail.email_marketing_consent && detail.email_marketing_consent.state ?
+              '<div class="kv-row"><span>Email Marketing</span><strong>' +
+                statusPill(detail.email_marketing_consent.state) +
+                (detail.email_marketing_consent.opt_in_level ? ' (' + escapeHtml(detail.email_marketing_consent.opt_in_level) + ')' : '') +
+              '</strong></div>'
+              : '') +
+            (detail.sms_marketing_consent && detail.sms_marketing_consent.state ?
+              '<div class="kv-row"><span>SMS Marketing</span><strong>' +
+                statusPill(detail.sms_marketing_consent.state) +
+                (detail.sms_marketing_consent.opt_in_level ? ' (' + escapeHtml(detail.sms_marketing_consent.opt_in_level) + ')' : '') +
+              '</strong></div>'
+              : '') +
+            (detail.marketing_opt_in_level ? '<div class="kv-row"><span>Opt-in Level</span><strong>' +
+              escapeHtml(detail.marketing_opt_in_level) +
+            '</strong></div>' : '') +
+          '</div>'
+          : '';
+
+        // SECTION 6: RAW JSON VIEWER
+        const rawJsonSection =
+          '<div class="drawer-section">' +
+            '<details style="margin-top:8px;">' +
+              '<summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:12px;">Raw Customer JSON</summary>' +
+              '<pre style="background:rgba(0,0,0,0.3);padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;max-height:300px;overflow-y:auto;">' +
+                escapeHtml(JSON.stringify(detail, null, 2)) +
+              '</pre>' +
+            '</details>' +
+          '</div>';
+
+        const customerUrl = buildShopifyUrl('customer', { customer: { id: detail.id || detail.customer_id }, shopify_domain: detail.shopify_domain });
 
         return {
-          title:
-            (detail.first_name || detail.last_name
-              ? (detail.first_name || '') + ' ' + (detail.last_name || '')
-              : 'Customer'),
+          title: displayName,
           subtitle: escapeHtml(detail.email || detail.store_name || ''),
-          bodyHtml: summary + tableHtml,
+          bodyHtml: overviewSection + contactSection + ordersSection + addressSection + marketingSection + rawJsonSection,
           shopifyUrl: customerUrl,
         };
       }

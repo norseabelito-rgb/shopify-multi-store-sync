@@ -2,6 +2,9 @@ const { getLatestOrders, searchOrders, getTodayOrdersCount } = require('../servi
 const { getOrderDetail } = require('../services/ordersDetailService');
 const { backfillAllStores, incrementalSyncAllStores } = require('../jobs/ordersSync');
 const { runDeploymentVerification } = require('../services/deploymentVerification');
+const { getLatestCustomers, searchCustomers, getCustomersCount } = require('../services/customersIndexService');
+const { getCustomerDetail: getCustomerDetailFromDB } = require('../services/customersDetailService');
+const { backfillAllStores: backfillCustomersAllStores, incrementalSyncAllStores: incrementalSyncCustomersAllStores } = require('../jobs/customersSync');
 
 // routes/api.js
 const express = require('express');
@@ -471,51 +474,49 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
   }
 });
 
-// /customers – derived from live Shopify orders
+// /customers – read from DB (customers_index)
 // Query params:
 //   store_id = "all" | store id
-//   q        = text (name, email, customer id)
-//   from/to  = YYYY-MM-DD
-//   limit    = max 200 (default 100)
+//   q        = text (name, email, phone, etc.)
+//   limit    = max 250 (default 100)
 //   page     = page number (default 1)
 router.get('/customers', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const searchQuery = (req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 200);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const dateFrom = req.query.from || null;
-    const dateTo = req.query.to || null;
 
-    console.log('[customers][LIVE]', {
+    console.log('[customers][DB]', {
       store: storeIdFilter,
       search: searchQuery,
-      from: dateFrom,
-      to: dateTo,
       limit,
       page,
     });
 
-    const result = await fetchCustomers({
-      store_id: storeIdFilter,
-      q: searchQuery,
-      from: dateFrom,
-      to: dateTo,
-      limit,
-      page,
-    });
+    const offset = (page - 1) * limit;
 
-    console.log('[customers][LIVE] returned', result.customers.length, 'customers, total:', result.totalCustomers);
+    // Search or list customers from DB
+    const customers = searchQuery
+      ? await searchCustomers({ q: searchQuery, store_id: storeIdFilter, limit, offset })
+      : await getLatestCustomers({ store_id: storeIdFilter, limit, offset });
+
+    // Get total count
+    const totalCustomers = await getCustomersCount({ q: searchQuery, store_id: storeIdFilter });
+
+    const totalPages = Math.ceil(totalCustomers / limit);
+
+    console.log('[customers][DB] returned', customers.length, 'customers, total:', totalCustomers);
 
     res.json({
-      customers: result.customers,
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalCustomers: result.totalCustomers || result.total,
-      hasNext: result.hasNext,
-      hasPrev: result.hasPrev,
-      source: 'SHOPIFY_LIVE',
+      customers,
+      page,
+      limit,
+      totalPages,
+      totalCustomers,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+      source: 'POSTGRES_INDEX',
     });
   } catch (err) {
     console.error('/customers error', err);
@@ -526,27 +527,52 @@ router.get('/customers', async (req, res) => {
   }
 });
 
-// /customers/:store_id/:customer_id – details + order history
+// /customers/:store_id/:customer_id – complete customer details from DB (customers_detail)
 router.get('/customers/:store_id/:customer_id', async (req, res) => {
   const { store_id: storeId, customer_id: customerId } = req.params;
-  const dateFrom = req.query.from || null;
-  const dateTo = req.query.to || null;
+
+  // Defensive guards
+  if (!storeId || !customerId) {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Both store_id and customer_id are required'
+    });
+  }
+
+  if (customerId === 'undefined' || customerId === 'null') {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Invalid customer_id: ' + customerId
+    });
+  }
 
   try {
-    console.log('[customer-detail][LIVE]', { storeId, customerId, from: dateFrom, to: dateTo });
-
-    const result = await getCustomerDetail(storeId, customerId, {
-      from: dateFrom,
-      to: dateTo,
-    });
-
-    if (!result) {
-      return res.status(404).json({ error: 'Customer not found in this store' });
+    // Get store info for context
+    const stores = await loadStoresRows();
+    const store = stores.find((s) => String(s.store_id) === String(storeId));
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
     }
 
-    console.log('[customer-detail][LIVE] found customer with', result.orders.length, 'orders');
+    // Fetch customer detail from database (customers_detail table)
+    const customerDetail = await getCustomerDetailFromDB(storeId, customerId);
 
-    res.json(result);
+    if (!customerDetail) {
+      return res.status(404).json({
+        error: 'Customer not found',
+        message: `Customer ${customerId} not found in database for store ${storeId}`
+      });
+    }
+
+    // Add store context to the customer
+    const enrichedCustomer = {
+      ...customerDetail,
+      store_id: storeId,
+      store_name: store.store_name || storeId,
+      shopify_domain: store.shopify_domain || '',
+    };
+
+    res.json({ customer: enrichedCustomer });
   } catch (err) {
     console.error('/customers detail error', { storeId, customerId, err });
     res.status(500).json({
@@ -986,6 +1012,42 @@ router.post('/tasks/orders/sync', requireTasksSecret, async (req, res) => {
     })
     .catch((err) => {
       console.error('[incremental] Job failed:', err);
+    });
+});
+
+router.post('/tasks/customers/backfill', requireTasksSecret, async (req, res) => {
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Customers backfill job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run backfill in background (non-blocking)
+  backfillCustomersAllStores()
+    .then((summary) => {
+      console.log('[customers-backfill] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[customers-backfill] Job failed:', err);
+    });
+});
+
+router.post('/tasks/customers/sync', requireTasksSecret, async (req, res) => {
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Customers incremental sync job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run incremental sync in background (non-blocking)
+  incrementalSyncCustomersAllStores()
+    .then((summary) => {
+      console.log('[customers-incremental] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[customers-incremental] Job failed:', err);
     });
 });
 

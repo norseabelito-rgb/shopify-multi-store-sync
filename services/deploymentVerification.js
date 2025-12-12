@@ -5,6 +5,8 @@ const { query } = require('../lib/db');
 const { loadStoresRows } = require('../lib/stores');
 const { getSyncState, getOrdersCount, getMaxUpdatedAtFromDB } = require('./ordersIndexService');
 const { getOrderDetailsCount } = require('./ordersDetailService');
+const { getCustomersSyncState, getCustomersCount, getMaxUpdatedAtFromDB: getMaxCustomerUpdatedAtFromDB } = require('./customersIndexService');
+const { getCustomerDetailsCount } = require('./customersDetailService');
 
 const BACKFILL_START_ISO = '2024-01-01T00:00:00Z';
 
@@ -38,7 +40,7 @@ async function runDeploymentVerification() {
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
-        AND table_name IN ('orders_index', 'orders_detail', 'sync_state')
+        AND table_name IN ('orders_index', 'orders_detail', 'sync_state', 'customers_index', 'customers_detail', 'customers_sync_state')
       ORDER BY table_name;
     `);
 
@@ -47,13 +49,24 @@ async function runDeploymentVerification() {
       orders_index: existingTables.includes('orders_index'),
       orders_detail: existingTables.includes('orders_detail'),
       sync_state: existingTables.includes('sync_state'),
+      customers_index: existingTables.includes('customers_index'),
+      customers_detail: existingTables.includes('customers_detail'),
+      customers_sync_state: existingTables.includes('customers_sync_state'),
     };
 
     console.log('✓ Tables:', existingTables.join(', '));
 
-    if (!results.tables_exist.orders_index || !results.tables_exist.orders_detail || !results.tables_exist.sync_state) {
-      results.issues.push('Missing required tables');
-      console.log('✗ WARNING: Some required tables are missing');
+    const missingTables = [];
+    if (!results.tables_exist.orders_index) missingTables.push('orders_index');
+    if (!results.tables_exist.orders_detail) missingTables.push('orders_detail');
+    if (!results.tables_exist.sync_state) missingTables.push('sync_state');
+    if (!results.tables_exist.customers_index) missingTables.push('customers_index');
+    if (!results.tables_exist.customers_detail) missingTables.push('customers_detail');
+    if (!results.tables_exist.customers_sync_state) missingTables.push('customers_sync_state');
+
+    if (missingTables.length > 0) {
+      results.issues.push(`Missing required tables: ${missingTables.join(', ')}`);
+      console.log(`✗ WARNING: Missing tables: ${missingTables.join(', ')}`);
     }
 
     // 3. Check each store
@@ -67,6 +80,9 @@ async function runDeploymentVerification() {
         counts: {},
         db_max: {},
         sync_state: null,
+        customers_counts: {},
+        customers_db_max: {},
+        customers_sync_state: null,
         issues: [],
       };
 
@@ -81,6 +97,7 @@ async function runDeploymentVerification() {
           continue;
         }
 
+        // ===== ORDERS CHECKS =====
         // Get DB counts
         const indexCount = await getOrdersCount(store.store_id);
         const detailCount = await getOrderDetailsCount(store.store_id);
@@ -106,7 +123,35 @@ async function runDeploymentVerification() {
             last_run_finished_at: syncState.last_run_finished_at,
           };
         } else {
-          storeResult.issues.push('sync_state row missing');
+          storeResult.issues.push('orders sync_state row missing');
+        }
+
+        // ===== CUSTOMERS CHECKS =====
+        const customersIndexCount = await getCustomersCount({ store_id: store.store_id });
+        const customersDetailCount = await getCustomerDetailsCount(store.store_id);
+        storeResult.customers_counts = {
+          customers_index: customersIndexCount,
+          customers_detail: customersDetailCount,
+        };
+
+        // Get max updated_at from customers DB
+        const customersDbMax = await getMaxCustomerUpdatedAtFromDB(store.store_id);
+        storeResult.customers_db_max = {
+          max_updated_at: customersDbMax.max_updated_at,
+          max_customer_id: customersDbMax.max_customer_id,
+        };
+
+        // Get customers sync_state
+        const customersSyncState = await getCustomersSyncState(store.store_id);
+        if (customersSyncState) {
+          storeResult.customers_sync_state = {
+            last_updated_at: customersSyncState.last_updated_at,
+            last_customer_id: customersSyncState.last_customer_id,
+            backfill_done: customersSyncState.backfill_done,
+            last_run_finished_at: customersSyncState.last_run_finished_at,
+          };
+        } else {
+          storeResult.issues.push('customers_sync_state row missing');
         }
 
         // Detect issues
@@ -155,12 +200,57 @@ async function runDeploymentVerification() {
           }
         }
 
+        // ===== CUSTOMERS VALIDATION =====
+        if (!customersSyncState) {
+          storeResult.issues.push('customers_sync_state row does not exist');
+          results.issues.push(`${store.store_id}: customers_sync_state row missing`);
+        } else {
+          // CRITICAL: Check if checkpoint is stuck at or before 2024-01-02 while DB has data
+          const isCheckpointStuck = (checkpoint) => {
+            if (!checkpoint) return true;
+            const checkpointDate = new Date(checkpoint);
+            const cutoffDate = new Date('2024-01-02T00:00:00Z');
+            return checkpointDate <= cutoffDate;
+          };
+
+          if (customersIndexCount > 0 && isCheckpointStuck(customersSyncState.last_updated_at)) {
+            storeResult.issues.push(
+              `CRITICAL: Customers checkpoint stuck at ${customersSyncState.last_updated_at || 'NULL'} but DB has ${customersIndexCount} customers`
+            );
+            results.issues.push(
+              `${store.store_id}: CRITICAL - Invalid customers checkpoint (will auto-bootstrap on next sync)`
+            );
+          }
+
+          // Check if checkpoint is significantly behind DB max (>24 hours old)
+          if (customersSyncState.last_updated_at && customersDbMax.max_updated_at && customersIndexCount > 100) {
+            const checkpointDate = new Date(customersSyncState.last_updated_at);
+            const dbMaxDate = new Date(customersDbMax.max_updated_at);
+            const hoursDiff = (dbMaxDate - checkpointDate) / (1000 * 60 * 60);
+            if (hoursDiff > 24) {
+              storeResult.issues.push(`Customers checkpoint is ${Math.round(hoursDiff)} hours behind DB max`);
+              results.issues.push(`${store.store_id}: Customers checkpoint lag detected (will auto-bootstrap on next sync)`);
+            }
+          }
+
+          // Check if backfill_done false while DB has large count
+          if (!customersSyncState.backfill_done && customersIndexCount > 500) {
+            storeResult.issues.push(`customers backfill_done=false but DB has ${customersIndexCount} customers`);
+            results.issues.push(`${store.store_id}: customers backfill_done should be true (will auto-fix on next sync)`);
+          }
+
+          // Check if last_customer_id null when DB has data
+          if (!customersSyncState.last_customer_id && customersIndexCount > 0) {
+            storeResult.issues.push('last_customer_id is NULL but DB has customers');
+            results.issues.push(`${store.store_id}: last_customer_id missing (will auto-bootstrap on next sync)`);
+          }
+        }
+
         // Log store summary
         console.log(
           `  ${store.store_id}: ` +
-          `index=${indexCount}, detail=${detailCount}, ` +
-          `checkpoint=${syncState?.last_updated_at || 'NONE'}, ` +
-          `backfill_done=${syncState?.backfill_done || false}` +
+          `orders(index=${indexCount}, detail=${detailCount}, checkpoint=${syncState?.last_updated_at || 'NONE'}), ` +
+          `customers(index=${customersIndexCount}, detail=${customersDetailCount}, checkpoint=${customersSyncState?.last_updated_at || 'NONE'})` +
           (storeResult.issues.length > 0 ? ` [${storeResult.issues.length} issues]` : '')
         );
 
@@ -178,9 +268,20 @@ async function runDeploymentVerification() {
       results.issues.forEach(issue => console.log(`  - ${issue}`));
 
       // Add recommendations
-      const hasCheckpointIssues = results.issues.some(i => i.includes('Checkpoint stuck') || i.includes('last_order_id missing'));
-      if (hasCheckpointIssues) {
-        results.recommendations.push('Run incremental sync - it will auto-bootstrap checkpoints from DB');
+      const hasOrdersCheckpointIssues = results.issues.some(i =>
+        (i.includes('Checkpoint stuck') || i.includes('last_order_id missing')) &&
+        !i.includes('Customers')
+      );
+      const hasCustomersCheckpointIssues = results.issues.some(i =>
+        i.includes('Customers checkpoint') || i.includes('last_customer_id missing')
+      );
+
+      if (hasOrdersCheckpointIssues) {
+        results.recommendations.push('Run orders incremental sync - it will auto-bootstrap checkpoints from DB');
+      }
+
+      if (hasCustomersCheckpointIssues) {
+        results.recommendations.push('Run customers incremental sync - it will auto-bootstrap checkpoints from DB');
       }
 
       const hasBackfillDoneIssues = results.issues.some(i => i.includes('backfill_done'));
