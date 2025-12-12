@@ -936,23 +936,39 @@ function requireTasksSecret(req, res, next) {
 }
 
 router.post('/tasks/orders/backfill', requireTasksSecret, async (req, res) => {
-  try {
-    const summary = await backfillAllStores();
-    res.json({ ok: true, summary });
-  } catch (err) {
-    console.error('backfill error', err);
-    res.status(500).json({ ok: false, error: err.message || String(err) });
-  }
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Backfill job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run backfill in background (non-blocking)
+  backfillAllStores()
+    .then((summary) => {
+      console.log('[backfill] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[backfill] Job failed:', err);
+    });
 });
 
 router.post('/tasks/orders/sync', requireTasksSecret, async (req, res) => {
-  try {
-    const summary = await incrementalSyncAllStores();
-    res.json({ ok: true, summary });
-  } catch (err) {
-    console.error('incremental sync error', err);
-    res.status(500).json({ ok: false, error: err.message || String(err) });
-  }
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Incremental sync job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run incremental sync in background (non-blocking)
+  incrementalSyncAllStores()
+    .then((summary) => {
+      console.log('[incremental] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[incremental] Job failed:', err);
+    });
 });
 
 module.exports = router;

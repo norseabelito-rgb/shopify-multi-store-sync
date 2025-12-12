@@ -187,19 +187,42 @@ async function getSyncState(store_id) {
 
 async function upsertSyncState(store_id, patch = {}) {
   const last_updated_at = patch.last_updated_at || null;
-  const backfill_done = patch.backfill_done === true;
+  const last_order_id = patch.last_order_id || null;
+  const backfill_done = patch.backfill_done === true ? true : null;
+  const last_run_started_at = patch.last_run_started_at || null;
+  const last_run_finished_at = patch.last_run_finished_at || null;
+  const last_run_new_orders = patch.last_run_new_orders != null ? patch.last_run_new_orders : null;
+  const last_run_error = patch.last_run_error || null;
 
   await query(
     `
-    INSERT INTO sync_state (store_id, last_updated_at, backfill_done, updated_at)
-    VALUES ($1, $2, $3, NOW())
+    INSERT INTO sync_state (
+      store_id, last_updated_at, last_order_id, backfill_done,
+      last_run_started_at, last_run_finished_at, last_run_new_orders, last_run_error,
+      updated_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
     ON CONFLICT (store_id) DO UPDATE SET
       last_updated_at = COALESCE(EXCLUDED.last_updated_at, sync_state.last_updated_at),
+      last_order_id = COALESCE(EXCLUDED.last_order_id, sync_state.last_order_id),
       backfill_done = COALESCE(EXCLUDED.backfill_done, sync_state.backfill_done),
+      last_run_started_at = COALESCE(EXCLUDED.last_run_started_at, sync_state.last_run_started_at),
+      last_run_finished_at = COALESCE(EXCLUDED.last_run_finished_at, sync_state.last_run_finished_at),
+      last_run_new_orders = COALESCE(EXCLUDED.last_run_new_orders, sync_state.last_run_new_orders),
+      last_run_error = COALESCE(EXCLUDED.last_run_error, sync_state.last_run_error),
       updated_at = NOW()
     `,
-    [store_id, last_updated_at, backfill_done]
+    [store_id, last_updated_at, last_order_id, backfill_done, last_run_started_at, last_run_finished_at, last_run_new_orders, last_run_error]
   );
+}
+
+async function getOrdersCount(store_id) {
+  if (store_id === 'all') {
+    const r = await query(`SELECT COUNT(*)::int AS c FROM orders_index`);
+    return r.rows[0]?.c || 0;
+  }
+  const r = await query(`SELECT COUNT(*)::int AS c FROM orders_index WHERE store_id = $1`, [store_id]);
+  return r.rows[0]?.c || 0;
 }
 
 module.exports = {
@@ -209,4 +232,5 @@ module.exports = {
   getTodayOrdersCount,
   getSyncState,
   upsertSyncState,
+  getOrdersCount,
 };
