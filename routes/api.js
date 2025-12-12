@@ -386,21 +386,12 @@ router.get('/orders', async (req, res) => {
     const storeIdFilter = req.query.store_id || 'all';
     const statusFilter = (req.query.status || 'any').toLowerCase();
     const searchQuery = (req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
     const dateFrom = req.query.from || null;
     const dateTo = req.query.to || null;
     const pageInfo = req.query.page_info || null;
 
-    console.log('[orders][LIVE]', {
-      store: storeIdFilter,
-      status: statusFilter,
-      search: searchQuery,
-      from: dateFrom,
-      to: dateTo,
-      limit,
-      hasPageInfo: !!pageInfo,
-      pageInfoPreview: pageInfo?.substring(0, 30),
-    });
+    // Force last 100, always.
+    const limit = 100;
 
     const result = await fetchOrders({
       store_id: storeIdFilter,
@@ -408,17 +399,15 @@ router.get('/orders', async (req, res) => {
       q: searchQuery,
       from: dateFrom,
       to: dateTo,
-      limit,
       page_info: pageInfo,
+      limit, // ignored by service (always 100), but kept for clarity
     });
-
-    console.log('[orders][LIVE] returned', result.orders.length, 'orders, hasNext:', result.hasNext, 'nextPageInfo:', result.nextPageInfo?.substring(0, 30));
 
     res.json({
       orders: result.orders,
       count: result.orders.length,
-      page: result.page,
-      limit: result.limit,
+      page: 1,
+      limit: 100,
       total: result.total,
       hasNext: result.hasNext,
       hasPrev: result.hasPrev,
