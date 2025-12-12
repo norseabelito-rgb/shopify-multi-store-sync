@@ -27,25 +27,36 @@ function normalizeStoreOrderList(rawOrders, store) {
   );
 }
 
-function buildShopifyOrderNameSearchQuery(qRaw) {
+function buildShopifyOrderSearchQuery(qRaw) {
   let q = String(qRaw || '').trim();
   if (!q) return null;
 
-  // strip wrapping quotes
+  // Strip wrapping quotes
   q = q.replace(/^"+|"+$/g, '').trim();
 
-  // If looks like an order number, search both "#1234" and "1234"
-  const base = q.startsWith('#') ? q.slice(1) : q;
+  // Normalize spaces
+  q = q.replace(/\s+/g, ' ');
 
-  // numeric-ish -> order number search
+  // If it looks like an order number, search both "#1234" and "1234"
+  const base = q.startsWith('#') ? q.slice(1) : q;
   if (/^\d+$/.test(base)) {
-    // Parentheses + OR are supported; values don't need field prefixes.
-    // We'll use phrase terms to be safe with special chars.
     return `("${'#' + base}" OR "${base}")`;
   }
 
-  // otherwise: default full-text search across indexed fields
-  // (customer name/email, order fields, etc., depending on Shopify indexing)
+  // If it looks like a phone (digits + optional +, spaces, dashes)
+  const phoneCandidate = q.replace(/[^\d+]/g, '');
+  const digitsOnly = q.replace(/[^\d]/g, '');
+  if (digitsOnly.length >= 7 && digitsOnly.length <= 15) {
+    // Search both original and digits-only variants
+    return `("${q}" OR "${digitsOnly}" OR "${phoneCandidate}")`;
+  }
+
+  // If it looks like an email
+  if (q.includes('@')) {
+    return `"${q}"`;
+  }
+
+  // Default: full text (customer name, email, phone, address, etc. depending on Shopify indexing)
   return `"${q}"`;
 }
 
@@ -162,23 +173,13 @@ async function searchOrdersInStoreByName(store, searchQuery, filters = {}) {
     return { orders: [], hasNext: false, endCursor: null };
   }
 
-  const gqlQueryString = buildShopifyOrderNameSearchQuery(searchQuery);
+  const gqlQueryString = buildShopifyOrderSearchQuery(searchQuery);
   if (!gqlQueryString) return { orders: [], hasNext: false, endCursor: null };
 
   // Optional: also apply date filters to the GraphQL query string if provided.
   // Shopify supports created_at filters in query strings like: created_at:>=2024-01-01
   // We'll include them only if present.
-  const { from, to } = filters;
-
   let fullQuery = gqlQueryString;
-  if (from) {
-    const fromIso = parseDateParam(from, false);
-    if (fromIso) fullQuery += ` created_at:>="${fromIso.substring(0, 10)}"`;
-  }
-  if (to) {
-    const toIso = parseDateParam(to, true);
-    if (toIso) fullQuery += ` created_at:<="${toIso.substring(0, 10)}"`;
-  }
 
   const gql = `
     query OrdersSearch($first: Int!, $query: String!) {

@@ -378,7 +378,6 @@ router.get('/stores', async (req, res) => {
 //   store_id = "all" | store id
 //   q        = text (order #, customer, product)
 //   status   = all | any | open | paid | fulfilled | cancelled
-//   from/to  = YYYY-MM-DD
 //   limit    = max 250 (default 100)
 //   page_info = Shopify cursor for pagination
 router.get('/orders', async (req, res) => {
@@ -386,8 +385,6 @@ router.get('/orders', async (req, res) => {
     const storeIdFilter = req.query.store_id || 'all';
     const statusFilter = (req.query.status || 'any').toLowerCase();
     const searchQuery = (req.query.q || '').trim();
-    const dateFrom = req.query.from || null;
-    const dateTo = req.query.to || null;
     const pageInfo = req.query.page_info || null;
 
     // Force last 100, always.
@@ -397,8 +394,6 @@ router.get('/orders', async (req, res) => {
       store_id: storeIdFilter,
       status: statusFilter,
       q: searchQuery,
-      from: dateFrom,
-      to: dateTo,
       page_info: pageInfo,
       limit, // ignored by service (always 100), but kept for clarity
     });

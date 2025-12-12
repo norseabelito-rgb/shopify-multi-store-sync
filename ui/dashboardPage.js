@@ -1409,14 +1409,6 @@ function dashboardPage() {
               </div>
               <div class="filter-group">
                 <label class="filter-chip">
-                  <span>From</span>
-                  <input id="orders-from" type="date" />
-                </label>
-                <label class="filter-chip">
-                  <span>To</span>
-                  <input id="orders-to" type="date" />
-                </label>
-                <label class="filter-chip">
                   <span>Status</span>
                   <select id="orders-status">
                     <option value="all">All</option>
@@ -1610,8 +1602,6 @@ function dashboardPage() {
       const ordersCountLabel = document.getElementById('orders-count-label');
       const ordersSearchInput = document.getElementById('orders-search');
       const ordersStatusSelect = document.getElementById('orders-status');
-      const ordersFromInput = document.getElementById('orders-from');
-      const ordersToInput = document.getElementById('orders-to');
       const ordersMeta = document.getElementById('orders-meta');
       const ordersLoading = document.getElementById('orders-loading');
       const ordersEmpty = document.getElementById('orders-empty');
@@ -1640,8 +1630,6 @@ function dashboardPage() {
         filters: {
           q: '',
           status: 'all',
-          from: todayStr,
-          to: todayStr,
           limit: ORDER_PAGE_SIZE,
         },
         error: '',
@@ -1676,9 +1664,6 @@ function dashboardPage() {
         product: null,
         customer: null,
       };
-
-      if (ordersFromInput && !ordersFromInput.value) ordersFromInput.value = todayStr;
-      if (ordersToInput && !ordersToInput.value) ordersToInput.value = todayStr;
 
       function formatNumber(n) {
         if (n == null || isNaN(n)) return '–';
@@ -3013,8 +2998,6 @@ function dashboardPage() {
         qs.set('limit', ORDER_PAGE_SIZE);
         if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
         if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
-        if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
-        if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
 
         try {
           const res = await fetch('/orders?' + qs.toString());
@@ -3214,20 +3197,6 @@ function dashboardPage() {
       if (ordersStatusSelect) {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
-          loadOrders();
-        });
-      }
-
-      if (ordersFromInput) {
-        ordersFromInput.addEventListener('change', () => {
-          ordersState.filters.from = ordersFromInput.value;
-          loadOrders();
-        });
-      }
-
-      if (ordersToInput) {
-        ordersToInput.addEventListener('change', () => {
-          ordersState.filters.to = ordersToInput.value;
           loadOrders();
         });
       }
