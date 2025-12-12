@@ -1,3 +1,6 @@
+const { getLatestOrders, searchOrders, getTodayOrdersCount } = require('../services/ordersIndexService');
+const { backfillAllStores, incrementalSyncAllStores } = require('../jobs/ordersSync');
+
 // routes/api.js
 const express = require('express');
 const fetch = require('node-fetch');
@@ -383,40 +386,31 @@ router.get('/stores', async (req, res) => {
 router.get('/orders', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
-    const statusFilter = (req.query.status || 'any').toLowerCase();
-    const searchQuery = (req.query.q || '').trim();
-    const pageInfo = req.query.page_info || null;
-
-    // Force last 100, always.
+    const q = (req.query.q || '').trim();
     const limit = 100;
 
-    const result = await fetchOrders({
-      store_id: storeIdFilter,
-      status: statusFilter,
-      q: searchQuery,
-      page_info: pageInfo,
-      limit, // ignored by service (always 100), but kept for clarity
-    });
+    const orders = q
+      ? await searchOrders({ store_id: storeIdFilter, q, limit })
+      : await getLatestOrders({ store_id: storeIdFilter, limit });
+
+    const totalTodayOrders = await getTodayOrdersCount({ store_id: storeIdFilter });
 
     res.json({
-      orders: result.orders,
-      count: result.orders.length,
+      orders,
+      count: orders.length,
       page: 1,
-      limit: 100,
-      total: result.total,
-      hasNext: result.hasNext,
-      hasPrev: result.hasPrev,
-      nextPageInfo: result.nextPageInfo,
-      prevPageInfo: result.prevPageInfo,
-      totalTodayOrders: result.totalTodayOrders || 0,
-      source: 'SHOPIFY_LIVE',
+      limit,
+      total: orders.length,
+      hasNext: false,
+      hasPrev: false,
+      nextPageInfo: null,
+      prevPageInfo: null,
+      totalTodayOrders,
+      source: 'POSTGRES_INDEX',
     });
   } catch (err) {
     console.error('/orders error', err);
-    res.status(500).json({
-      error: 'Failed to load orders',
-      message: err.message || String(err),
-    });
+    res.status(500).json({ error: 'Failed to load orders', message: err.message || String(err) });
   }
 });
 
@@ -928,6 +922,36 @@ router.get('/media', async (req, res) => {
   } catch (err) {
     console.error('Error in /media proxy', err);
     res.status(500).send('Media proxy error');
+  }
+});
+
+function requireTasksSecret(req, res, next) {
+  const secret = process.env.TASKS_SECRET;
+  if (!secret) return res.status(500).json({ error: 'Missing TASKS_SECRET env var' });
+
+  const got = req.headers['x-tasks-secret'];
+  if (!got || got !== secret) return res.status(401).json({ error: 'Unauthorized' });
+
+  next();
+}
+
+router.post('/tasks/orders/backfill', requireTasksSecret, async (req, res) => {
+  try {
+    const summary = await backfillAllStores();
+    res.json({ ok: true, summary });
+  } catch (err) {
+    console.error('backfill error', err);
+    res.status(500).json({ ok: false, error: err.message || String(err) });
+  }
+});
+
+router.post('/tasks/orders/sync', requireTasksSecret, async (req, res) => {
+  try {
+    const summary = await incrementalSyncAllStores();
+    res.json({ ok: true, summary });
+  } catch (err) {
+    console.error('incremental sync error', err);
+    res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
 

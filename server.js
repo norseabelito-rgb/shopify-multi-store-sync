@@ -6,6 +6,7 @@ const apiRouter = require('./routes/api');
 const dashboardRouter = require('./routes/dashboard');
 const marketingRouter = require('./routes/marketing');
 const shopifyRouter = require('./routes/shopify');
+const { initDb } = require('./lib/db');
 // logsTestRouter removed - no longer needed
 
 const app = express();
