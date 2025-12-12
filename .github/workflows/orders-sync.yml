@@ -2,7 +2,7 @@ name: Orders incremental sync
 
 on:
   schedule:
-    - cron: "*/5 * * * *" # every 5 minutes (UTC)
+    - cron: "*/10 * * * *" # every 5 minutes (UTC)
   workflow_dispatch: {}
 
 jobs:
