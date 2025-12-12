@@ -2,7 +2,7 @@ name: Orders incremental sync
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # every 10 minutes (UTC)
+    - cron: "*/30 * * * *" # every 10 minutes (UTC)
   workflow_dispatch: {}
 
 # Prevent concurrent runs - only one sync at a time
