@@ -28,16 +28,25 @@ function normalizeStoreOrderList(rawOrders, store) {
 }
 
 function buildShopifyOrderNameSearchQuery(qRaw) {
-  const q = String(qRaw || '').trim();
+  let q = String(qRaw || '').trim();
   if (!q) return null;
 
-  // user may type "#30000" or "30000"
-  const normalized = q.startsWith('#') ? q : `#${q}`;
+  // strip wrapping quotes
+  q = q.replace(/^"+|"+$/g, '').trim();
 
-  // Shopify Admin search query syntax (GraphQL orders query)
-  // We'll search by name. This is the safest for "#1234" style order names.
-  // Example: name:#30000
-  return `name:${normalized}`;
+  // If looks like an order number, search both "#1234" and "1234"
+  const base = q.startsWith('#') ? q.slice(1) : q;
+
+  // numeric-ish -> order number search
+  if (/^\d+$/.test(base)) {
+    // Parentheses + OR are supported; values don't need field prefixes.
+    // We'll use phrase terms to be safe with special chars.
+    return `("${'#' + base}" OR "${base}")`;
+  }
+
+  // otherwise: default full-text search across indexed fields
+  // (customer name/email, order fields, etc., depending on Shopify indexing)
+  return `"${q}"`;
 }
 
 function gidToNumericId(gid) {
@@ -164,11 +173,11 @@ async function searchOrdersInStoreByName(store, searchQuery, filters = {}) {
   let fullQuery = gqlQueryString;
   if (from) {
     const fromIso = parseDateParam(from, false);
-    if (fromIso) fullQuery += ` created_at:>=${fromIso.substring(0, 10)}`;
+    if (fromIso) fullQuery += ` created_at:>="${fromIso.substring(0, 10)}"`;
   }
   if (to) {
     const toIso = parseDateParam(to, true);
-    if (toIso) fullQuery += ` created_at:<=${toIso.substring(0, 10)}`;
+    if (toIso) fullQuery += ` created_at:<="${toIso.substring(0, 10)}"`;
   }
 
   const gql = `
