@@ -1067,4 +1067,214 @@ router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
   }
 });
 
+// ==================== DAILY REPORTS ENDPOINTS ====================
+
+const peopleService = require('../services/peopleService');
+const dailyReportsIndexService = require('../services/dailyReportsIndexService');
+const dailyReportsDetailService = require('../services/dailyReportsDetailService');
+
+// GET /reports/people - Get all people
+router.get('/reports/people', async (req, res) => {
+  try {
+    const activeOnly = req.query.active === 'true';
+    const searchQuery = req.query.q;
+
+    const people = searchQuery
+      ? await peopleService.searchPeople(searchQuery, activeOnly)
+      : await peopleService.getAllPeople({ activeOnly });
+
+    console.log(`[reports/people] Returned ${people.length} people`);
+    res.json({ people });
+  } catch (err) {
+    console.error('[reports/people] error', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// POST /reports/people - Create new person
+router.post('/reports/people', async (req, res) => {
+  try {
+    const { first_name, last_name, email, phone, role } = req.body;
+
+    if (!first_name || !last_name || !email) {
+      return res.status(400).json({ error: 'first_name, last_name, and email are required' });
+    }
+
+    const person = await peopleService.createPerson({ first_name, last_name, email, phone, role });
+
+    console.log(`[reports/people] Created person: ${person.email}`);
+    res.status(201).json({ person });
+  } catch (err) {
+    console.error('[reports/people] create error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// PUT /reports/people/:id - Update person
+router.put('/reports/people/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const person = await peopleService.updatePerson(id, updates);
+
+    console.log(`[reports/people] Updated person: ${id}`);
+    res.json({ person });
+  } catch (err) {
+    console.error('[reports/people] update error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// DELETE /reports/people/:id - Deactivate person
+router.delete('/reports/people/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const person = await peopleService.deactivatePerson(id);
+
+    console.log(`[reports/people] Deactivated person: ${id}`);
+    res.json({ person });
+  } catch (err) {
+    console.error('[reports/people] delete error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// GET /reports/daily - Get all reports for a specific date
+router.get('/reports/daily', async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ error: 'date parameter (YYYY-MM-DD) is required' });
+    }
+
+    // Get all active people
+    const allPeople = await peopleService.getAllPeople({ activeOnly: true });
+
+    // Get reports for this date (includes person info from join)
+    const reports = await dailyReportsIndexService.getReportsByDate(date);
+
+    // Get people who submitted
+    const submittedPersonIds = new Set(reports.map(r => r.person_id));
+
+    // Find missing people
+    const missingPeople = allPeople.filter(p => !submittedPersonIds.has(p.id));
+
+    const result = {
+      date,
+      people: allPeople,
+      reports,
+      submitted_count: reports.length,
+      missing_people: missingPeople,
+      active_people_count: allPeople.length,
+    };
+
+    console.log(`[reports/daily] ${date}: ${reports.length}/${allPeople.length} submitted`);
+    res.json(result);
+  } catch (err) {
+    console.error('[reports/daily] error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// GET /reports/daily/mine - Get specific person's report for a date
+router.get('/reports/daily/mine', async (req, res) => {
+  try {
+    const { person_id, date } = req.query;
+
+    if (!person_id || !date) {
+      return res.status(400).json({ error: 'person_id and date are required' });
+    }
+
+    // Get report detail
+    const reportDetail = await dailyReportsDetailService.getReportDetailByPersonAndDate(person_id, date);
+
+    if (!reportDetail) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    // Get person info
+    const person = await peopleService.getPersonById(person_id);
+
+    console.log(`[reports/daily/mine] ${person?.email} - ${date}`);
+    res.json({
+      person,
+      report: reportDetail.raw_json,
+      submitted_at: reportDetail.submitted_at,
+      updated_at: reportDetail.updated_at,
+    });
+  } catch (err) {
+    console.error('[reports/daily/mine] error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// POST /reports/daily - Submit/update daily report
+router.post('/reports/daily', async (req, res) => {
+  try {
+    const { person_id, date, report } = req.body;
+
+    if (!person_id || !date || !report) {
+      return res.status(400).json({ error: 'person_id, date, and report are required' });
+    }
+
+    // Verify person exists
+    const person = await peopleService.getPersonById(person_id);
+    if (!person) {
+      return res.status(404).json({ error: 'Person not found' });
+    }
+
+    // Check if report already exists
+    const existingIndex = await dailyReportsIndexService.getReportIndex(person_id, date);
+
+    // Upsert index entry
+    const indexEntry = await dailyReportsIndexService.upsertReportIndex(
+      person_id,
+      date,
+      report,
+      existingIndex?.report_id
+    );
+
+    // Upsert detail entry
+    const detailEntry = await dailyReportsDetailService.upsertReportDetail(
+      indexEntry.report_id,
+      person_id,
+      date,
+      report
+    );
+
+    console.log(`[reports/daily] ${person.email} submitted report for ${date}`);
+    res.json({
+      success: true,
+      report_id: indexEntry.report_id,
+      submitted_at: indexEntry.submitted_at,
+      updated_at: indexEntry.updated_at,
+    });
+  } catch (err) {
+    console.error('[reports/daily] submit error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
+// GET /reports/calendar - Get calendar stats for a month
+router.get('/reports/calendar', async (req, res) => {
+  try {
+    const { month } = req.query;
+
+    if (!month) {
+      return res.status(400).json({ error: 'month parameter (YYYY-MM) is required' });
+    }
+
+    const stats = await dailyReportsIndexService.getMonthlyCalendarStats(month);
+
+    console.log(`[reports/calendar] ${month}: ${stats.length} days`);
+    res.json({ month, stats });
+  } catch (err) {
+    console.error('[reports/calendar] error', err);
+    res.status(400).json({ error: err.message || String(err) });
+  }
+});
+
 module.exports = router;

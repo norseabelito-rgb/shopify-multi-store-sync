@@ -1093,6 +1093,322 @@ function dashboardPage() {
       padding: 0 6px;
       color: var(--muted);
     }
+
+    /* DAILY REPORTS */
+
+    .reports-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .reports-month-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      justify-content: center;
+    }
+
+    #reports-current-month {
+      font-size: 14px;
+      font-weight: 600;
+      min-width: 150px;
+      text-align: center;
+    }
+
+    .reports-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: var(--panel-soft);
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+    }
+
+    .reports-calendar-cell {
+      aspect-ratio: 1;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .reports-calendar-cell:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .reports-calendar-cell.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .reports-calendar-cell.today {
+      border-color: var(--success);
+    }
+
+    .reports-calendar-cell.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .reports-calendar-day {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .reports-calendar-count {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .reports-main-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 16px;
+    }
+
+    .reports-people-panel,
+    .reports-editor-panel {
+      background: var(--panel-soft);
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      padding: 16px;
+    }
+
+    .reports-search-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .reports-people-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .reports-person-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .reports-person-item:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .reports-person-item.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .reports-person-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .reports-person-status {
+      font-size: 16px;
+    }
+
+    .reports-editor-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .reports-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .reports-form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .reports-form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .reports-form-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .reports-items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .reports-item-card {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .reports-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .reports-item-remove {
+      background: var(--danger);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #3d7ae5;
+    }
+
+    .btn-secondary {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .reports-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .reports-modal-content {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      width: 90%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .reports-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .reports-modal-header h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .reports-modal-body {
+      padding: 16px;
+    }
+
+    .reports-saved-indicator {
+      font-size: 12px;
+      color: var(--success);
+      margin-top: 8px;
+    }
+
+    .reports-timestamp {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -1146,6 +1462,9 @@ function dashboardPage() {
           </button>
           <button class="nav-item" data-view="customers">
             <span>Customers</span>
+          </button>
+          <button class="nav-item" data-view="daily-reports">
+            <span>Daily Reports</span>
           </button>
           <button class="nav-item" data-view="shipping">
             <span>Shipping</span>
@@ -1513,6 +1832,56 @@ function dashboardPage() {
           </section>
         </section>
 
+        <section id="view-daily-reports" class="view">
+          <div class="reports-header">
+            <div class="top-title-block">
+              <h2 class="page-title">Daily Reports</h2>
+              <p class="page-subtitle">Team daily reporting & calendar visualization</p>
+            </div>
+            <button id="reports-manage-people-btn" class="btn-primary">Manage People</button>
+          </div>
+
+          <div class="reports-month-selector">
+            <button id="reports-prev-month" class="btn-icon">&larr;</button>
+            <span id="reports-current-month">Loading...</span>
+            <button id="reports-next-month" class="btn-icon">&rarr;</button>
+          </div>
+
+          <div id="reports-calendar-grid" class="reports-calendar-grid"></div>
+
+          <div class="reports-main-layout">
+            <div class="reports-people-panel">
+              <div class="panel-header">
+                <div class="panel-title">People</div>
+                <input
+                  id="reports-people-search"
+                  type="search"
+                  placeholder="Search people..."
+                  class="reports-search-input"
+                />
+              </div>
+              <div id="reports-people-list" class="reports-people-list"></div>
+            </div>
+
+            <div class="reports-editor-panel">
+              <div id="reports-editor-content"></div>
+            </div>
+          </div>
+
+          <div id="reports-people-modal" class="reports-modal" style="display:none;">
+            <div class="reports-modal-content">
+              <div class="reports-modal-header">
+                <h3>Manage People</h3>
+                <button id="reports-modal-close" class="btn-icon">&times;</button>
+              </div>
+              <div class="reports-modal-body">
+                <button id="reports-add-person-btn" class="btn-primary">Add New Person</button>
+                <div id="reports-people-management-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="view-shipping" class="view">
           <section class="panel">
             <div class="panel-header">
@@ -1663,6 +2032,17 @@ function dashboardPage() {
         order: null,
         product: null,
         customer: null,
+      };
+
+      // Daily Reports State
+      const reportsState = {
+        currentMonth: new Date(),
+        selectedDate: null,
+        selectedPerson: null,
+        people: [],
+        calendarStats: [],
+        currentReport: null,
+        loading: false,
       };
 
       function formatNumber(n) {
@@ -1832,6 +2212,9 @@ function dashboardPage() {
         }
         if (view === 'customers' && customersDirty) {
           loadCustomers();
+        }
+        if (view === 'daily-reports') {
+          initDailyReports();
         }
 
         params.set('view', view);
@@ -3550,6 +3933,366 @@ function dashboardPage() {
         closeAllPanels();
         loadStores(previousStoreId);
       });
+
+      // ==================== DAILY REPORTS FUNCTIONS ====================
+
+      function initDailyReports() {
+        loadReportsPeople();
+        loadReportsCalendar();
+        setupReportsEventListeners();
+      }
+
+      function setupReportsEventListeners() {
+        const prevMonthBtn = document.getElementById('reports-prev-month');
+        const nextMonthBtn = document.getElementById('reports-next-month');
+        const managePeopleBtn = document.getElementById('reports-manage-people-btn');
+        const modalCloseBtn = document.getElementById('reports-modal-close');
+        const peopleSearchInput = document.getElementById('reports-people-search');
+
+        if (prevMonthBtn) {
+          prevMonthBtn.onclick = () => {
+            reportsState.currentMonth.setMonth(reportsState.currentMonth.getMonth() - 1);
+            loadReportsCalendar();
+          };
+        }
+
+        if (nextMonthBtn) {
+          nextMonthBtn.onclick = () => {
+            reportsState.currentMonth.setMonth(reportsState.currentMonth.getMonth() + 1);
+            loadReportsCalendar();
+          };
+        }
+
+        if (managePeopleBtn) {
+          managePeopleBtn.onclick = () => {
+            document.getElementById('reports-people-modal').style.display = 'flex';
+            loadPeopleManagementList();
+          };
+        }
+
+        if (modalCloseBtn) {
+          modalCloseBtn.onclick = () => {
+            document.getElementById('reports-people-modal').style.display = 'none';
+          };
+        }
+
+        if (peopleSearchInput) {
+          peopleSearchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = reportsState.people.filter(p =>
+              (p.first_name + ' ' + p.last_name).toLowerCase().includes(query) ||
+              p.email.toLowerCase().includes(query)
+            );
+            renderReportsPeopleList(filtered);
+          });
+        }
+      }
+
+      async function loadReportsPeople() {
+        try {
+          const res = await fetch('/api/reports/people?active=true');
+          const data = await res.json();
+          reportsState.people = data.people || [];
+        } catch (err) {
+          console.error('[reports] Failed to load people:', err);
+          reportsState.people = [];
+        }
+      }
+
+      async function loadReportsCalendar() {
+        const monthStr = reportsState.currentMonth.toISOString().slice(0, 7);
+        document.getElementById('reports-current-month').textContent =
+          reportsState.currentMonth.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+
+        try {
+          const res = await fetch('/api/reports/calendar?month=' + monthStr);
+          const data = await res.json();
+          reportsState.calendarStats = data.stats || [];
+          renderReportsCalendar();
+        } catch (err) {
+          console.error('[reports] Failed to load calendar:', err);
+        }
+      }
+
+      function renderReportsCalendar() {
+        const grid = document.getElementById('reports-calendar-grid');
+        if (!grid) return;
+
+        grid.innerHTML = '';
+        const year = reportsState.currentMonth.getFullYear();
+        const month = reportsState.currentMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+
+        const statsMap = {};
+        reportsState.calendarStats.forEach(s => {
+          statsMap[s.date] = s;
+        });
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(year, month, day);
+          const dateStr = date.toISOString().split('T')[0];
+          const stat = statsMap[dateStr] || { submitted_count: 0, active_people_count: 0 };
+          const isToday = dateStr === todayStr;
+          const isSelected = reportsState.selectedDate === dateStr;
+
+          const cell = document.createElement('div');
+          cell.className = 'reports-calendar-cell';
+          if (isToday) cell.classList.add('today');
+          if (isSelected) cell.classList.add('selected');
+
+          cell.innerHTML =
+            '<div class="reports-calendar-day">' + day + '</div>' +
+            '<div class="reports-calendar-count">' +
+              stat.submitted_count + '/' + stat.active_people_count +
+            '</div>';
+
+          cell.onclick = () => selectReportsDate(dateStr);
+          grid.appendChild(cell);
+        }
+      }
+
+      async function selectReportsDate(dateStr) {
+        reportsState.selectedDate = dateStr;
+        reportsState.selectedPerson = null;
+        renderReportsCalendar();
+
+        try {
+          const res = await fetch('/api/reports/daily?date=' + dateStr);
+          const data = await res.json();
+
+          const peopleWithStatus = reportsState.people.map(p => ({
+            ...p,
+            hasReport: data.reports.some(r => r.person_id === p.id)
+          }));
+
+          renderReportsPeopleList(peopleWithStatus);
+          document.getElementById('reports-editor-content').innerHTML =
+            '<p style="color: var(--muted);">Select a person to view/edit their report</p>';
+        } catch (err) {
+          console.error('[reports] Failed to load reports for date:', err);
+        }
+      }
+
+      function renderReportsPeopleList(people) {
+        const list = document.getElementById('reports-people-list');
+        if (!list) return;
+
+        if (!people || people.length === 0) {
+          list.innerHTML = '<p style="color: var(--muted);">No people found</p>';
+          return;
+        }
+
+        list.innerHTML = people.map(p => {
+          const status = p.hasReport ? '✅' : '❌';
+          const selected = reportsState.selectedPerson?.id === p.id ? 'selected' : '';
+          return (
+            '<div class="reports-person-item ' + selected + '" data-person-id="' + p.id + '">' +
+              '<span class="reports-person-name">' +
+                escapeHtml(p.first_name + ' ' + p.last_name) +
+              '</span>' +
+              '<span class="reports-person-status">' + status + '</span>' +
+            '</div>'
+          );
+        }).join('');
+
+        list.querySelectorAll('.reports-person-item').forEach(item => {
+          item.onclick = () => {
+            const personId = item.getAttribute('data-person-id');
+            const person = people.find(p => p.id === personId);
+            if (person) selectPerson(person);
+          };
+        });
+      }
+
+      async function selectPerson(person) {
+        reportsState.selectedPerson = person;
+        renderReportsPeopleList(reportsState.people.map(p => ({
+          ...p,
+          hasReport: true
+        })));
+
+        if (!reportsState.selectedDate) {
+          document.getElementById('reports-editor-content').innerHTML =
+            '<p style="color: var(--muted);">Please select a date first</p>';
+          return;
+        }
+
+        try {
+          const res = await fetch(
+            '/api/reports/daily/mine?person_id=' + person.id + '&date=' + reportsState.selectedDate
+          );
+          const data = await res.json();
+          reportsState.currentReport = data.report;
+          renderReportEditor(person, data.report);
+        } catch (err) {
+          console.error('[reports] Failed to load report:', err);
+          renderReportEditor(person, null);
+        }
+      }
+
+      function renderReportEditor(person, report) {
+        const editor = document.getElementById('reports-editor-content');
+        if (!editor) return;
+
+        const summary = report?.raw_json?.summary || '';
+        const blockers = report?.raw_json?.blockers || '';
+        const items = report?.raw_json?.items || [];
+
+        editor.innerHTML =
+          '<div class="reports-editor-form">' +
+            '<h3>' + escapeHtml(person.first_name + ' ' + person.last_name) + '</h3>' +
+            '<p style="color: var(--muted); font-size: 12px;">Date: ' +
+              reportsState.selectedDate +
+            '</p>' +
+
+            '<div class="reports-form-group">' +
+              '<label class="reports-form-label">Summary *</label>' +
+              '<textarea id="report-summary" class="reports-form-textarea" placeholder="What did you work on today?">' +
+                escapeHtml(summary) +
+              '</textarea>' +
+            '</div>' +
+
+            '<div class="reports-form-group">' +
+              '<label class="reports-form-label">Blockers / Needs</label>' +
+              '<textarea id="report-blockers" class="reports-form-textarea" placeholder="Any blockers or help needed?">' +
+                escapeHtml(blockers) +
+              '</textarea>' +
+            '</div>' +
+
+            '<div class="reports-form-group">' +
+              '<label class="reports-form-label">Items</label>' +
+              '<div id="report-items-list" class="reports-items-list"></div>' +
+              '<button id="report-add-item-btn" class="btn-secondary">Add Item</button>' +
+            '</div>' +
+
+            '<button id="report-submit-btn" class="btn-primary">Save Report</button>' +
+            '<div id="report-saved-indicator" class="reports-saved-indicator" style="display:none;">Saved!</div>' +
+            (report ? '<div class="reports-timestamp">Last updated: ' +
+              formatDateTime(report.updated_at) + '</div>' : '') +
+          '</div>';
+
+        renderReportItems(items);
+
+        document.getElementById('report-add-item-btn').onclick = () => {
+          items.push({ title: '', description: '', status: 'in-progress', links: [] });
+          renderReportItems(items);
+        };
+
+        document.getElementById('report-submit-btn').onclick = () => submitReport(person);
+      }
+
+      function renderReportItems(items) {
+        const container = document.getElementById('report-items-list');
+        if (!container) return;
+
+        container.innerHTML = items.map((item, idx) =>
+          '<div class="reports-item-card" data-item-index="' + idx + '">' +
+            '<div class="reports-item-header">' +
+              '<label class="reports-form-label">Item ' + (idx + 1) + '</label>' +
+              '<button class="reports-item-remove" data-item-index="' + idx + '">Remove</button>' +
+            '</div>' +
+            '<input type="text" class="reports-form-input item-title" placeholder="Title *" value="' +
+              escapeHtml(item.title) + '" />' +
+            '<textarea class="reports-form-textarea item-description" placeholder="Description">' +
+              escapeHtml(item.description || '') +
+            '</textarea>' +
+            '<select class="reports-form-input item-status">' +
+              '<option value="in-progress" ' + (item.status === 'in-progress' ? 'selected' : '') + '>In Progress</option>' +
+              '<option value="done" ' + (item.status === 'done' ? 'selected' : '') + '>Done</option>' +
+              '<option value="blocked" ' + (item.status === 'blocked' ? 'selected' : '') + '>Blocked</option>' +
+            '</select>' +
+          '</div>'
+        ).join('');
+
+        container.querySelectorAll('.reports-item-remove').forEach(btn => {
+          btn.onclick = () => {
+            const idx = parseInt(btn.getAttribute('data-item-index'));
+            items.splice(idx, 1);
+            renderReportItems(items);
+          };
+        });
+      }
+
+      async function submitReport(person) {
+        const summary = document.getElementById('report-summary').value;
+        const blockers = document.getElementById('report-blockers').value;
+
+        const items = [];
+        document.querySelectorAll('.reports-item-card').forEach(card => {
+          const title = card.querySelector('.item-title').value;
+          const description = card.querySelector('.item-description').value;
+          const status = card.querySelector('.item-status').value;
+          if (title) {
+            items.push({ title, description, status, links: [] });
+          }
+        });
+
+        if (!summary) {
+          alert('Summary is required');
+          return;
+        }
+
+        const payload = {
+          person_id: person.id,
+          date: reportsState.selectedDate,
+          report: { summary, blockers, items }
+        };
+
+        try {
+          const res = await fetch('/api/reports/daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) throw new Error('Failed to save report');
+
+          const indicator = document.getElementById('report-saved-indicator');
+          if (indicator) {
+            indicator.style.display = 'block';
+            setTimeout(() => indicator.style.display = 'none', 2000);
+          }
+
+          loadReportsCalendar();
+        } catch (err) {
+          console.error('[reports] Failed to submit report:', err);
+          alert('Failed to save report. Please try again.');
+        }
+      }
+
+      async function loadPeopleManagementList() {
+        const container = document.getElementById('reports-people-management-list');
+        if (!container) return;
+
+        try {
+          const res = await fetch('/api/reports/people');
+          const data = await res.json();
+          const allPeople = data.people || [];
+
+          container.innerHTML = allPeople.map(p =>
+            '<div class="reports-person-item">' +
+              '<div>' +
+                '<div class="reports-person-name">' +
+                  escapeHtml(p.first_name + ' ' + p.last_name) +
+                '</div>' +
+                '<div style="font-size: 11px; color: var(--muted);">' +
+                  escapeHtml(p.email) +
+                '</div>' +
+              '</div>' +
+              '<span style="font-size: 11px; color: ' +
+                (p.active ? 'var(--success)' : 'var(--danger)') + ';">' +
+                (p.active ? 'Active' : 'Inactive') +
+              '</span>' +
+            '</div>'
+          ).join('');
+        } catch (err) {
+          console.error('[reports] Failed to load people management:', err);
+        }
+      }
+
+      // ==================== END DAILY REPORTS ====================
 
       // init
       setView(currentView);
