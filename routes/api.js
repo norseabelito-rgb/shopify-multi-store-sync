@@ -1,4 +1,5 @@
 const { getLatestOrders, searchOrders, getTodayOrdersCount } = require('../services/ordersIndexService');
+const { getOrderDetail } = require('../services/ordersDetailService');
 const { backfillAllStores, incrementalSyncAllStores } = require('../jobs/ordersSync');
 const { runDeploymentVerification } = require('../services/deploymentVerification');
 
@@ -415,39 +416,55 @@ router.get('/orders', async (req, res) => {
   }
 });
 
-// /orders/:store_id/:order_id – detalii complete
+// /orders/:store_id/:order_id – detalii complete din DB (orders_detail)
 router.get('/orders/:store_id/:order_id', async (req, res) => {
   const { store_id: storeId, order_id: orderId } = req.params;
 
+  // Defensive guards
+  if (!storeId || !orderId) {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Both store_id and order_id are required'
+    });
+  }
+
+  if (orderId === 'undefined' || orderId === 'null') {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Invalid order_id: ' + orderId
+    });
+  }
+
   try {
+    // Get store info for context
     const stores = await loadStoresRows();
     const store = stores.find((s) => String(s.store_id) === String(storeId));
     if (!store) {
       return res.status(404).json({ error: 'Store not found' });
     }
 
-    const domain = String(store.shopify_domain || '').trim();
-    if (!domain) {
-      return res
-        .status(400)
-        .json({ error: 'Missing shopify_domain for store ' + storeId });
+    // Fetch order detail from database (orders_detail table)
+    const orderDetail = await getOrderDetail(storeId, orderId);
+
+    if (!orderDetail) {
+      return res.status(404).json({
+        error: 'Order not found',
+        message: `Order ${orderId} not found in database for store ${storeId}`
+      });
     }
 
-    const accessToken = getShopifyAccessTokenForStore(storeId);
-    const data = await fetchOrderDetail(domain, accessToken, orderId);
-    const detail = data.order;
+    // Add store context to the order
+    const enrichedOrder = {
+      ...orderDetail,
+      store_id: storeId,
+      store_name: store.store_name || storeId,
+      shopify_domain: store.shopify_domain || '',
+    };
 
-    if (!detail) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    const normalized = normalizeOrderDetail(detail, { ...store, shopify_domain: domain });
-    res.json({ order: normalized });
+    res.json({ order: enrichedOrder });
   } catch (err) {
     console.error('/orders detail error', { storeId, orderId, err });
-    const status =
-      err && err.message && String(err.message).includes('404') ? 404 : 500;
-    res.status(status).json({
+    res.status(500).json({
       error: 'Failed to load order details',
       message: err.message || String(err),
     });

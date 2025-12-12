@@ -2068,17 +2068,23 @@ function dashboardPage() {
             const fulfillment = order.fulfillment_status
               ? statusPill(order.fulfillment_status)
               : '';
+            // Use order_id (DB field) instead of id
+            const orderId = order.order_id || order.id;
+            // Display: order_name if available, otherwise #order_id
+            const displayName = order.order_name || ('#' + orderId);
+            const subtitle = order.updated_at ? formatDateTime(order.updated_at) : formatDateTime(order.created_at);
+
             return (
-              '<tr data-id="' +
-              order.id +
+              '<tr data-order-id="' +
+              orderId +
               '" data-store="' +
               escapeHtml(order.store_id) +
               '">' +
                 '<td>' +
                   '<div class="order-id">' +
-                    escapeHtml(order.name || ('#' + order.id)) +
+                    escapeHtml(displayName) +
                   '</div>' +
-                  '<div class="order-sub">#' + escapeHtml(String(order.id)) + '</div>' +
+                  '<div class="order-sub">' + subtitle + '</div>' +
                 '</td>' +
                 '<td>' + formatDateTime(order.created_at) + '</td>' +
                 '<td class="store-name-cell">' +
@@ -2087,8 +2093,8 @@ function dashboardPage() {
                 '<td>' +
                   '<div class="order-customer">' +
                     '<span>' + escapeHtml(order.customer_name || 'Guest') + '</span>' +
-                    (order.customer_email
-                      ? '<span class="order-sub">' + escapeHtml(order.customer_email) + '</span>'
+                    (order.email
+                      ? '<span class="order-sub">' + escapeHtml(order.email) + '</span>'
                       : '') +
                   '</div>' +
                 '</td>' +
@@ -2110,8 +2116,12 @@ function dashboardPage() {
         ordersTableBody.innerHTML = rowsHtml;
         ordersTableBody.querySelectorAll('tr').forEach((tr) => {
           tr.addEventListener('click', () => {
-            const orderId = tr.getAttribute('data-id');
+            const orderId = tr.getAttribute('data-order-id');
             const storeId = tr.getAttribute('data-store');
+            if (!orderId || !storeId) {
+              console.error('Missing orderId or storeId', { orderId, storeId });
+              return;
+            }
             openOrderDrawer(orderId, storeId);
           });
         });
@@ -2879,7 +2889,17 @@ function dashboardPage() {
       }
 
       async function openOrderDrawer(orderId, storeId) {
-        if (!orderId || !storeId) return;
+        // Defensive guards
+        if (!orderId || !storeId) {
+          console.error('openOrderDrawer: Missing orderId or storeId', { orderId, storeId });
+          return;
+        }
+
+        if (orderId === 'undefined' || orderId === 'null') {
+          console.error('openOrderDrawer: Invalid orderId', orderId);
+          return;
+        }
+
         const cacheKey = storeId + '::' + orderId;
         const loadingDetail = {
           id: orderId,
@@ -2911,26 +2931,46 @@ function dashboardPage() {
               '/' +
               encodeURIComponent(orderId)
           );
-          if (!res.ok) throw new Error('HTTP ' + res.status);
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.message || 'HTTP ' + res.status);
+          }
+
           const data = await res.json();
           const detail = data.order;
-          if (!detail) throw new Error('Order missing in response');
-          orderDetailsCache.set(cacheKey, detail);
-          drawerState.order = detail;
+
+          if (!detail) {
+            throw new Error('Order not found in response');
+          }
+
+          // Ensure required fields exist
+          const enrichedDetail = {
+            ...detail,
+            id: detail.id || orderId,
+            name: detail.name || ('#' + orderId),
+            store_id: detail.store_id || storeId,
+            line_items: detail.line_items || [],
+            currency: detail.currency || 'RON',
+            total_price: detail.total_price || 0,
+          };
+
+          orderDetailsCache.set(cacheKey, enrichedDetail);
+          drawerState.order = enrichedDetail;
           renderDrawer();
         } catch (err) {
-          console.error('Error loading order', err);
+          console.error('Error loading order', { orderId, storeId, error: err });
           drawerState.order = {
             id: orderId,
             store_id: storeId,
             name: 'Order #' + orderId,
             _loading: false,
             line_items: [],
-            store_name: '',
+            store_name: storeId,
             shopify_domain: '',
             created_at: '',
             customer: null,
-            currency: '',
+            currency: 'RON',
             total_price: 0,
             error: err.message || String(err),
           };
