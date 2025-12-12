@@ -148,18 +148,51 @@ async function fetchOrders(filters = {}) {
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // Determine how many orders to fetch based on whether there's a search query
-    // If searching, fetch more to search through, then limit to 100
-    const fetchLimit = searchQuery ? 500 : 100;
-
-    const result = await fetchOrdersForStore(store, { from, to, status, limit: fetchLimit });
-
-    let orders = result.orders;
-
-    // Apply search filter if provided
+    // If there's a search query, we need to fetch ALL orders and search through them
+    // Otherwise just fetch the first 100
     if (searchQuery) {
+      console.log('[ordersService] Search query detected, fetching all orders from Shopify...');
+
+      // Fetch all orders using pagination
+      const { fetchAllOrdersPaginated } = require('../lib/shopify');
+      const domain = String(store.shopify_domain || '').trim();
+      const accessToken = getShopifyAccessTokenForStore(store.store_id);
+
+      // Build query with filters
+      const query = {
+        status: status === 'all' ? 'any' : status,
+        limit: 250, // Max per page
+        order: 'created_at desc',
+        fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,billing_address,shipping_address,customer,line_items',
+      };
+
+      if (from) {
+        const fromDate = parseDateParam(from, false);
+        if (fromDate) query.created_at_min = fromDate;
+      }
+      if (to) {
+        const toDate = parseDateParam(to, true);
+        if (toDate) query.created_at_max = toDate;
+      }
+
+      // Fetch all orders
+      const rawOrders = await fetchAllOrdersPaginated(domain, accessToken, query);
+
+      // Normalize them
+      const allOrders = rawOrders.map(order =>
+        normalizeOrderListEntry(order, {
+          store_id: store.store_id,
+          store_name: store.store_name || store.store_id,
+          shopify_domain: domain,
+          currency: store.currency || order.currency || 'RON',
+        })
+      );
+
+      console.log('[ordersService] Fetched', allOrders.length, 'total orders, now filtering by search...');
+
+      // Apply search filter
       const needle = searchQuery.toLowerCase();
-      orders = orders.filter(order => {
+      const filtered = allOrders.filter(order => {
         const haystack = [
           order.name,
           order.customer_name,
@@ -169,17 +202,31 @@ async function fetchOrders(filters = {}) {
         return haystack.includes(needle);
       });
 
-      // Limit search results to 100
-      orders = orders.slice(0, 100);
+      // Return first 100 matches
+      const results = filtered.slice(0, 100);
+      console.log('[ordersService] Search found', filtered.length, 'matches, returning first', results.length);
 
-      console.log('[ordersService] Search filtered to', orders.length, 'orders');
+      return {
+        orders: results,
+        page: 1,
+        limit: results.length,
+        total: filtered.length,
+        hasNext: false,
+        hasPrev: false,
+        nextPageInfo: null,
+        prevPageInfo: null,
+        totalTodayOrders: todayCount,
+      };
     }
 
+    // No search query - just fetch first 100
+    const result = await fetchOrdersForStore(store, { from, to, status, limit: 100 });
+
     return {
-      orders,
+      orders: result.orders,
       page: 1,
-      limit: orders.length,
-      total: orders.length,
+      limit: result.orders.length,
+      total: result.orders.length,
       hasNext: false,
       hasPrev: false,
       nextPageInfo: null,
