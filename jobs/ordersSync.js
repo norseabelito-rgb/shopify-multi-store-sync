@@ -191,37 +191,56 @@ async function incrementalSyncAllStores() {
       storeSummary.db_count_before = dbCountBefore;
 
       // BOOTSTRAP CHECKPOINT FROM DB IF MISSING OR STUCK AT 2024-01-01
-      // This fixes the case where backfill completed but checkpoint wasn't set
-      // CRITICAL: Bootstrap MUST happen before fetching state for use in queries
+      // CRITICAL: Must use Date comparison, not string comparison (Postgres format varies)
       let state = await getSyncState(store.store_id);
       let checkpointBootstrapped = false;
 
-      if (!state?.last_updated_at || state.last_updated_at === BACKFILL_START_ISO) {
-        // Checkpoint missing or stuck - bootstrap from DB if data exists
-        if (dbCountBefore > 0) {
-          const dbMax = await getMaxUpdatedAtFromDB(store.store_id);
-          if (dbMax.max_updated_at) {
-            checkpointBootstrapped = true;
+      // Helper: Check if checkpoint is stuck at or before 2024-01-02
+      const isCheckpointStuck = (checkpoint) => {
+        if (!checkpoint) return true;
+        const checkpointDate = new Date(checkpoint);
+        const cutoffDate = new Date('2024-01-02T00:00:00Z');
+        return checkpointDate <= cutoffDate;
+      };
 
-            // Save bootstrapped checkpoint
-            await upsertSyncState(store.store_id, {
-              last_updated_at: new Date(dbMax.max_updated_at).toISOString(),
-              last_order_id: dbMax.max_order_id,
-              backfill_done: true, // If we have data, backfill must have run
-            });
+      // FAIL-FAST: If DB has data but checkpoint is invalid, ABORT
+      if (dbCountBefore > 0 && isCheckpointStuck(state?.last_updated_at)) {
+        const dbMax = await getMaxUpdatedAtFromDB(store.store_id);
 
-            console.log(
-              `[incremental] ${store.store_id} - BOOTSTRAPPED checkpoint from DB: ` +
-              `${new Date(dbMax.max_updated_at).toISOString()} (order_id: ${dbMax.max_order_id}, DB has ${dbCountBefore} orders)`
-            );
-
-            // RE-FETCH state to get the bootstrapped checkpoint we just saved
-            state = await getSyncState(store.store_id);
-          }
+        if (!dbMax.max_updated_at) {
+          throw new Error(
+            `FATAL: Incremental sync aborted – DB has ${dbCountBefore} orders but no valid updated_at timestamps. ` +
+            `This indicates data corruption. Manual intervention required.`
+          );
         }
+
+        // Bootstrap from DB
+        checkpointBootstrapped = true;
+
+        await upsertSyncState(store.store_id, {
+          last_updated_at: new Date(dbMax.max_updated_at).toISOString(),
+          last_order_id: dbMax.max_order_id,
+          backfill_done: true,
+        });
+
+        console.log(
+          `[incremental] ${store.store_id} - BOOTSTRAPPED checkpoint from DB: ` +
+          `${new Date(dbMax.max_updated_at).toISOString()} (order_id: ${dbMax.max_order_id}, DB has ${dbCountBefore} orders)`
+        );
+
+        // RE-FETCH state to ensure we use the bootstrapped checkpoint
+        state = await getSyncState(store.store_id);
       }
 
-      // Now use the (possibly bootstrapped) checkpoint
+      // FINAL VALIDATION: Ensure checkpoint is now valid
+      if (dbCountBefore > 0 && isCheckpointStuck(state?.last_updated_at)) {
+        throw new Error(
+          `FATAL: Incremental sync aborted – checkpoint is invalid (${state?.last_updated_at || 'NULL'}) ` +
+          `while DB has ${dbCountBefore} orders. This should never happen after bootstrap.`
+        );
+      }
+
+      // Single source of truth: Use checkpoint from freshly read state
       const checkpointDate = state?.last_updated_at
         ? new Date(state.last_updated_at)
         : new Date(BACKFILL_START_ISO);
@@ -229,6 +248,7 @@ async function incrementalSyncAllStores() {
       const updated_at_min = checkpointDate.toISOString();
       storeSummary.checkpoint_before = updated_at_min;
 
+      // Log query parameters BEFORE first Shopify call
       console.log(
         `[incremental] ${store.store_id} - START${checkpointBootstrapped ? ' (BOOTSTRAPPED)' : ''}: ` +
         `DB has ${dbCountBefore} index / ${dbDetailCountBefore} details, ` +
@@ -249,6 +269,16 @@ async function incrementalSyncAllStores() {
           fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,billing_address,shipping_address,customer,line_items',
         };
         if (page_info) query.page_info = page_info;
+
+        // Log Shopify query parameters on FIRST call
+        if (storeSummary.pages === 0) {
+          console.log(
+            `[shopify-query] store=${store.store_id}, ` +
+            `updated_at_min=${query.updated_at_min}, ` +
+            `order=${query.order}, ` +
+            `limit=${query.limit}`
+          );
+        }
 
         // Rate limiting
         if (storeSummary.pages > 0) {

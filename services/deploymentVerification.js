@@ -114,14 +114,21 @@ async function runDeploymentVerification() {
           storeResult.issues.push('sync_state row does not exist');
           results.issues.push(`${store.store_id}: sync_state row missing`);
         } else {
-          // Check if checkpoint stuck at 2024-01-01 while DB has newer data
-          if (syncState.last_updated_at === BACKFILL_START_ISO && dbMax.max_updated_at) {
-            const dbMaxDate = new Date(dbMax.max_updated_at);
-            const checkpointDate = new Date(BACKFILL_START_ISO);
-            if (dbMaxDate > checkpointDate) {
-              storeResult.issues.push('Checkpoint stuck at 2024-01-01 but DB has newer orders');
-              results.issues.push(`${store.store_id}: Checkpoint stuck (will auto-bootstrap on next sync)`);
-            }
+          // CRITICAL: Check if checkpoint is stuck at or before 2024-01-02 while DB has data
+          const isCheckpointStuck = (checkpoint) => {
+            if (!checkpoint) return true;
+            const checkpointDate = new Date(checkpoint);
+            const cutoffDate = new Date('2024-01-02T00:00:00Z');
+            return checkpointDate <= cutoffDate;
+          };
+
+          if (indexCount > 0 && isCheckpointStuck(syncState.last_updated_at)) {
+            storeResult.issues.push(
+              `CRITICAL: Checkpoint stuck at ${syncState.last_updated_at || 'NULL'} but DB has ${indexCount} orders`
+            );
+            results.issues.push(
+              `${store.store_id}: CRITICAL - Invalid checkpoint (will auto-bootstrap on next sync)`
+            );
           }
 
           // Check if checkpoint is significantly behind DB max (>24 hours old)
@@ -138,7 +145,7 @@ async function runDeploymentVerification() {
           // Check if backfill_done false while DB has large count
           if (!syncState.backfill_done && indexCount > 1000) {
             storeResult.issues.push(`backfill_done=false but DB has ${indexCount} orders`);
-            results.issues.push(`${store.store_id}: backfill_done should be true`);
+            results.issues.push(`${store.store_id}: backfill_done should be true (will auto-fix on next sync)`);
           }
 
           // Check if last_order_id null when DB has data
