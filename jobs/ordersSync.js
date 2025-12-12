@@ -185,8 +185,6 @@ async function incrementalSyncAllStores() {
         last_run_error: null,
       });
 
-      const state = await getSyncState(store.store_id);
-
       // Get current DB counts for logging
       const dbCountBefore = await getOrdersCount(store.store_id);
       const dbDetailCountBefore = await getOrderDetailsCount(store.store_id);
@@ -194,7 +192,8 @@ async function incrementalSyncAllStores() {
 
       // BOOTSTRAP CHECKPOINT FROM DB IF MISSING OR STUCK AT 2024-01-01
       // This fixes the case where backfill completed but checkpoint wasn't set
-      let checkpointDate;
+      // CRITICAL: Bootstrap MUST happen before fetching state for use in queries
+      let state = await getSyncState(store.store_id);
       let checkpointBootstrapped = false;
 
       if (!state?.last_updated_at || state.last_updated_at === BACKFILL_START_ISO) {
@@ -202,32 +201,30 @@ async function incrementalSyncAllStores() {
         if (dbCountBefore > 0) {
           const dbMax = await getMaxUpdatedAtFromDB(store.store_id);
           if (dbMax.max_updated_at) {
-            checkpointDate = new Date(dbMax.max_updated_at);
             checkpointBootstrapped = true;
 
             // Save bootstrapped checkpoint
             await upsertSyncState(store.store_id, {
-              last_updated_at: checkpointDate.toISOString(),
+              last_updated_at: new Date(dbMax.max_updated_at).toISOString(),
               last_order_id: dbMax.max_order_id,
               backfill_done: true, // If we have data, backfill must have run
             });
 
             console.log(
               `[incremental] ${store.store_id} - BOOTSTRAPPED checkpoint from DB: ` +
-              `${checkpointDate.toISOString()} (DB has ${dbCountBefore} orders)`
+              `${new Date(dbMax.max_updated_at).toISOString()} (order_id: ${dbMax.max_order_id}, DB has ${dbCountBefore} orders)`
             );
-          } else {
-            // DB has records but no updated_at - fallback to BACKFILL_START_ISO
-            checkpointDate = new Date(BACKFILL_START_ISO);
+
+            // RE-FETCH state to get the bootstrapped checkpoint we just saved
+            state = await getSyncState(store.store_id);
           }
-        } else {
-          // No data in DB - use BACKFILL_START_ISO
-          checkpointDate = new Date(BACKFILL_START_ISO);
         }
-      } else {
-        // Valid checkpoint exists
-        checkpointDate = new Date(state.last_updated_at);
       }
+
+      // Now use the (possibly bootstrapped) checkpoint
+      const checkpointDate = state?.last_updated_at
+        ? new Date(state.last_updated_at)
+        : new Date(BACKFILL_START_ISO);
 
       const updated_at_min = checkpointDate.toISOString();
       storeSummary.checkpoint_before = updated_at_min;
@@ -242,8 +239,6 @@ async function incrementalSyncAllStores() {
       let keepGoing = true;
       let maxUpdatedAt = checkpointDate;
       let maxOrderId = state?.last_order_id || null;
-      let newOrdersThisRun = 0;
-      const seenOrderIds = new Set();
 
       while (keepGoing) {
         const query = {
@@ -263,15 +258,6 @@ async function incrementalSyncAllStores() {
         const batch = await fetchOrdersBatch(store, query);
         storeSummary.pages += 1;
         storeSummary.fetched += batch.orders.length;
-
-        // Track new orders (never seen before in this run)
-        for (const order of batch.orders) {
-          const orderId = String(order.id);
-          if (!seenOrderIds.has(orderId)) {
-            seenOrderIds.add(orderId);
-            newOrdersThisRun += 1;
-          }
-        }
 
         // 1. Store full raw order details (JSONB)
         if (batch.orders.length) {
@@ -323,7 +309,7 @@ async function incrementalSyncAllStores() {
         if (storeSummary.pages % LOG_EVERY_N_PAGES === 0) {
           console.log(
             `[incremental] ${store.store_id} - Page ${storeSummary.pages}: ` +
-            `${storeSummary.fetched} fetched, ${newOrdersThisRun} new in this run`
+            `${storeSummary.fetched} fetched so far`
           );
         }
 
@@ -340,29 +326,32 @@ async function incrementalSyncAllStores() {
       // Final checkpoint update
       const finalCheckpoint = maxUpdatedAt.toISOString();
       storeSummary.checkpoint_after = finalCheckpoint;
-      storeSummary.new_orders = newOrdersThisRun;
 
       // Get final DB counts
       const dbCountAfter = await getOrdersCount(store.store_id);
       const dbDetailCountAfter = await getOrderDetailsCount(store.store_id);
       storeSummary.db_count_after = dbCountAfter;
 
+      // Calculate ACTUAL new orders as DB growth (not fetched count)
+      const actualNewOrders = dbCountAfter - dbCountBefore;
+      storeSummary.new_orders = actualNewOrders;
+
       const endTime = new Date();
       await upsertSyncState(store.store_id, {
         last_updated_at: finalCheckpoint,
         last_order_id: maxOrderId,
         last_run_finished_at: endTime.toISOString(),
-        last_run_new_orders: newOrdersThisRun,
+        last_run_new_orders: actualNewOrders,
       });
 
       console.log(
         `[incremental] ${store.store_id} - COMPLETE: ` +
-        `${storeSummary.fetched} fetched, ${newOrdersThisRun} new orders, ${storeSummary.pages} pages. ` +
+        `${storeSummary.fetched} fetched, ${actualNewOrders} new orders, ${storeSummary.pages} pages. ` +
         `DB: ${dbCountBefore} → ${dbCountAfter} index (${dbDetailCountBefore} → ${dbDetailCountAfter} details). ` +
         `Final checkpoint: ${finalCheckpoint}`
       );
 
-      summary.total_new_orders += newOrdersThisRun;
+      summary.total_new_orders += actualNewOrders;
     } catch (err) {
       storeSummary.error = err.message || String(err);
       console.error(`[incremental] ${store.store_id} - ERROR:`, err.message);

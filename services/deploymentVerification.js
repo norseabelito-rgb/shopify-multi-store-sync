@@ -124,6 +124,17 @@ async function runDeploymentVerification() {
             }
           }
 
+          // Check if checkpoint is significantly behind DB max (>24 hours old)
+          if (syncState.last_updated_at && dbMax.max_updated_at && indexCount > 100) {
+            const checkpointDate = new Date(syncState.last_updated_at);
+            const dbMaxDate = new Date(dbMax.max_updated_at);
+            const hoursDiff = (dbMaxDate - checkpointDate) / (1000 * 60 * 60);
+            if (hoursDiff > 24) {
+              storeResult.issues.push(`Checkpoint is ${Math.round(hoursDiff)} hours behind DB max`);
+              results.issues.push(`${store.store_id}: Checkpoint lag detected (will auto-bootstrap on next sync)`);
+            }
+          }
+
           // Check if backfill_done false while DB has large count
           if (!syncState.backfill_done && indexCount > 1000) {
             storeResult.issues.push(`backfill_done=false but DB has ${indexCount} orders`);
