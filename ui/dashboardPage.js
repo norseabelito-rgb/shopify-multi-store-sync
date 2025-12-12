@@ -2362,136 +2362,342 @@ function dashboardPage() {
       }
 
       function buildOrderContent(detail) {
-        const statusHtml = [
-          detail && detail.financial_status ? statusPill(detail.financial_status) : '',
-          detail && detail.fulfillment_status ? statusPill(detail.fulfillment_status) : '',
-        ]
-          .filter(Boolean)
-          .join(' ');
-        const shippingLine =
-          detail && detail.shipping_lines && detail.shipping_lines[0]
-            ? detail.shipping_lines[0]
-            : null;
-        const shippingText = shippingLine
-          ? (shippingLine.title || 'Shipping') +
-            ' · ' +
-            formatMoney(shippingLine.price, detail.currency)
-          : 'No shipping line';
-        const gateway =
-          detail &&
-          Array.isArray(detail.payment_gateway_names) &&
-          detail.payment_gateway_names.length
-            ? detail.payment_gateway_names.join(', ')
-            : '—';
+        // Handle error/loading states
+        if (detail && detail.error) {
+          return {
+            title: 'Order',
+            subtitle: '',
+            bodyHtml: '<div class="orders-empty-inline">Nu am putut încărca comanda.<br />' +
+              escapeHtml(detail.error) + '</div>',
+            shopifyUrl: null,
+          };
+        }
 
-        const itemsHtml =
-          detail && detail.line_items && detail.line_items.length
-            ? detail.line_items
-                .map((li) => {
-                  const total = li.total || li.price * (li.quantity || 0);
-                  const safeImg = li.image_src
-                    ? String(li.image_src).replace(/"/g, '%22').replace(/'/g, '%27')
-                    : '';
-                  const thumb =
-                    '<div class="line-thumb"' +
+        if (detail && detail._loading) {
+          return {
+            title: 'Loading...',
+            subtitle: '',
+            bodyHtml: '<div class="orders-empty-inline">Se încarcă detaliile comenzii...</div>',
+            shopifyUrl: null,
+          };
+        }
+
+        // Helper: detect shipping from line_items (for Romanian stores)
+        const detectShippingFromLineItems = () => {
+          if (!detail || !detail.line_items || !detail.line_items.length) return [];
+          const shippingKeywords = ['livrare', 'transport', 'curier', 'shipping', 'delivery'];
+          return detail.line_items.filter(li => {
+            const title = String(li.title || '').toLowerCase();
+            return shippingKeywords.some(kw => title.includes(kw));
+          });
+        };
+
+        const shippingFromLineItems = detectShippingFromLineItems();
+
+        // === SECTION 1: OVERVIEW ===
+        const statusHtml = [
+          detail.financial_status ? statusPill(detail.financial_status) : '',
+          detail.fulfillment_status ? statusPill(detail.fulfillment_status) : '',
+        ].filter(Boolean).join(' ');
+
+        const overviewSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Overview</div>' +
+          '<div class="kv-row"><span>Order #</span><strong>' +
+            escapeHtml(detail.name || detail.order_number || detail.id || '—') +
+          '</strong></div>' +
+          '<div class="kv-row"><span>Store</span><strong>' +
+            escapeHtml(detail.store_name || detail.store_id || '—') +
+          '</strong></div>' +
+          '<div class="kv-row"><span>Created</span><strong>' +
+            formatDateTime(detail.created_at) +
+          '</strong></div>' +
+          (detail.updated_at && detail.updated_at !== detail.created_at
+            ? '<div class="kv-row"><span>Updated</span><strong>' +
+              formatDateTime(detail.updated_at) +
+              '</strong></div>'
+            : '') +
+          (detail.processed_at
+            ? '<div class="kv-row"><span>Processed</span><strong>' +
+              formatDateTime(detail.processed_at) +
+              '</strong></div>'
+            : '') +
+          (detail.cancelled_at
+            ? '<div class="kv-row"><span>Cancelled</span><strong>' +
+              formatDateTime(detail.cancelled_at) +
+              (detail.cancel_reason ? ' (' + escapeHtml(detail.cancel_reason) + ')' : '') +
+              '</strong></div>'
+            : '') +
+          '<div class="kv-row"><span>Total</span><strong>' +
+            formatMoney(detail.total_price, detail.currency) +
+          '</strong></div>' +
+          (detail.subtotal_price
+            ? '<div class="kv-row"><span>Subtotal</span><strong>' +
+              formatMoney(detail.subtotal_price, detail.currency) +
+              '</strong></div>'
+            : '') +
+          (detail.total_tax && parseFloat(detail.total_tax) > 0
+            ? '<div class="kv-row"><span>Tax</span><strong>' +
+              formatMoney(detail.total_tax, detail.currency) +
+              '</strong></div>'
+            : '') +
+          (detail.total_discounts && parseFloat(detail.total_discounts) > 0
+            ? '<div class="kv-row"><span>Discounts</span><strong>-' +
+              formatMoney(detail.total_discounts, detail.currency) +
+              '</strong></div>'
+            : '') +
+          (statusHtml
+            ? '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">' +
+              statusHtml +
+              '</div>'
+            : '') +
+          (detail.tags
+            ? '<div class="order-sub" style="margin-top:6px;">Tags: ' +
+              escapeHtml(detail.tags) +
+              '</div>'
+            : '') +
+          (detail.note
+            ? '<div class="order-sub" style="margin-top:6px;">Note: ' +
+              escapeHtml(detail.note) +
+              '</div>'
+            : '') +
+          (detail.source_name
+            ? '<div class="order-sub" style="margin-top:4px;">Source: ' +
+              escapeHtml(detail.source_name) +
+              '</div>'
+            : '') +
+        '</div>';
+
+        // === SECTION 2: CUSTOMER ===
+        const customer = detail.customer;
+        const customerName = customer
+          ? ((customer.first_name || '') + ' ' + (customer.last_name || '')).trim() || customer.email || 'Customer'
+          : (detail.billing_address && detail.billing_address.name) || (detail.shipping_address && detail.shipping_address.name) || 'Guest';
+
+        const customerEmail = customer?.email || detail.email || detail.contact_email || '';
+        const customerPhone = customer?.phone || detail.phone || detail.billing_address?.phone || detail.shipping_address?.phone || '';
+
+        const customerSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Customer</div>' +
+          (customer
+            ? '<button class="link-inline" data-action="view-customer">' +
+              escapeHtml(customerName) +
+              '</button>'
+            : '<div><strong>' + escapeHtml(customerName) + '</strong></div>') +
+          (customerEmail
+            ? '<div class="order-sub">' + escapeHtml(customerEmail) + '</div>'
+            : '') +
+          (customerPhone
+            ? '<div class="order-sub">' + escapeHtml(customerPhone) + '</div>'
+            : '') +
+          (customer?.id
+            ? '<div class="order-sub">Customer ID: ' + escapeHtml(customer.id) + '</div>'
+            : '') +
+          (customer?.tags
+            ? '<div class="order-sub">Tags: ' + escapeHtml(customer.tags) + '</div>'
+            : '') +
+          (customer?.state
+            ? '<div class="order-sub">State: ' + escapeHtml(customer.state) + '</div>'
+            : '') +
+        '</div>';
+
+        // === SECTION 3: ADDRESSES ===
+        const addressesSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Addresses</div>' +
+          (detail.shipping_address
+            ? '<div style="margin-bottom:8px;">' +
+              '<div class="order-sub" style="font-weight:600;margin-bottom:4px;">Shipping Address</div>' +
+              '<div class="order-sub">' + escapeHtml(formatAddress(detail.shipping_address)) + '</div>' +
+              '</div>'
+            : '') +
+          (detail.billing_address
+            ? '<div>' +
+              '<div class="order-sub" style="font-weight:600;margin-bottom:4px;">Billing Address</div>' +
+              '<div class="order-sub">' + escapeHtml(formatAddress(detail.billing_address)) + '</div>' +
+              '</div>'
+            : (!detail.shipping_address
+              ? '<div class="order-sub">No address information</div>'
+              : '')) +
+        '</div>';
+
+        // === SECTION 4: SHIPPING & DELIVERY ===
+        let shippingHtml = '';
+
+        // Try shipping_lines first
+        if (detail.shipping_lines && detail.shipping_lines.length > 0) {
+          shippingHtml = detail.shipping_lines.map(sl => {
+            const price = sl.discounted_price || sl.price || 0;
+            return '<div class="kv-row"><span>' +
+              escapeHtml(sl.title || sl.code || 'Shipping') +
+              '</span><strong>' +
+              formatMoney(price, detail.currency) +
+              '</strong></div>' +
+              (sl.carrier_identifier || sl.code
+                ? '<div class="order-sub" style="margin-left:0;">Code: ' +
+                  escapeHtml(sl.carrier_identifier || sl.code) +
+                  '</div>'
+                : '');
+          }).join('');
+        }
+        // Fallback: detect shipping from line_items
+        else if (shippingFromLineItems.length > 0) {
+          shippingHtml = '<div class="order-sub" style="font-weight:600;margin-bottom:4px;">Shipping (from line items)</div>' +
+            shippingFromLineItems.map(li => {
+              return '<div class="kv-row"><span>' +
+                escapeHtml(li.title || 'Shipping') +
+                '</span><strong>' +
+                formatMoney(li.price, detail.currency) +
+                '</strong></div>';
+            }).join('');
+        } else {
+          shippingHtml = '<div class="order-sub">No shipping information</div>';
+        }
+
+        // Add fulfillment info
+        let fulfillmentHtml = '';
+        if (detail.fulfillments && detail.fulfillments.length > 0) {
+          fulfillmentHtml = '<div style="margin-top:8px;">' +
+            '<div class="order-sub" style="font-weight:600;margin-bottom:4px;">Fulfillments</div>' +
+            detail.fulfillments.map(f => {
+              return '<div class="order-sub">' +
+                'Status: ' + escapeHtml(f.status || '—') +
+                (f.tracking_company ? ' · ' + escapeHtml(f.tracking_company) : '') +
+                (f.tracking_number ? ' · #' + escapeHtml(f.tracking_number) : '') +
+                '</div>' +
+                (f.tracking_url
+                  ? '<div class="order-sub"><a href="' +
+                    escapeHtml(f.tracking_url) +
+                    '" target="_blank" rel="noopener">Track shipment</a></div>'
+                  : '');
+            }).join('') +
+            '</div>';
+        }
+
+        const shippingSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Shipping & Delivery</div>' +
+          shippingHtml +
+          fulfillmentHtml +
+        '</div>';
+
+        // === SECTION 5: PAYMENT ===
+        const gateway = (detail.payment_gateway_names && detail.payment_gateway_names.length)
+          ? detail.payment_gateway_names.join(', ')
+          : (detail.gateway || '—');
+
+        let transactionsHtml = '';
+        if (detail.transactions && detail.transactions.length > 0) {
+          transactionsHtml = '<div style="margin-top:8px;">' +
+            '<div class="order-sub" style="font-weight:600;margin-bottom:4px;">Transactions</div>' +
+            detail.transactions.map(t => {
+              return '<div class="order-sub">' +
+                escapeHtml((t.kind || 'transaction') + ' · ' + (t.status || 'unknown')) +
+                ' · ' + formatMoney(t.amount, detail.currency) +
+                (t.gateway ? ' (' + escapeHtml(t.gateway) + ')' : '') +
+                '</div>';
+            }).join('') +
+            '</div>';
+        }
+
+        let refundsHtml = '';
+        if (detail.refunds && detail.refunds.length > 0) {
+          const totalRefunded = detail.refunds.reduce((sum, r) => {
+            return sum + r.transactions.reduce((tsum, t) => tsum + parseFloat(t.amount || 0), 0);
+          }, 0);
+          refundsHtml = '<div style="margin-top:8px;">' +
+            '<div class="order-sub" style="font-weight:600;">Refunds: -' +
+            formatMoney(totalRefunded, detail.currency) +
+            '</div>' +
+            '</div>';
+        }
+
+        const paymentSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Payment</div>' +
+          '<div class="kv-row"><span>Status</span><strong>' +
+            (detail.financial_status ? statusPill(detail.financial_status) : '—') +
+          '</strong></div>' +
+          '<div class="kv-row"><span>Gateway</span><strong>' +
+            escapeHtml(gateway) +
+          '</strong></div>' +
+          '<div class="kv-row"><span>Total Paid</span><strong>' +
+            formatMoney(detail.total_price, detail.currency) +
+          '</strong></div>' +
+          transactionsHtml +
+          refundsHtml +
+        '</div>';
+
+        // === SECTION 6: ITEMS ===
+        const regularItems = detail.line_items
+          ? detail.line_items.filter(li => !shippingFromLineItems.includes(li))
+          : [];
+
+        const itemsHtml = regularItems.length > 0
+          ? regularItems.map((li) => {
+              const total = li.total || li.price * (li.quantity || 0);
+              const safeImg = li.image_src
+                ? String(li.image_src).replace(/"/g, '%22').replace(/'/g, '%27')
+                : '';
+              const thumb = '<div class="line-thumb"' +
                 (safeImg ? ' style="background-image:url(\\'' + safeImg + '\\');"' : '') +
                 '></div>';
               return (
                 '<div class="line-item">' +
                   '<div class="line-item-left">' +
-                        thumb +
-                        '<div>' +
-                          '<div class="line-item-title">' +
-                            '<button class="link-inline order-product-link" ' +
-                              'data-product-id="' + escapeHtml(li.product_id || '') + '" ' +
-                              'data-product-title="' + escapeHtml(li.title || '') + '" ' +
-                              'data-product-sku="' + escapeHtml(li.sku || '') + '" ' +
-                              'data-product-price="' + (li.price || 0) + '"' +
-                            '>' +
-                              escapeHtml(li.title || 'Product') +
-                            '</button>' +
-                          '</div>' +
+                    thumb +
+                    '<div>' +
+                      '<div class="line-item-title">' +
+                        '<button class="link-inline order-product-link" ' +
+                          'data-product-id="' + escapeHtml(li.product_id || '') + '" ' +
+                          'data-product-title="' + escapeHtml(li.title || '') + '" ' +
+                          'data-product-sku="' + escapeHtml(li.sku || '') + '" ' +
+                          'data-product-price="' + (li.price || 0) + '"' +
+                        '>' +
+                          escapeHtml(li.title || 'Product') +
+                        '</button>' +
+                      '</div>' +
                       (li.sku ? '<div class="order-sub">SKU: ' + escapeHtml(li.sku) + '</div>' : '') +
+                      (li.vendor ? '<div class="order-sub">Vendor: ' + escapeHtml(li.vendor) + '</div>' : '') +
+                      (li.variant_title ? '<div class="order-sub">' + escapeHtml(li.variant_title) + '</div>' : '') +
                     '</div>' +
                   '</div>' +
                   '<div class="line-item-right">' +
-                    '<div class="pill">' + (li.quantity || 0) + ' pcs</div>' +
+                    '<div class="pill">' + (li.quantity || 0) + ' × ' + formatMoney(li.price, detail.currency) + '</div>' +
                     '<div class="order-sub">' + formatMoney(total, detail.currency) + '</div>' +
                   '</div>' +
                 '</div>'
               );
-                })
-                .join('')
-            : '<div class="order-sub">No items.</div>';
+            }).join('')
+          : '<div class="order-sub">No items.</div>';
 
-        const customerBlock =
-          detail && detail.customer
-            ? '<div>' +
-                '<button class="link-inline" data-action="view-customer">' +
-                  (escapeHtml(
-                    (detail.customer.first_name || '') + ' ' + (detail.customer.last_name || '')
-                  ).trim() ||
-                    escapeHtml(detail.customer.email || 'Customer')) +
-                '</button>' +
-                (detail.customer.email
-                  ? '<div class="order-sub">' + escapeHtml(detail.customer.email) + '</div>'
-                  : '') +
-                (detail.customer.phone
-                  ? '<div class="order-sub">' + escapeHtml(detail.customer.phone) + '</div>'
-                  : '') +
-              '</div>'
-            : '<div class="order-sub">Guest checkout</div>';
+        const itemsSection = '<div class="drawer-section">' +
+          '<div class="section-heading">Items</div>' +
+          itemsHtml +
+        '</div>';
+
+        // === SECTION 7: RAW JSON (COLLAPSIBLE) ===
+        const rawJsonSection = '<div class="drawer-section">' +
+          '<details style="margin-top:8px;">' +
+            '<summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:12px;margin-bottom:6px;">Raw Order JSON</summary>' +
+            '<pre style="background:rgba(0,0,0,0.3);padding:8px;border-radius:6px;font-size:11px;overflow-x:auto;max-height:300px;overflow-y:auto;">' +
+              escapeHtml(JSON.stringify(detail, null, 2)) +
+            '</pre>' +
+          '</details>' +
+        '</div>';
+
+        // === ASSEMBLE ALL SECTIONS ===
+        const bodyHtml = overviewSection +
+          customerSection +
+          addressesSection +
+          shippingSection +
+          paymentSection +
+          itemsSection +
+          rawJsonSection;
 
         const orderUrl = buildShopifyUrl('order', detail);
 
-        const bodyHtml = detail && detail.error
-          ? '<div class="orders-empty-inline">Nu am putut încărca comanda.<br />' +
-            escapeHtml(detail.error) +
-            '</div>'
-          : detail && detail._loading
-          ? '<div class="orders-empty-inline">Se încarcă detaliile comenzii...</div>'
-          : '<div class="drawer-section">' +
-              '<div class="kv-row"><span>Store</span><strong>' +
-                escapeHtml(detail.store_name || detail.store_id || '') +
-              '</strong></div>' +
-              '<div class="kv-row"><span>Placed</span><strong>' +
-                formatDateTime(detail.created_at) +
-              '</strong></div>' +
-              '<div class="kv-row"><span>Total</span><strong>' +
-                formatMoney(detail.total_price, detail.currency) +
-              '</strong></div>' +
-              (statusHtml
-                ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">' +
-                  statusHtml +
-                  '</div>'
-                : '') +
-            '</div>' +
-            '<div class="drawer-section">' +
-              '<div class="section-heading">Customer</div>' +
-              customerBlock +
-              '<div class="order-sub" style="margin-top:6px;">' +
-                escapeHtml(formatAddress(detail.shipping_address || detail.billing_address)) +
-              '</div>' +
-            '</div>' +
-            '<div class="drawer-section">' +
-              '<div class="section-heading">Items</div>' +
-              itemsHtml +
-            '</div>' +
-            '<div class="drawer-section">' +
-              '<div class="section-heading">Shipping & Payment</div>' +
-              '<div class="kv-row"><span>Shipping</span><strong>' +
-                escapeHtml(shippingText) +
-              '</strong></div>' +
-              '<div class="kv-row"><span>Payment</span><strong>' +
-                escapeHtml(gateway) +
-              '</strong></div>' +
-            '</div>';
-
         return {
-          title: detail && detail.name ? detail.name : 'Order',
+          title: detail.name || 'Order #' + (detail.order_number || detail.id),
           subtitle:
-            (detail && (detail.store_name || detail.store_id || '')) +
-            (detail && detail.created_at ? ' · ' + formatDateTime(detail.created_at) : ''),
+            (detail.store_name || detail.store_id || '') +
+            (detail.created_at ? ' · ' + formatDateTime(detail.created_at) : ''),
           bodyHtml,
           shopifyUrl: orderUrl,
         };
