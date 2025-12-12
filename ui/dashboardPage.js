@@ -2157,8 +2157,7 @@ function dashboardPage() {
                 ordersState.sort.by = key;
                 ordersState.sort.dir = 'asc';
               }
-              ordersState.nextPageInfo = null;  // Reset for fresh query
-              loadOrders(false);  // Replace, not append
+              loadOrders();
             });
             th._sortingBound = true;
           }
@@ -3002,16 +3001,11 @@ function dashboardPage() {
         }
       }
 
-      async function loadOrders(append = false) {
-        // Prevent loading if already loading or if appending but no more data
-        if (ordersState.loading || (append && !ordersState.nextPageInfo)) {
-          return;
-        }
+      async function loadOrders() {
+        if (ordersState.loading) return;
 
         ordersState.loading = true;
-        if (!append) {
-          ordersState.error = '';
-        }
+        ordersState.error = '';
         renderOrdersTable();
 
         const qs = new URLSearchParams();
@@ -3022,46 +3016,24 @@ function dashboardPage() {
         if (ordersState.filters.from) qs.set('from', ordersState.filters.from);
         if (ordersState.filters.to) qs.set('to', ordersState.filters.to);
 
-        // Use cursor for infinite scroll
-        if (append && ordersState.nextPageInfo) {
-          qs.set('page_info', ordersState.nextPageInfo);
-        }
-
         try {
           const res = await fetch('/orders?' + qs.toString());
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
 
-          const newOrders = Array.isArray(data.orders) ? data.orders : [];
+          ordersState.items = Array.isArray(data.orders) ? data.orders : [];
+          ordersState.totalTodayOrders = data.totalTodayOrders || 0;
 
-          // Append to existing items or replace
-          if (append) {
-            ordersState.items = [...ordersState.items, ...newOrders];
-            console.log('[orders] Appended', newOrders.length, 'orders, total now:', ordersState.items.length);
-          } else {
-            ordersState.items = newOrders;
-            console.log('[orders] Loaded', newOrders.length, 'orders');
+          // Update today's metric
+          if (statTodayHome) {
+            statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
           }
 
-          // Store cursor for next load
-          ordersState.nextPageInfo = data.nextPageInfo || null;
-          ordersState.hasNext = !!data.nextPageInfo;
-
-          // Store today's count for the metric (only on initial load)
-          if (!append) {
-            ordersState.totalTodayOrders = data.totalTodayOrders || 0;
-            if (statTodayHome) {
-              statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
-            }
-          }
+          console.log('[orders] Loaded', ordersState.items.length, 'orders, today:', ordersState.totalTodayOrders);
         } catch (err) {
           console.error('Error /orders', err);
-          if (!append) {
-            ordersState.items = [];
-            ordersState.error = err.message || String(err);
-          }
-          ordersState.nextPageInfo = null;
-          ordersState.hasNext = false;
+          ordersState.items = [];
+          ordersState.error = err.message || String(err);
         } finally {
           ordersState.loading = false;
           ordersDirty = false;
@@ -3218,8 +3190,7 @@ function dashboardPage() {
           clearTimeout(searchDebounce);
           searchDebounce = setTimeout(() => {
             ordersState.filters.q = ordersSearchInput.value.trim();
-            ordersState.nextPageInfo = null;  // Reset for fresh query
-            loadOrders(false);  // Replace, not append
+            loadOrders();
           }, 260);
         });
       }
@@ -3243,24 +3214,21 @@ function dashboardPage() {
       if (ordersStatusSelect) {
         ordersStatusSelect.addEventListener('change', () => {
           ordersState.filters.status = ordersStatusSelect.value || 'all';
-          ordersState.nextPageInfo = null;  // Reset for fresh query
-          loadOrders(false);  // Replace, not append
+          loadOrders();
         });
       }
 
       if (ordersFromInput) {
         ordersFromInput.addEventListener('change', () => {
           ordersState.filters.from = ordersFromInput.value;
-          ordersState.nextPageInfo = null;  // Reset for fresh query
-          loadOrders(false);  // Replace, not append
+          loadOrders();
         });
       }
 
       if (ordersToInput) {
         ordersToInput.addEventListener('change', () => {
           ordersState.filters.to = ordersToInput.value;
-          ordersState.nextPageInfo = null;  // Reset for fresh query
-          loadOrders(false);  // Replace, not append
+          loadOrders();
         });
       }
 
@@ -3285,28 +3253,10 @@ function dashboardPage() {
         ordersDirty = true;
         customersDirty = true;
         orderDetailsCache.clear();
-        ordersState.nextPageInfo = null;  // Reset for fresh query
         customersState.page = 1;
         closeAllPanels();
         loadStores(previousStoreId);
       });
-
-      // Infinite scroll for orders table
-      if (ordersTableShell) {
-        ordersTableShell.addEventListener('scroll', () => {
-          const scrollTop = ordersTableShell.scrollTop;
-          const scrollHeight = ordersTableShell.scrollHeight;
-          const clientHeight = ordersTableShell.clientHeight;
-
-          // Load more when scrolled to within 200px of bottom
-          if (scrollTop + clientHeight >= scrollHeight - 200) {
-            if (ordersState.hasNext && !ordersState.loading) {
-              console.log('[orders] Scroll triggered load more');
-              loadOrders(true); // append = true
-            }
-          }
-        });
-      }
 
       // init
       setView(currentView);

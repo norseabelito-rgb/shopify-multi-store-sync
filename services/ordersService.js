@@ -141,21 +141,25 @@ async function fetchOrders(filters = {}) {
     };
   }
 
-  // For single store: use Shopify cursor pagination for infinite scroll
+  // For single store: fetch orders based on filters, max 100
   if (targetStores.length === 1) {
     const store = targetStores[0];
 
     // Get today's count for this store
     const todayCount = await getTodayOrdersCount(store);
 
-    // If there's a search query and no page_info, disable pagination and fetch more
-    if (searchQuery && !page_info) {
-      // Fetch a large batch for search
-      const searchLimit = 1000;
-      const result = await fetchOrdersForStore(store, { from, to, status, limit: searchLimit });
+    // Determine how many orders to fetch based on whether there's a search query
+    // If searching, fetch more to search through, then limit to 100
+    const fetchLimit = searchQuery ? 500 : 100;
 
+    const result = await fetchOrdersForStore(store, { from, to, status, limit: fetchLimit });
+
+    let orders = result.orders;
+
+    // Apply search filter if provided
+    if (searchQuery) {
       const needle = searchQuery.toLowerCase();
-      const filtered = result.orders.filter(order => {
+      orders = orders.filter(order => {
         const haystack = [
           order.name,
           order.customer_name,
@@ -165,32 +169,20 @@ async function fetchOrders(filters = {}) {
         return haystack.includes(needle);
       });
 
-      return {
-        orders: filtered,
-        page: 1,
-        limit: filtered.length,
-        total: filtered.length,
-        hasNext: false, // No pagination during search
-        hasPrev: false,
-        nextPageInfo: null,
-        prevPageInfo: null,
-        totalTodayOrders: todayCount,
-      };
+      // Limit search results to 100
+      orders = orders.slice(0, 100);
+
+      console.log('[ordersService] Search filtered to', orders.length, 'orders');
     }
 
-    // Normal infinite scroll (no search)
-    const result = await fetchOrdersForStore(store, { from, to, status, limit, page_info });
-
-    console.log('[ordersService] Fetched', result.orders.length, 'orders, hasNext:', !!result.nextPageInfo, 'cursor:', result.nextPageInfo?.substring(0, 30));
-
     return {
-      orders: result.orders,
+      orders,
       page: 1,
-      limit: parseInt(limit, 10) || 100,
-      total: result.orders.length,
-      hasNext: !!result.nextPageInfo,
+      limit: orders.length,
+      total: orders.length,
+      hasNext: false,
       hasPrev: false,
-      nextPageInfo: result.nextPageInfo,
+      nextPageInfo: null,
       prevPageInfo: null,
       totalTodayOrders: todayCount,
     };
