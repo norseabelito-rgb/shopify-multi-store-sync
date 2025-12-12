@@ -7,6 +7,7 @@ const dashboardRouter = require('./routes/dashboard');
 const marketingRouter = require('./routes/marketing');
 const shopifyRouter = require('./routes/shopify');
 const { initDb } = require('./lib/db');
+const { runDeploymentVerification } = require('./services/deploymentVerification');
 // logsTestRouter removed - no longer needed
 
 const app = express();
@@ -207,4 +208,15 @@ app.use((err, req, res, next) => {
   app.listen(PORT, () => {
     console.log('Server running on port', PORT);
   });
+
+  // Run post-deploy verification (non-blocking)
+  // This runs once per container boot and logs any issues
+  setTimeout(async () => {
+    try {
+      await runDeploymentVerification();
+    } catch (err) {
+      console.error('[verification] Failed:', err.message);
+      // Don't crash server - verification is informational
+    }
+  }, 1000); // Small delay to let server fully start
 })();

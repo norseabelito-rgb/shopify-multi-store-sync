@@ -7,6 +7,7 @@ const {
   getSyncState,
   upsertSyncState,
   getOrdersCount,
+  getMaxUpdatedAtFromDB,
 } = require('../services/ordersIndexService');
 const { upsertOrderDetails, getOrderDetailsCount } = require('../services/ordersDetailService');
 
@@ -129,8 +130,23 @@ async function backfillAllStores() {
         `${storeSummary.fetched} fetched, ${storeSummary.upserted} index, ${storeSummary.details_upserted} details in ${storeSummary.pages} pages`
       );
 
-      // mark backfill done
-      await upsertSyncState(store.store_id, { backfill_done: true });
+      // Mark backfill done AND set checkpoint from DB
+      // This ensures incremental sync knows where to start from
+      const dbMax = await getMaxUpdatedAtFromDB(store.store_id);
+      const checkpointUpdate = {
+        backfill_done: true,
+      };
+
+      if (dbMax.max_updated_at) {
+        checkpointUpdate.last_updated_at = new Date(dbMax.max_updated_at).toISOString();
+        checkpointUpdate.last_order_id = dbMax.max_order_id;
+        console.log(
+          `[backfill] ${store.store_id} - Setting checkpoint: ` +
+          `last_updated_at=${checkpointUpdate.last_updated_at}, last_order_id=${dbMax.max_order_id}`
+        );
+      }
+
+      await upsertSyncState(store.store_id, checkpointUpdate);
     } catch (err) {
       storeSummary.error = err.message || String(err);
       console.error(`[backfill] ${store.store_id} - ERROR:`, err.message);
@@ -176,16 +192,48 @@ async function incrementalSyncAllStores() {
       const dbDetailCountBefore = await getOrderDetailsCount(store.store_id);
       storeSummary.db_count_before = dbCountBefore;
 
-      // Determine checkpoint - NO SAFETY WINDOW!
-      const checkpointDate = state?.last_updated_at
-        ? new Date(state.last_updated_at)
-        : new Date(BACKFILL_START_ISO);
+      // BOOTSTRAP CHECKPOINT FROM DB IF MISSING OR STUCK AT 2024-01-01
+      // This fixes the case where backfill completed but checkpoint wasn't set
+      let checkpointDate;
+      let checkpointBootstrapped = false;
+
+      if (!state?.last_updated_at || state.last_updated_at === BACKFILL_START_ISO) {
+        // Checkpoint missing or stuck - bootstrap from DB if data exists
+        if (dbCountBefore > 0) {
+          const dbMax = await getMaxUpdatedAtFromDB(store.store_id);
+          if (dbMax.max_updated_at) {
+            checkpointDate = new Date(dbMax.max_updated_at);
+            checkpointBootstrapped = true;
+
+            // Save bootstrapped checkpoint
+            await upsertSyncState(store.store_id, {
+              last_updated_at: checkpointDate.toISOString(),
+              last_order_id: dbMax.max_order_id,
+              backfill_done: true, // If we have data, backfill must have run
+            });
+
+            console.log(
+              `[incremental] ${store.store_id} - BOOTSTRAPPED checkpoint from DB: ` +
+              `${checkpointDate.toISOString()} (DB has ${dbCountBefore} orders)`
+            );
+          } else {
+            // DB has records but no updated_at - fallback to BACKFILL_START_ISO
+            checkpointDate = new Date(BACKFILL_START_ISO);
+          }
+        } else {
+          // No data in DB - use BACKFILL_START_ISO
+          checkpointDate = new Date(BACKFILL_START_ISO);
+        }
+      } else {
+        // Valid checkpoint exists
+        checkpointDate = new Date(state.last_updated_at);
+      }
 
       const updated_at_min = checkpointDate.toISOString();
       storeSummary.checkpoint_before = updated_at_min;
 
       console.log(
-        `[incremental] ${store.store_id} - START: ` +
+        `[incremental] ${store.store_id} - START${checkpointBootstrapped ? ' (BOOTSTRAPPED)' : ''}: ` +
         `DB has ${dbCountBefore} index / ${dbDetailCountBefore} details, ` +
         `checkpoint: ${updated_at_min}`
       );

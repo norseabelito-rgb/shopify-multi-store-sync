@@ -1,5 +1,6 @@
 const { getLatestOrders, searchOrders, getTodayOrdersCount } = require('../services/ordersIndexService');
 const { backfillAllStores, incrementalSyncAllStores } = require('../jobs/ordersSync');
+const { runDeploymentVerification } = require('../services/deploymentVerification');
 
 // routes/api.js
 const express = require('express');
@@ -969,6 +970,22 @@ router.post('/tasks/orders/sync', requireTasksSecret, async (req, res) => {
     .catch((err) => {
       console.error('[incremental] Job failed:', err);
     });
+});
+
+router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
+  try {
+    const results = await runDeploymentVerification();
+    res.json({
+      ok: true,
+      ...results,
+    });
+  } catch (err) {
+    console.error('[verify] error', err);
+    res.status(500).json({
+      ok: false,
+      error: err.message || String(err),
+    });
+  }
 });
 
 module.exports = router;

@@ -229,6 +229,19 @@ async function getOrdersCount(store_id) {
   return r.rows[0]?.c || 0;
 }
 
+async function getMaxUpdatedAtFromDB(store_id) {
+  const r = await query(
+    `SELECT MAX(updated_at) as max_updated_at, MAX(order_id) as max_order_id
+     FROM orders_index
+     WHERE store_id = $1`,
+    [store_id]
+  );
+  return {
+    max_updated_at: r.rows[0]?.max_updated_at || null,
+    max_order_id: r.rows[0]?.max_order_id || null,
+  };
+}
+
 module.exports = {
   upsertOrders,
   getLatestOrders,
@@ -237,4 +250,5 @@ module.exports = {
   getSyncState,
   upsertSyncState,
   getOrdersCount,
+  getMaxUpdatedAtFromDB,
 };
