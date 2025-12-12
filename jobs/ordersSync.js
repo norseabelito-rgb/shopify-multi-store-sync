@@ -7,9 +7,11 @@ const {
   getSyncState,
   upsertSyncState,
 } = require('../services/ordersIndexService');
+const { upsertOrderDetails } = require('../services/ordersDetailService');
 
 const BACKFILL_START_ISO = '2024-01-01T00:00:00Z';
 const PAGE_LIMIT = 250;
+const LOG_EVERY_N_PAGES = 10; // Log progress every N pages
 
 // Convert normalized list entry into DB row
 function toDbRow(order, store) {
@@ -39,10 +41,20 @@ async function fetchOrdersBatch(store, query) {
 
 async function backfillAllStores() {
   const stores = await loadStoresRows();
-  const summary = { stores: [], total_upserted: 0 };
+  const summary = { stores: [], total_upserted: 0, total_details_upserted: 0 };
 
   for (const store of stores) {
-    const storeSummary = { store_id: store.store_id, fetched: 0, upserted: 0, pages: 0, error: null };
+    const storeSummary = {
+      store_id: store.store_id,
+      fetched: 0,
+      upserted: 0,
+      details_upserted: 0,
+      pages: 0,
+      error: null
+    };
+
+    console.log(`[backfill] Starting backfill for store: ${store.store_id}`);
+
     try {
       const domain = String(store.shopify_domain || '').trim();
       if (!domain) throw new Error('Missing shopify_domain');
@@ -56,7 +68,8 @@ async function backfillAllStores() {
           limit: PAGE_LIMIT,
           order: 'created_at asc',
           created_at_min: BACKFILL_START_ISO,
-          fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,customer',
+          // Fetch ALL fields for full order details
+          fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,billing_address,shipping_address,customer,line_items',
         };
         if (page_info) query.page_info = page_info;
 
@@ -65,7 +78,14 @@ async function backfillAllStores() {
         storeSummary.pages += 1;
         storeSummary.fetched += batch.orders.length;
 
-        // Normalize -> DB rows
+        // 1. Store full raw order details (JSONB)
+        if (batch.orders.length) {
+          const detailResult = await upsertOrderDetails(store.store_id, batch.orders);
+          storeSummary.details_upserted += detailResult.upserted;
+          summary.total_details_upserted += detailResult.upserted;
+        }
+
+        // 2. Normalize and store index entries
         const normalized = batch.orders.map((o) =>
           normalizeOrderListEntry(o, {
             store_id: store.store_id,
@@ -81,6 +101,14 @@ async function backfillAllStores() {
           summary.total_upserted += wr.upserted;
         }
 
+        // Log progress every N pages
+        if (storeSummary.pages % LOG_EVERY_N_PAGES === 0) {
+          console.log(
+            `[backfill] ${store.store_id} - Page ${storeSummary.pages}: ` +
+            `${storeSummary.fetched} fetched, ${storeSummary.upserted} index, ${storeSummary.details_upserted} details`
+          );
+        }
+
         // next page
         page_info = batch.nextPageInfo;
         keepGoing = !!page_info && batch.orders.length > 0;
@@ -89,10 +117,16 @@ async function backfillAllStores() {
         if (batch.orders.length === 0) keepGoing = false;
       }
 
+      console.log(
+        `[backfill] ${store.store_id} - COMPLETE: ` +
+        `${storeSummary.fetched} fetched, ${storeSummary.upserted} index, ${storeSummary.details_upserted} details in ${storeSummary.pages} pages`
+      );
+
       // mark backfill done
       await upsertSyncState(store.store_id, { backfill_done: true });
     } catch (err) {
       storeSummary.error = err.message || String(err);
+      console.error(`[backfill] ${store.store_id} - ERROR:`, err.message);
     }
     summary.stores.push(storeSummary);
   }
@@ -102,10 +136,20 @@ async function backfillAllStores() {
 
 async function incrementalSyncAllStores() {
   const stores = await loadStoresRows();
-  const summary = { stores: [], total_upserted: 0 };
+  const summary = { stores: [], total_upserted: 0, total_details_upserted: 0 };
 
   for (const store of stores) {
-    const storeSummary = { store_id: store.store_id, fetched: 0, upserted: 0, pages: 0, error: null };
+    const storeSummary = {
+      store_id: store.store_id,
+      fetched: 0,
+      upserted: 0,
+      details_upserted: 0,
+      pages: 0,
+      error: null
+    };
+
+    console.log(`[incremental] Starting sync for store: ${store.store_id}`);
+
     try {
       const domain = String(store.shopify_domain || '').trim();
       if (!domain) throw new Error('Missing shopify_domain');
@@ -127,7 +171,8 @@ async function incrementalSyncAllStores() {
           limit: PAGE_LIMIT,
           order: 'updated_at asc',
           updated_at_min,
-          fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,customer',
+          // Fetch ALL fields for full order details
+          fields: 'id,name,order_number,created_at,updated_at,financial_status,fulfillment_status,total_price,currency,email,phone,billing_address,shipping_address,customer,line_items',
         };
         if (page_info) query.page_info = page_info;
 
@@ -136,6 +181,14 @@ async function incrementalSyncAllStores() {
         storeSummary.pages += 1;
         storeSummary.fetched += batch.orders.length;
 
+        // 1. Store full raw order details (JSONB)
+        if (batch.orders.length) {
+          const detailResult = await upsertOrderDetails(store.store_id, batch.orders);
+          storeSummary.details_upserted += detailResult.upserted;
+          summary.total_details_upserted += detailResult.upserted;
+        }
+
+        // 2. Normalize and store index entries
         const normalized = batch.orders.map((o) =>
           normalizeOrderListEntry(o, {
             store_id: store.store_id,
@@ -158,14 +211,28 @@ async function incrementalSyncAllStores() {
           summary.total_upserted += wr.upserted;
         }
 
+        // Log progress every N pages
+        if (storeSummary.pages % LOG_EVERY_N_PAGES === 0) {
+          console.log(
+            `[incremental] ${store.store_id} - Page ${storeSummary.pages}: ` +
+            `${storeSummary.fetched} fetched, ${storeSummary.upserted} index, ${storeSummary.details_upserted} details`
+          );
+        }
+
         page_info = batch.nextPageInfo;
         keepGoing = !!page_info && batch.orders.length > 0;
         if (batch.orders.length === 0) keepGoing = false;
       }
 
+      console.log(
+        `[incremental] ${store.store_id} - COMPLETE: ` +
+        `${storeSummary.fetched} fetched, ${storeSummary.upserted} index, ${storeSummary.details_upserted} details in ${storeSummary.pages} pages`
+      );
+
       await upsertSyncState(store.store_id, { last_updated_at: maxUpdatedAt.toISOString() });
     } catch (err) {
       storeSummary.error = err.message || String(err);
+      console.error(`[incremental] ${store.store_id} - ERROR:`, err.message);
     }
     summary.stores.push(storeSummary);
   }
