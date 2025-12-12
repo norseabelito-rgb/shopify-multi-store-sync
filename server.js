@@ -195,6 +195,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error', message: err.message || String(err) });
 });
 
-app.listen(PORT, () => {
-  console.log('Server running on port', PORT);
-});
+(async () => {
+  try {
+    await initDb();
+    console.log('[db] initialized');
+  } catch (e) {
+    console.error('[db] init failed', e);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log('Server running on port', PORT);
+  });
+})();

@@ -9,7 +9,6 @@ function normalizeText(s) {
 }
 
 function buildSearchText(o) {
-  // include everything the user might type: order name/number, name, email, phone
   const parts = [
     o.order_name,
     o.order_number,
@@ -33,11 +32,12 @@ async function upsertOrders(rows) {
 
   for (const r of rows) {
     const search_text = buildSearchText(r);
+
     values.push(`(
-      $${i++},$${i++},$${i++},$${i++},
-      $${i++},$${i++},$${i++},$${i++},$${i++},
-      $${i++},$${i++},$${i++},$${i++},
-      $${i++},$${i++}
+      $${i++}, $${i++}, $${i++}, $${i++},
+      $${i++}, $${i++}, $${i++}, $${i++}, $${i++},
+      $${i++}, $${i++}, $${i++}, $${i++},
+      $${i++}
     )`);
 
     params.push(
@@ -54,24 +54,16 @@ async function upsertOrders(rows) {
       r.currency || null,
       r.financial_status || null,
       r.fulfillment_status || null,
-      search_text,
-      search_text // for fts convenience (same field)
+      search_text
     );
   }
-
-  // Note: last param duplicate is fine; we store search_text once, but we keep params simple.
-  // We'll use the first search_text and ignore the second by mapping to same column.
-  // To avoid confusion, we actually only store one search_text column:
-  // -> We'll use the first one and drop the second:
-  // However we already pushed 15 params per row above; keep it consistent.
-  // We'll map both to search_text and it will just overwrite with same value.
 
   const sql = `
     INSERT INTO orders_index (
       store_id, order_id, order_name, order_number,
       created_at, updated_at, customer_name, email, phone,
       total_price, currency, financial_status, fulfillment_status,
-      search_text, search_text
+      search_text
     ) VALUES ${values.join(',')}
     ON CONFLICT (store_id, order_id) DO UPDATE SET
       order_name = EXCLUDED.order_name,
@@ -124,7 +116,6 @@ async function searchOrders({ store_id = 'all', q = '', limit = 100 } = {}) {
   const l = Math.max(1, Math.min(Number(limit) || 100, 250));
   if (!term) return [];
 
-  // Use FTS for "search everywhere". Fallback to ILIKE too (phone/email exact-ish).
   if (store_id && store_id !== 'all') {
     const r = await query(
       `
@@ -159,7 +150,6 @@ async function searchOrders({ store_id = 'all', q = '', limit = 100 } = {}) {
 }
 
 async function getTodayOrdersCount({ store_id = 'all' } = {}) {
-  // Count orders created today in UTC (simple and consistent)
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
