@@ -188,10 +188,12 @@ async function getSyncState(store_id) {
 async function upsertSyncState(store_id, patch = {}) {
   const last_updated_at = patch.last_updated_at || null;
   const last_order_id = patch.last_order_id || null;
-  const backfill_done = patch.backfill_done === true ? true : null;
+  // CRITICAL: Never pass NULL for backfill_done - it's NOT NULL in DB
+  const backfill_done = patch.backfill_done === true ? true : false;
   const last_run_started_at = patch.last_run_started_at || null;
   const last_run_finished_at = patch.last_run_finished_at || null;
-  const last_run_new_orders = patch.last_run_new_orders != null ? patch.last_run_new_orders : null;
+  // CRITICAL: Never pass NULL for last_run_new_orders - default to 0
+  const last_run_new_orders = patch.last_run_new_orders != null ? patch.last_run_new_orders : 0;
   const last_run_error = patch.last_run_error || null;
 
   await query(
@@ -205,10 +207,12 @@ async function upsertSyncState(store_id, patch = {}) {
     ON CONFLICT (store_id) DO UPDATE SET
       last_updated_at = COALESCE(EXCLUDED.last_updated_at, sync_state.last_updated_at),
       last_order_id = COALESCE(EXCLUDED.last_order_id, sync_state.last_order_id),
-      backfill_done = COALESCE(EXCLUDED.backfill_done, sync_state.backfill_done),
+      -- backfill_done: Use incoming value, fallback to existing, never NULL (should never happen now)
+      backfill_done = COALESCE(EXCLUDED.backfill_done, sync_state.backfill_done, FALSE),
       last_run_started_at = COALESCE(EXCLUDED.last_run_started_at, sync_state.last_run_started_at),
       last_run_finished_at = COALESCE(EXCLUDED.last_run_finished_at, sync_state.last_run_finished_at),
-      last_run_new_orders = COALESCE(EXCLUDED.last_run_new_orders, sync_state.last_run_new_orders),
+      -- last_run_new_orders: Use incoming value, fallback to existing, never NULL
+      last_run_new_orders = COALESCE(EXCLUDED.last_run_new_orders, sync_state.last_run_new_orders, 0),
       last_run_error = COALESCE(EXCLUDED.last_run_error, sync_state.last_run_error),
       updated_at = NOW()
     `,

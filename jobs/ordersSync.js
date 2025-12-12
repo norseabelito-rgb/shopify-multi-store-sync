@@ -319,11 +319,16 @@ async function incrementalSyncAllStores() {
       storeSummary.error = err.message || String(err);
       console.error(`[incremental] ${store.store_id} - ERROR:`, err.message);
 
-      // Record error in checkpoint
-      await upsertSyncState(store.store_id, {
-        last_run_finished_at: new Date().toISOString(),
-        last_run_error: err.message || String(err),
-      }).catch(e => console.error('Failed to save error state:', e));
+      // Record error in checkpoint (with improved error handling)
+      try {
+        await upsertSyncState(store.store_id, {
+          last_run_finished_at: new Date().toISOString(),
+          last_run_error: err.message || String(err),
+        });
+      } catch (checkpointErr) {
+        // If checkpoint write fails, log concisely (one line only)
+        console.error(`[incremental] ${store.store_id} - Checkpoint save failed: ${checkpointErr.message}`);
+      }
     }
     summary.stores.push(storeSummary);
   }
