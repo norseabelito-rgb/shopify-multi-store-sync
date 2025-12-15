@@ -1165,8 +1165,12 @@ router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
   }
 });
 
-// ==================== DAILY REPORTS ENDPOINTS ====================
+// ==================== DAILY REPORTS ENDPOINTS (Day-Centric) ====================
+// Mount new day-centric daily reports router
+const dailyReportsRouter = require('./dailyReports');
+router.use('/daily-reports', dailyReportsRouter);
 
+// Keep old endpoints for backward compatibility (can be removed after migration)
 const peopleService = require('../services/peopleService');
 const dailyReportsIndexService = require('../services/dailyReportsIndexService');
 const dailyReportsDetailService = require('../services/dailyReportsDetailService');
