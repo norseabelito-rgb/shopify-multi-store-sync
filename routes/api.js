@@ -1,4 +1,4 @@
-const { getLatestOrders, searchOrders, getTodayOrdersCount } = require('../services/ordersIndexService');
+const { getLatestOrders, searchOrders, getTodayOrdersCount, getOrdersByCustomer } = require('../services/ordersIndexService');
 const { getOrderDetail } = require('../services/ordersDetailService');
 const { backfillAllStores, incrementalSyncAllStores } = require('../jobs/ordersSync');
 const { runDeploymentVerification } = require('../services/deploymentVerification');
@@ -581,6 +581,33 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
     console.error('[customer-detail] ERROR:', { storeId, customerId, err: err.message });
     res.status(500).json({
       error: 'Failed to load customer details',
+      message: err.message || String(err),
+    });
+  }
+});
+
+// /customers/:store_id/:customer_id/orders – get orders for a specific customer
+router.get('/customers/:store_id/:customer_id/orders', async (req, res) => {
+  const { store_id: storeId, customer_id: customerId } = req.params;
+  const limit = parseInt(req.query.limit || '50', 10);
+
+  try {
+    if (!storeId || !customerId) {
+      return res.status(400).json({ error: 'Missing store_id or customer_id' });
+    }
+
+    const orders = await getOrdersByCustomer(storeId, customerId, { limit });
+
+    res.json({
+      orders,
+      count: orders.length,
+      store_id: storeId,
+      customer_id: customerId,
+    });
+  } catch (err) {
+    console.error('[customer-orders] ERROR:', { storeId, customerId, err: err.message });
+    res.status(500).json({
+      error: 'Failed to load customer orders',
       message: err.message || String(err),
     });
   }

@@ -35,7 +35,7 @@ async function upsertOrders(rows) {
 
     values.push(`(
       $${i++}, $${i++}, $${i++}, $${i++},
-      $${i++}, $${i++}, $${i++}, $${i++}, $${i++},
+      $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++},
       $${i++}, $${i++}, $${i++}, $${i++},
       $${i++}
     )`);
@@ -47,6 +47,7 @@ async function upsertOrders(rows) {
       r.order_number || null,
       r.created_at || null,
       r.updated_at || null,
+      r.customer_id || null,
       r.customer_name || null,
       r.email || null,
       r.phone || null,
@@ -61,7 +62,7 @@ async function upsertOrders(rows) {
   const sql = `
     INSERT INTO orders_index (
       store_id, order_id, order_name, order_number,
-      created_at, updated_at, customer_name, email, phone,
+      created_at, updated_at, customer_id, customer_name, email, phone,
       total_price, currency, financial_status, fulfillment_status,
       search_text
     ) VALUES ${values.join(',')}
@@ -70,6 +71,7 @@ async function upsertOrders(rows) {
       order_number = EXCLUDED.order_number,
       created_at = EXCLUDED.created_at,
       updated_at = EXCLUDED.updated_at,
+      customer_id = EXCLUDED.customer_id,
       customer_name = EXCLUDED.customer_name,
       email = EXCLUDED.email,
       phone = EXCLUDED.phone,
@@ -276,6 +278,34 @@ async function getMaxUpdatedAtFromDB(store_id) {
   };
 }
 
+/**
+ * Get orders for a specific customer
+ * @param {string} storeId - Store identifier
+ * @param {string|number} customerId - Customer ID
+ * @param {Object} options - Query options
+ * @param {number} options.limit - Max results (default 50)
+ * @returns {Promise<Array>}
+ */
+async function getOrdersByCustomer(storeId, customerId, { limit = 50 } = {}) {
+  const l = Math.max(1, Math.min(Number(limit) || 50, 200));
+
+  // Query by customer_id (primary match)
+  const r = await query(
+    `
+    SELECT
+      order_id, order_name, order_number, created_at, updated_at,
+      total_price, currency, financial_status, fulfillment_status
+    FROM orders_index
+    WHERE store_id = $1 AND customer_id = $2
+    ORDER BY created_at DESC
+    LIMIT $3
+    `,
+    [storeId, Number(customerId), l]
+  );
+
+  return r.rows;
+}
+
 module.exports = {
   upsertOrders,
   getLatestOrders,
@@ -285,4 +315,5 @@ module.exports = {
   upsertSyncState,
   getOrdersCount,
   getMaxUpdatedAtFromDB,
+  getOrdersByCustomer,
 };

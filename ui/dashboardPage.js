@@ -3247,7 +3247,15 @@ function dashboardPage() {
           '</div>'
           : '';
 
-        // SECTION 6: RAW JSON VIEWER
+        // SECTION 6: CUSTOMER ORDERS LIST
+        const customerOrdersSection = detail._orders
+          ? buildCustomerOrdersSection(detail._orders, detail.store_id)
+          : '<div class="drawer-section" id="customer-orders-section">' +
+              '<div class="section-heading">Orders</div>' +
+              '<div class="order-sub">Loading orders...</div>' +
+            '</div>';
+
+        // SECTION 7: RAW JSON VIEWER
         const rawJsonSection =
           '<div class="drawer-section">' +
             '<details style="margin-top:8px;">' +
@@ -3263,9 +3271,54 @@ function dashboardPage() {
         return {
           title: displayName,
           subtitle: escapeHtml(detail.email || detail.store_name || ''),
-          bodyHtml: overviewSection + contactSection + ordersSection + addressSection + marketingSection + rawJsonSection,
+          bodyHtml: overviewSection + contactSection + ordersSection + addressSection + marketingSection + customerOrdersSection + rawJsonSection,
           shopifyUrl: customerUrl,
         };
+      }
+
+      function buildCustomerOrdersSection(orders, storeId) {
+        if (!orders || orders.length === 0) {
+          return '<div class="drawer-section" id="customer-orders-section">' +
+            '<div class="section-heading">Orders</div>' +
+            '<div class="order-sub">No orders found for this customer.</div>' +
+          '</div>';
+        }
+
+        const orderRows = orders.map(order => {
+          const financialBadge = order.financial_status
+            ? '<span class="pill" style="background:var(--muted);font-size:10px;margin-left:4px;">' +
+              escapeHtml(order.financial_status) +
+              '</span>'
+            : '';
+          const fulfillmentBadge = order.fulfillment_status
+            ? '<span class="pill" style="background:var(--muted);font-size:10px;margin-left:4px;">' +
+              escapeHtml(order.fulfillment_status) +
+              '</span>'
+            : '';
+
+          return '<div class="customer-order-link" data-order-id="' + escapeHtml(order.order_id) + '" data-store-id="' + escapeHtml(storeId) + '" style="padding:8px;border-bottom:1px solid rgba(255,255,255,0.1);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">' +
+            '<div style="flex:1;">' +
+              '<div style="font-weight:600;color:var(--text);">' +
+                escapeHtml(order.order_name || '#' + order.order_id) +
+                financialBadge +
+                fulfillmentBadge +
+              '</div>' +
+              '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' +
+                (order.created_at ? formatDateTime(order.created_at) : '—') +
+              '</div>' +
+            '</div>' +
+            '<div style="text-align:right;font-weight:600;color:var(--text);">' +
+              formatMoney(order.total_price || 0, order.currency || 'RON') +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+        return '<div class="drawer-section" id="customer-orders-section">' +
+          '<div class="section-heading">Orders (' + orders.length + ')</div>' +
+          '<div style="max-height:300px;overflow-y:auto;margin-top:8px;">' +
+            orderRows +
+          '</div>' +
+        '</div>';
       }
 
       function buildProductContent(product, detail) {
@@ -3638,6 +3691,10 @@ function dashboardPage() {
           }
           console.log('[openCustomerDetail] customer keys count:', Object.keys(customerObj).length);
           drawerState.customer = customerObj;
+          renderDrawer();
+
+          // Fetch customer orders in background
+          fetchCustomerOrders(storeId, customerId);
         } catch (err) {
           console.error('[openCustomerDetail] Error:', err);
           drawerState.customer = {
@@ -3645,9 +3702,33 @@ function dashboardPage() {
             id: customerId,
             store_id: storeId,
           };
-        } finally {
           drawerState.mode = 'customer';
           renderDrawer();
+        }
+      }
+
+      async function fetchCustomerOrders(storeId, customerId) {
+        try {
+          const ordersUrl = '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId) + '/orders';
+          const res = await fetch(ordersUrl);
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+          const data = await res.json();
+          const orders = data.orders || [];
+
+          // Update customer object with orders and re-render
+          if (drawerState.customer && drawerState.mode === 'customer') {
+            drawerState.customer._orders = orders;
+            renderDrawer();
+          }
+        } catch (err) {
+          console.error('[fetchCustomerOrders] Error:', err);
+          // Silently fail - orders section will show "Loading orders..." or error
+          if (drawerState.customer && drawerState.mode === 'customer') {
+            drawerState.customer._orders = [];
+            renderDrawer();
+          }
         }
       }
 
