@@ -554,12 +554,19 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
     // Fetch customer detail from database (customers_detail table)
     const customerDetail = await getCustomerDetailFromDB(storeId, customerId);
 
+    // Diagnostic logging
     if (!customerDetail) {
+      console.log(`[customer-detail] NOT FOUND: store=${storeId}, customer_id=${customerId}`);
       return res.status(404).json({
-        error: 'Customer not found',
-        message: `Customer ${customerId} not found in database for store ${storeId}`
+        error: 'Customer not found in customers_detail',
+        message: `Customer ${customerId} not found in customers_detail table for store ${storeId}`,
+        store_id: storeId,
+        customer_id: customerId,
       });
     }
+
+    const rawJsonKeys = customerDetail ? Object.keys(customerDetail).length : 0;
+    console.log(`[customer-detail] FOUND: store=${storeId}, customer_id=${customerId}, keys=${rawJsonKeys}`);
 
     // Add store context to the customer
     const enrichedCustomer = {
@@ -571,7 +578,7 @@ router.get('/customers/:store_id/:customer_id', async (req, res) => {
 
     res.json({ customer: enrichedCustomer });
   } catch (err) {
-    console.error('/customers detail error', { storeId, customerId, err });
+    console.error('[customer-detail] ERROR:', { storeId, customerId, err: err.message });
     res.status(500).json({
       error: 'Failed to load customer details',
       message: err.message || String(err),

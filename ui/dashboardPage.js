@@ -3616,16 +3616,19 @@ function dashboardPage() {
         drawerState.customer = { _loading: true };
         renderDrawer();
 
+        const url = '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId);
+        console.log('[openCustomerDetail] Fetching:', url);
+
         try {
-          const res = await fetch(
-            '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId)
-          );
+          const res = await fetch(url);
           if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('[openCustomerDetail] HTTP error:', res.status, errorData);
             throw new Error('HTTP ' + res.status + (res.status === 404 ? ' - Customer not found' : ''));
           }
           const data = await res.json();
+          console.log('[openCustomerDetail] Response keys:', Object.keys(data), 'customer keys:', data.customer ? Object.keys(data.customer).length : 0);
           drawerState.customer = data.customer || data;
-          console.log('[openCustomerDetail] Loaded customer:', customerId);
         } catch (err) {
           console.error('[openCustomerDetail] Error:', err);
           drawerState.customer = {
