@@ -5,6 +5,7 @@ const { runDeploymentVerification } = require('../services/deploymentVerificatio
 const { getLatestCustomers, searchCustomers, getCustomersCount } = require('../services/customersIndexService');
 const { getCustomerDetail: getCustomerDetailFromDB } = require('../services/customersDetailService');
 const { backfillAllStores: backfillCustomersAllStores, incrementalSyncAllStores: incrementalSyncCustomersAllStores } = require('../jobs/customersSync');
+const { runBackfillJob: runCustomerIdBackfill, getBackfillStatus: getCustomerIdBackfillStatus } = require('../services/ordersCustomerIdBackfill');
 
 // routes/api.js
 const express = require('express');
@@ -28,6 +29,7 @@ const {
 } = require('../lib/mapping');
 const { fetchOrders } = require('../services/ordersService');
 const { fetchCustomers, getCustomerDetail } = require('../services/customersService');
+const { query } = require('../lib/db');
 const {
   normalizeOrderDetail,
 } = require('../lib/orderUtils');
@@ -596,7 +598,39 @@ router.get('/customers/:store_id/:customer_id/orders', async (req, res) => {
       return res.status(400).json({ error: 'Missing store_id or customer_id' });
     }
 
-    const orders = await getOrdersByCustomer(storeId, customerId, { limit });
+    // Primary: Query by customer_id
+    let orders = await getOrdersByCustomer(storeId, customerId, { limit });
+
+    // Fallback: If no orders found AND customer_id column might not be populated yet,
+    // try matching by email/phone from customer detail
+    if (orders.length === 0) {
+      const customerDetail = await getCustomerDetailFromDB(storeId, customerId);
+
+      if (customerDetail && (customerDetail.email || customerDetail.phone)) {
+        const email = customerDetail.email ? String(customerDetail.email).toLowerCase().trim() : null;
+        const phone = customerDetail.phone ? String(customerDetail.phone).trim() : null;
+
+        // Query orders by email or phone (temporary fallback)
+        const fallbackResult = await query(
+          `
+          SELECT
+            order_id, order_name, order_number, created_at, updated_at,
+            total_price, currency, financial_status, fulfillment_status
+          FROM orders_index
+          WHERE store_id = $1
+            AND (
+              (email IS NOT NULL AND LOWER(TRIM(email)) = $2)
+              OR (phone IS NOT NULL AND TRIM(phone) = $3)
+            )
+          ORDER BY created_at DESC
+          LIMIT $4
+          `,
+          [storeId, email || '', phone || '', limit]
+        );
+
+        orders = fallbackResult.rows;
+      }
+    }
 
     res.json({
       orders,
@@ -1080,6 +1114,39 @@ router.post('/tasks/customers/sync', requireTasksSecret, async (req, res) => {
     .catch((err) => {
       console.error('[customers-incremental] Job failed:', err);
     });
+});
+
+// POST /tasks/orders/backfill-customer-id - One-time backfill of customer_id in orders_index
+router.post('/tasks/orders/backfill-customer-id', requireTasksSecret, async (req, res) => {
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Customer ID backfill job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run backfill in background (non-blocking)
+  runCustomerIdBackfill()
+    .then((summary) => {
+      console.log('[backfill-customer-id] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[backfill-customer-id] Job failed:', err);
+    });
+});
+
+// GET /tasks/orders/backfill-customer-id/status - Check backfill job status
+router.get('/tasks/orders/backfill-customer-id/status', requireTasksSecret, async (req, res) => {
+  try {
+    const status = await getCustomerIdBackfillStatus();
+    res.json(status);
+  } catch (err) {
+    console.error('[backfill-customer-id-status] Error:', err);
+    res.status(500).json({
+      error: 'Failed to get backfill status',
+      message: err.message || String(err),
+    });
+  }
 });
 
 router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
