@@ -3119,7 +3119,8 @@ function dashboardPage() {
       }
 
       function buildCustomerFullContent(data) {
-        const detail = (data && data.customer) || {};
+        // data IS the customer object (not a wrapper)
+        const detail = data || {};
         const loading = data && data._loading;
 
         if (loading) {
@@ -3148,8 +3149,11 @@ function dashboardPage() {
         const overviewSection =
           '<div class="drawer-section">' +
             '<div class="section-heading">Overview</div>' +
+            (detail.store_id ? '<div class="kv-row"><span>Store</span><strong>' +
+              escapeHtml(detail.store_name || detail.store_id) +
+            '</strong></div>' : '') +
             '<div class="kv-row"><span>Customer ID</span><strong>' +
-              escapeHtml(detail.id || detail.customer_id || '—') +
+              escapeHtml(String(detail.id || detail.customer_id || '—')) +
             '</strong></div>' +
             '<div class="kv-row"><span>Created</span><strong>' +
               (detail.created_at ? formatDateTime(detail.created_at) : '—') +
@@ -3627,8 +3631,13 @@ function dashboardPage() {
             throw new Error('HTTP ' + res.status + (res.status === 404 ? ' - Customer not found' : ''));
           }
           const data = await res.json();
-          console.log('[openCustomerDetail] Response keys:', Object.keys(data), 'customer keys:', data.customer ? Object.keys(data.customer).length : 0);
-          drawerState.customer = data.customer || data;
+          // Robust parsing: accept { customer: {...} }, { raw_json: {...} }, or direct object
+          const customerObj = data?.customer ?? data?.raw_json ?? data;
+          if (!customerObj || typeof customerObj !== 'object') {
+            throw new Error('Invalid customer payload');
+          }
+          console.log('[openCustomerDetail] customer keys count:', Object.keys(customerObj).length);
+          drawerState.customer = customerObj;
         } catch (err) {
           console.error('[openCustomerDetail] Error:', err);
           drawerState.customer = {
