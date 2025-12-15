@@ -84,15 +84,32 @@ async function upsertOrders(rows) {
   return { upserted: rows.length };
 }
 
-async function getLatestOrders({ store_id = 'all', limit = 100 } = {}) {
+async function getLatestOrders({ store_id = 'all', limit = 100, sort_by = 'created_at', sort_dir = 'desc' } = {}) {
   const l = Math.max(1, Math.min(Number(limit) || 100, 250));
+
+  // Whitelist allowed sort columns to prevent SQL injection
+  const allowedSortColumns = {
+    'created_at': 'created_at',
+    'updated_at': 'updated_at',
+    'order_name': 'order_name',
+    'order_number': 'order_number',
+    'customer_name': 'customer_name',
+    'email': 'email',
+    'total_price': 'total_price',
+    'financial_status': 'financial_status',
+    'fulfillment_status': 'fulfillment_status',
+    'store_id': 'store_id',
+  };
+
+  const sortColumn = allowedSortColumns[sort_by] || 'created_at';
+  const sortDirection = (sort_dir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   if (store_id && store_id !== 'all') {
     const r = await query(
       `
       SELECT * FROM orders_index
       WHERE store_id = $1
-      ORDER BY created_at DESC
+      ORDER BY ${sortColumn} ${sortDirection}
       LIMIT $2
       `,
       [store_id, l]
@@ -103,7 +120,7 @@ async function getLatestOrders({ store_id = 'all', limit = 100 } = {}) {
   const r = await query(
     `
     SELECT * FROM orders_index
-    ORDER BY created_at DESC
+    ORDER BY ${sortColumn} ${sortDirection}
     LIMIT $1
     `,
     [l]
@@ -111,10 +128,27 @@ async function getLatestOrders({ store_id = 'all', limit = 100 } = {}) {
   return r.rows;
 }
 
-async function searchOrders({ store_id = 'all', q = '', limit = 100 } = {}) {
+async function searchOrders({ store_id = 'all', q = '', limit = 100, sort_by = 'created_at', sort_dir = 'desc' } = {}) {
   const term = String(q || '').trim();
   const l = Math.max(1, Math.min(Number(limit) || 100, 250));
   if (!term) return [];
+
+  // Whitelist allowed sort columns to prevent SQL injection
+  const allowedSortColumns = {
+    'created_at': 'created_at',
+    'updated_at': 'updated_at',
+    'order_name': 'order_name',
+    'order_number': 'order_number',
+    'customer_name': 'customer_name',
+    'email': 'email',
+    'total_price': 'total_price',
+    'financial_status': 'financial_status',
+    'fulfillment_status': 'fulfillment_status',
+    'store_id': 'store_id',
+  };
+
+  const sortColumn = allowedSortColumns[sort_by] || 'created_at';
+  const sortDirection = (sort_dir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   if (store_id && store_id !== 'all') {
     const r = await query(
@@ -126,7 +160,7 @@ async function searchOrders({ store_id = 'all', q = '', limit = 100 } = {}) {
           to_tsvector('simple', COALESCE(search_text,'')) @@ plainto_tsquery('simple', $2)
           OR search_text ILIKE '%' || lower($2) || '%'
         )
-      ORDER BY created_at DESC
+      ORDER BY ${sortColumn} ${sortDirection}
       LIMIT $3
       `,
       [store_id, term, l]
@@ -141,7 +175,7 @@ async function searchOrders({ store_id = 'all', q = '', limit = 100 } = {}) {
     WHERE
       to_tsvector('simple', COALESCE(search_text,'')) @@ plainto_tsquery('simple', $1)
       OR search_text ILIKE '%' || lower($1) || '%'
-    ORDER BY created_at DESC
+    ORDER BY ${sortColumn} ${sortDirection}
     LIMIT $2
     `,
     [term, l]

@@ -2013,15 +2013,11 @@ function dashboardPage() {
         loading: false,
         filters: {
           q: '',
-          from: null,
-          to: null,
-          limit: ORDER_PAGE_SIZE,
+          limit: 1000,
         },
         error: '',
-        page: 1,
         total: 0,
-        hasNext: false,
-        hasPrev: false,
+        sort: { by: 'updated_at', dir: 'desc' },
       };
       let ordersDirty = true;
       let customersDirty = true;
@@ -2514,32 +2510,63 @@ function dashboardPage() {
       }
 
       function setupSortingUI() {
-        const table = document.querySelector('.orders-table');
-        if (!table) return;
-        const headers = table.querySelectorAll('th');
-        const keys = ['name', 'created_at', 'store_name', 'customer_name', 'items_count', 'total_price', 'financial_status'];
-        headers.forEach((th, idx) => {
-          const key = keys[idx];
-          if (!key) return;
-          const baseLabel = th.getAttribute('data-label') || th.textContent.replace(/ ↑| ↓/g, '').trim();
-          th.setAttribute('data-label', baseLabel);
-          th.style.cursor = 'pointer';
-          const indicator =
-            ordersState.sort.by === key ? (ordersState.sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
-          th.textContent = baseLabel + indicator;
-          if (!th._sortingBound) {
-            th.addEventListener('click', () => {
-              if (ordersState.sort.by === key) {
-                ordersState.sort.dir = ordersState.sort.dir === 'asc' ? 'desc' : 'asc';
-              } else {
-                ordersState.sort.by = key;
-                ordersState.sort.dir = 'asc';
-              }
-              loadOrders();
-            });
-            th._sortingBound = true;
-          }
-        });
+        // Setup sorting for Orders table
+        const ordersTable = document.querySelector('#view-orders .orders-table');
+        if (ordersTable) {
+          const headers = ordersTable.querySelectorAll('th');
+          const keys = ['order_name', 'created_at', 'store_id', 'customer_name', null, 'total_price', 'financial_status'];
+          headers.forEach((th, idx) => {
+            const key = keys[idx];
+            if (!key) return;
+            const baseLabel = th.getAttribute('data-label') || th.textContent.replace(/ ↑| ↓/g, '').trim();
+            th.setAttribute('data-label', baseLabel);
+            th.style.cursor = 'pointer';
+            const indicator =
+              ordersState.sort.by === key ? (ordersState.sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+            th.textContent = baseLabel + indicator;
+            if (!th._sortingBound) {
+              th.addEventListener('click', () => {
+                if (ordersState.sort.by === key) {
+                  ordersState.sort.dir = ordersState.sort.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                  ordersState.sort.by = key;
+                  ordersState.sort.dir = 'asc';
+                }
+                loadOrders();
+              });
+              th._sortingBound = true;
+            }
+          });
+        }
+
+        // Setup sorting for Customers table
+        const customersTable = document.querySelector('#view-customers .orders-table');
+        if (customersTable) {
+          const headers = customersTable.querySelectorAll('th');
+          const keys = ['display_name', 'email', 'orders_count', 'total_spent', 'updated_at', 'store_id', 'created_at'];
+          headers.forEach((th, idx) => {
+            const key = keys[idx];
+            if (!key) return;
+            const baseLabel = th.getAttribute('data-label') || th.textContent.replace(/ ↑| ↓/g, '').trim();
+            th.setAttribute('data-label', baseLabel);
+            th.style.cursor = 'pointer';
+            const indicator =
+              customersState.sort.by === key ? (customersState.sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+            th.textContent = baseLabel + indicator;
+            if (!th._sortingBound) {
+              th.addEventListener('click', () => {
+                if (customersState.sort.by === key) {
+                  customersState.sort.dir = customersState.sort.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                  customersState.sort.by = key;
+                  customersState.sort.dir = 'asc';
+                }
+                loadCustomers();
+              });
+              th._sortingBound = true;
+            }
+          });
+        }
       }
 
       function updateCustomersMeta(count) {
@@ -2642,85 +2669,13 @@ function dashboardPage() {
         });
 
         renderCustomersPagination();
+        setupSortingUI();
       }
 
       function renderCustomersPagination() {
         if (!customersPagination) return;
-        const totalPages = Math.max(
-          1,
-          Math.ceil(
-            (customersState.total || customersState.items.length || 0) /
-              (customersState.filters.limit || ORDER_PAGE_SIZE)
-          )
-        );
-        const current = Math.min(customersState.page, totalPages);
-        const prevDisabled = current <= 1;
-        const nextDisabled = current >= totalPages;
-
-        function pageButton(page, label, isActive = false, disabled = false) {
-          return (
-            '<button class="' +
-            'pagination-page' +
-            (isActive ? ' active' : '') +
-            '" data-page="' +
-            page +
-            '" ' +
-            (disabled ? 'disabled' : '') +
-            '>' +
-            label +
-            '</button>'
-          );
-        }
-
-        const pages = [];
-        if (totalPages <= 7) {
-          for (let i = 1; i <= totalPages; i++) pages.push(pageButton(i, i, i === current));
-        } else {
-          const addPage = (p) => pages.push(pageButton(p, p, p === current));
-          addPage(1);
-          addPage(2);
-          if (current > 4) pages.push('<span class="pagination-ellipsis">…</span>');
-          const start = Math.max(3, current - 1);
-          const end = Math.min(totalPages - 2, current + 1);
-          for (let i = start; i <= end; i++) addPage(i);
-          if (current < totalPages - 3) pages.push('<span class="pagination-ellipsis">…</span>');
-          addPage(totalPages - 1);
-          addPage(totalPages);
-        }
-
-        customersPagination.innerHTML =
-          '<button class="pagination-btn" id="customers-prev" ' +
-          (prevDisabled ? 'disabled' : '') +
-          '>Prev</button>' +
-          pages.join('') +
-          '<button class="pagination-btn" id="customers-next" ' +
-          (nextDisabled ? 'disabled' : '') +
-          '>Next</button>';
-
-        const prevBtn = document.getElementById('customers-prev');
-        const nextBtn = document.getElementById('customers-next');
-        if (prevBtn) {
-          prevBtn.addEventListener('click', () => {
-            if (prevDisabled) return;
-            customersState.page = Math.max(1, customersState.page - 1);
-            loadCustomers();
-          });
-        }
-        if (nextBtn) {
-          nextBtn.addEventListener('click', () => {
-            if (nextDisabled) return;
-            customersState.page = Math.min(totalPages, customersState.page + 1);
-            loadCustomers();
-          });
-        }
-        customersPagination.querySelectorAll('.pagination-page').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const page = parseInt(btn.getAttribute('data-page'), 10);
-            if (Number.isNaN(page) || page === current) return;
-            customersState.page = page;
-            loadCustomers();
-          });
-        });
+        // No pagination - single scrollable list
+        customersPagination.innerHTML = '';
       }
 
       function renderPagination() {
@@ -3395,7 +3350,9 @@ function dashboardPage() {
         if (!drawerStackEl) return;
         drawerStackEl.innerHTML = '';
 
-        if (!drawerState.open || !drawerState.order) {
+        // Handle both order drawer and standalone customer drawer
+        const hasContent = drawerState.open && (drawerState.order || drawerState.customer);
+        if (!hasContent) {
           drawerStackEl.setAttribute('aria-hidden', 'true');
           drawerBackdrop.classList.remove('visible');
           drawerStackEl.style.pointerEvents = 'none';
@@ -3414,18 +3371,18 @@ function dashboardPage() {
         }
 
         const tabs = [
-          { key: 'order', label: 'Comanda', enabled: true },
-          { key: 'customer', label: 'Client', enabled: hasCustomer },
+          { key: 'order', label: 'Comanda', enabled: !!detail },
+          { key: 'customer', label: 'Client', enabled: hasCustomer || drawerState.mode === 'customer' },
           { key: 'product', label: 'Produs', enabled: !!hasProducts },
         ];
 
         const content =
-          drawerState.mode === 'customer'
+          drawerState.mode === 'customer' && drawerState.customer
+            ? buildCustomerFullContent(drawerState.customer || {})
+            : drawerState.mode === 'customer' && detail
             ? buildCustomerContent(detail)
             : drawerState.mode === 'product'
             ? buildProductContent(drawerState.product, detail)
-            : drawerState.mode === 'customer-full'
-            ? buildCustomerFullContent(drawerState.customer || {})
             : buildOrderContent(detail);
 
         const tabsHtml = tabs
@@ -3446,8 +3403,10 @@ function dashboardPage() {
           })
           .join('');
 
+        // Standalone customer drawer (no tabs) or order drawer with tabs
+        const isStandaloneCustomer = drawerState.mode === 'customer' && drawerState.customer && !detail;
         const panelHtml =
-          drawerState.mode === 'customer-full'
+          isStandaloneCustomer
             ? '<div class="drawer-panel order-panel">' +
                 '<div class="drawer-header">' +
                   '<button class="drawer-close" data-action="close-panel">Close</button>' +
@@ -3490,7 +3449,7 @@ function dashboardPage() {
           if (panel) panel.classList.add('open');
         });
 
-        if (drawerState.mode !== 'customer-full') {
+        if (!isStandaloneCustomer) {
           drawerStackEl.querySelectorAll('.drawer-tab').forEach((tab) => {
             tab.addEventListener('click', () => {
               if (tab.disabled) return;
@@ -3646,49 +3605,36 @@ function dashboardPage() {
       }
 
       async function openCustomerDetail(storeId, customerId) {
-        if (!storeId || !customerId) return;
+        // Defensive guards
+        if (!storeId || !customerId || customerId === 'undefined' || customerId === 'null') {
+          console.error('[openCustomerDetail] Invalid params:', { storeId, customerId });
+          return;
+        }
+
         drawerState.open = true;
-        drawerState.mode = 'customer-full';
-        drawerState.customer = {
-          customer: {
-            customer_id: customerId,
-            store_id: storeId,
-            first_name: '',
-            last_name: '',
-            email: '',
-            total_orders: 0,
-            total_spent: 0,
-          },
-          orders: [],
-          _loading: true,
-        };
+        drawerState.mode = 'customer';
+        drawerState.customer = { _loading: true };
         renderDrawer();
+
         try {
-          const qs = new URLSearchParams();
-          if (customersState.filters.from) qs.set('from', customersState.filters.from);
-          if (customersState.filters.to) qs.set('to', customersState.filters.to);
           const res = await fetch(
-            '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId) + '?' + qs.toString()
+            '/customers/' + encodeURIComponent(storeId) + '/' + encodeURIComponent(customerId)
           );
-          if (!res.ok) throw new Error('HTTP ' + res.status);
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status + (res.status === 404 ? ' - Customer not found' : ''));
+          }
           const data = await res.json();
-          drawerState.customer = data;
+          drawerState.customer = data.customer || data;
+          console.log('[openCustomerDetail] Loaded customer:', customerId);
         } catch (err) {
-          console.error('Customer detail error', err);
+          console.error('[openCustomerDetail] Error:', err);
           drawerState.customer = {
-            customer: {
-              first_name: 'Customer',
-              last_name: '',
-              email: '',
-              total_orders: 0,
-              total_spent: 0,
-              store_name: storeId,
-            },
-            orders: [],
             error: err.message || String(err),
+            id: customerId,
+            store_id: storeId,
           };
         } finally {
-          drawerState.mode = 'customer-full';
+          drawerState.mode = 'customer';
           renderDrawer();
         }
       }
@@ -3703,6 +3649,8 @@ function dashboardPage() {
         const qs = new URLSearchParams();
         qs.set('store_id', selectedStoreId || 'all');
         qs.set('limit', ORDER_PAGE_SIZE);
+        qs.set('sort_by', ordersState.sort.by);
+        qs.set('sort_dir', ordersState.sort.dir);
         if (ordersState.filters.q) qs.set('q', ordersState.filters.q);
         if (ordersState.filters.status) qs.set('status', ordersState.filters.status);
 
@@ -3719,7 +3667,7 @@ function dashboardPage() {
             statTodayHome.textContent = formatNumber(ordersState.totalTodayOrders);
           }
 
-          console.log('[orders] Loaded', ordersState.items.length, 'orders, today:', ordersState.totalTodayOrders);
+          console.log('[orders] Loaded', ordersState.items.length, 'orders (server-side sorted)');
         } catch (err) {
           console.error('Error /orders', err);
           ordersState.items = [];
@@ -3738,31 +3686,24 @@ function dashboardPage() {
 
         const qs = new URLSearchParams();
         qs.set('store_id', selectedStoreId || 'all');
-        qs.set('limit', customersState.filters.limit || ORDER_PAGE_SIZE);
-        qs.set('page', customersState.page);
+        qs.set('limit', customersState.filters.limit || 1000);
+        qs.set('sort_by', customersState.sort.by);
+        qs.set('sort_dir', customersState.sort.dir);
         if (customersState.filters.q) qs.set('q', customersState.filters.q);
-        if (customersState.filters.from) qs.set('from', customersState.filters.from);
-        if (customersState.filters.to) qs.set('to', customersState.filters.to);
 
         try {
           const res = await fetch('/customers?' + qs.toString());
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           customersState.items = Array.isArray(data.customers) ? data.customers : [];
-          customersState.page = data.page || customersState.page;
           customersState.total = data.totalCustomers || data.total || customersState.items.length;
-          customersState.filters.limit = data.limit || ORDER_PAGE_SIZE;
-          customersState.hasNext = data.hasNext || false;
-          customersState.hasPrev = data.hasPrev || false;
 
-          console.log('[customers] Loaded', customersState.items.length, 'customers, total:', customersState.total);
+          console.log('[customers] Loaded', customersState.items.length, 'customers (no pagination)');
         } catch (err) {
           console.error('Error /customers', err);
           customersState.items = [];
           customersState.error = err.message || String(err);
           customersState.total = 0;
-          customersState.hasNext = false;
-          customersState.hasPrev = false;
         } finally {
           customersState.loading = false;
           customersDirty = false;

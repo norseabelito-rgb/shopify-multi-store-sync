@@ -381,22 +381,24 @@ router.get('/stores', async (req, res) => {
   }
 });
 
-// /orders – live Shopify data with filters and pagination
+// /orders – DB-first orders with search, filters, and sorting
 // Query params:
 //   store_id = "all" | store id
 //   q        = text (order #, customer, product)
-//   status   = all | any | open | paid | fulfilled | cancelled
 //   limit    = max 250 (default 100)
-//   page_info = Shopify cursor for pagination
+//   sort_by  = column to sort by (default 'created_at')
+//   sort_dir = 'asc' | 'desc' (default 'desc')
 router.get('/orders', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const q = (req.query.q || '').trim();
     const limit = 100;
+    const sort_by = req.query.sort_by || 'created_at';
+    const sort_dir = req.query.sort_dir || 'desc';
 
     const orders = q
-      ? await searchOrders({ store_id: storeIdFilter, q, limit })
-      : await getLatestOrders({ store_id: storeIdFilter, limit });
+      ? await searchOrders({ store_id: storeIdFilter, q, limit, sort_by, sort_dir })
+      : await getLatestOrders({ store_id: storeIdFilter, limit, sort_by, sort_dir });
 
     const totalTodayOrders = await getTodayOrdersCount({ store_id: storeIdFilter });
 
@@ -478,44 +480,39 @@ router.get('/orders/:store_id/:order_id', async (req, res) => {
 // Query params:
 //   store_id = "all" | store id
 //   q        = text (name, email, phone, etc.)
-//   limit    = max 250 (default 100)
-//   page     = page number (default 1)
+//   limit    = max 2000 (default 1000, no pagination)
+//   sort_by  = column to sort by (default 'updated_at')
+//   sort_dir = 'asc' | 'desc' (default 'desc')
 router.get('/customers', async (req, res) => {
   try {
     const storeIdFilter = req.query.store_id || 'all';
     const searchQuery = (req.query.q || '').trim();
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 250);
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 1000, 1), 2000);
+    const sort_by = req.query.sort_by || 'updated_at';
+    const sort_dir = req.query.sort_dir || 'desc';
 
     console.log('[customers][DB]', {
       store: storeIdFilter,
       search: searchQuery,
       limit,
-      page,
+      sort_by,
+      sort_dir,
     });
 
-    const offset = (page - 1) * limit;
-
-    // Search or list customers from DB
+    // Search or list customers from DB (no pagination, single list)
     const customers = searchQuery
-      ? await searchCustomers({ q: searchQuery, store_id: storeIdFilter, limit, offset })
-      : await getLatestCustomers({ store_id: storeIdFilter, limit, offset });
+      ? await searchCustomers({ q: searchQuery, store_id: storeIdFilter, limit, sort_by, sort_dir })
+      : await getLatestCustomers({ store_id: storeIdFilter, limit, sort_by, sort_dir });
 
     // Get total count
     const totalCustomers = await getCustomersCount({ q: searchQuery, store_id: storeIdFilter });
-
-    const totalPages = Math.ceil(totalCustomers / limit);
 
     console.log('[customers][DB] returned', customers.length, 'customers, total:', totalCustomers);
 
     res.json({
       customers,
-      page,
-      limit,
-      totalPages,
+      count: customers.length,
       totalCustomers,
-      hasNext: page < totalPages,
-      hasPrev: page > 1,
       source: 'POSTGRES_INDEX',
     });
   } catch (err) {

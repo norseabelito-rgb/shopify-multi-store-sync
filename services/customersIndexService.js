@@ -106,21 +106,38 @@ async function upsertCustomers(rows) {
 }
 
 /**
- * Get latest customers with optional store filter
+ * Get latest customers with optional store filter and sorting
  * @param {Object} options - Query options
  * @param {string} options.store_id - Store ID or 'all'
- * @param {number} options.limit - Max results to return
+ * @param {number} options.limit - Max results to return (default 1000 for no pagination)
+ * @param {string} options.sort_by - Column to sort by
+ * @param {string} options.sort_dir - Sort direction ('asc' or 'desc')
  * @returns {Promise<Array>}
  */
-async function getLatestCustomers({ store_id = 'all', limit = 100 } = {}) {
-  const l = Math.max(1, Math.min(Number(limit) || 100, 250));
+async function getLatestCustomers({ store_id = 'all', limit = 1000, sort_by = 'updated_at', sort_dir = 'desc' } = {}) {
+  const l = Math.max(1, Math.min(Number(limit) || 1000, 2000));
+
+  // Whitelist allowed sort columns to prevent SQL injection
+  const allowedSortColumns = {
+    'updated_at': 'updated_at',
+    'created_at': 'created_at',
+    'display_name': 'display_name',
+    'email': 'email',
+    'phone': 'phone',
+    'orders_count': 'orders_count',
+    'total_spent': 'total_spent',
+    'store_id': 'store_id',
+  };
+
+  const sortColumn = allowedSortColumns[sort_by] || 'updated_at';
+  const sortDirection = (sort_dir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   if (store_id && store_id !== 'all') {
     const r = await query(
       `
       SELECT * FROM customers_index
       WHERE store_id = $1
-      ORDER BY updated_at DESC
+      ORDER BY ${sortColumn} ${sortDirection}
       LIMIT $2
       `,
       [store_id, l]
@@ -131,7 +148,7 @@ async function getLatestCustomers({ store_id = 'all', limit = 100 } = {}) {
   const r = await query(
     `
     SELECT * FROM customers_index
-    ORDER BY updated_at DESC
+    ORDER BY ${sortColumn} ${sortDirection}
     LIMIT $1
     `,
     [l]
@@ -145,16 +162,31 @@ async function getLatestCustomers({ store_id = 'all', limit = 100 } = {}) {
  * @param {string} options.q - Search query
  * @param {string} options.store_id - Store ID or 'all'
  * @param {number} options.limit - Max results
- * @param {number} options.offset - Offset for pagination
+ * @param {string} options.sort_by - Column to sort by
+ * @param {string} options.sort_dir - Sort direction ('asc' or 'desc')
  * @returns {Promise<Array>}
  */
-async function searchCustomers({ q, store_id = 'all', limit = 100, offset = 0 } = {}) {
-  const l = Math.max(1, Math.min(Number(limit) || 100, 250));
-  const off = Math.max(0, Number(offset) || 0);
+async function searchCustomers({ q, store_id = 'all', limit = 1000, sort_by = 'updated_at', sort_dir = 'desc' } = {}) {
+  const l = Math.max(1, Math.min(Number(limit) || 1000, 2000));
 
   if (!q || !String(q).trim()) {
-    return getLatestCustomers({ store_id, limit: l });
+    return getLatestCustomers({ store_id, limit: l, sort_by, sort_dir });
   }
+
+  // Whitelist allowed sort columns to prevent SQL injection
+  const allowedSortColumns = {
+    'updated_at': 'updated_at',
+    'created_at': 'created_at',
+    'display_name': 'display_name',
+    'email': 'email',
+    'phone': 'phone',
+    'orders_count': 'orders_count',
+    'total_spent': 'total_spent',
+    'store_id': 'store_id',
+  };
+
+  const sortColumn = allowedSortColumns[sort_by] || 'updated_at';
+  const sortDirection = (sort_dir || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   const searchQuery = normalizeText(q);
   const params = [];
@@ -171,13 +203,13 @@ async function searchCustomers({ q, store_id = 'all', limit = 100, offset = 0 } 
     params.push(store_id);
   }
 
-  params.push(l, off);
+  params.push(l);
 
   const sql = `
     SELECT * FROM customers_index
     WHERE ${whereClauses.join(' AND ')}
-    ORDER BY updated_at DESC
-    LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    ORDER BY ${sortColumn} ${sortDirection}
+    LIMIT $${paramIndex++}
   `;
 
   const r = await query(sql, params);
