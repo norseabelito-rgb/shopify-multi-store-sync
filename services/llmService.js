@@ -1,15 +1,38 @@
 // services/llmService.js
 // LLM Gateway service for AI-powered insights
-// Supports Anthropic Claude API with safe error handling
+// Supports Anthropic Claude API with safe error handling and model fallback
 
 const fetch = require('node-fetch');
-
-//deploycomm
 
 // Configuration from environment
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'anthropic';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const LLM_MODEL = process.env.LLM_MODEL || 'claude-sonnet-4-20250514';
+
+// Model configuration with fallback chain
+const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const FALLBACK_MODELS = [
+  'claude-sonnet-4-20250514',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-sonnet-20240229',
+];
+
+/**
+ * Get the configured model, validating it's not empty/invalid
+ * @returns {string} Valid model string
+ */
+function getConfiguredModel() {
+  const envModel = process.env.LLM_MODEL;
+
+  // Check if model is set and not empty
+  if (envModel && envModel.trim() && envModel.trim() !== 'undefined' && envModel.trim() !== 'null') {
+    return envModel.trim();
+  }
+
+  console.log(`[llm] LLM_MODEL not set or invalid, using default: ${DEFAULT_MODEL}`);
+  return DEFAULT_MODEL;
+}
+
+const LLM_MODEL = getConfiguredModel();
 
 // Safety limits
 const MAX_CONTEXT_SIZE = 50000; // characters
@@ -60,7 +83,76 @@ function limitContext(context) {
 }
 
 /**
+ * Check if an error indicates model not found
+ * @param {number} status - HTTP status code
+ * @param {string} errorText - Error response text
+ * @returns {boolean} True if model not found error
+ */
+function isModelNotFoundError(status, errorText) {
+  if (status === 404) return true;
+  if (status === 400) {
+    const lower = (errorText || '').toLowerCase();
+    if (lower.includes('model') && (lower.includes('not found') || lower.includes('invalid') || lower.includes('does not exist'))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Make a single API call to Anthropic
+ * @param {object} options - Request options
+ * @returns {Promise<object>} Response or error
+ */
+async function makeAnthropicRequest({ model, maxTokens, system, fullUserMessage }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [
+          {
+            role: 'user',
+            content: fullUserMessage,
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        ok: false,
+        status: response.status,
+        errorText,
+        isModelError: isModelNotFoundError(response.status, errorText),
+      };
+    }
+
+    const data = await response.json();
+    return { ok: true, data };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/**
  * Generate JSON response from Claude API
+ * Includes automatic retry with fallback models if model not found
  *
  * @param {object} options - Generation options
  * @param {string} options.system - System prompt
@@ -71,10 +163,10 @@ function limitContext(context) {
  * @returns {Promise<object>} Parsed JSON response or error object
  */
 async function generateJSON({ system, user, jsonContext, model, maxTokens }) {
-  const usedModel = model || LLM_MODEL;
+  const requestedModel = model || LLM_MODEL;
   const usedMaxTokens = maxTokens || MAX_RESPONSE_TOKENS;
 
-  console.log(`[llm] Generating JSON with ${LLM_PROVIDER}/${usedModel}`);
+  console.log(`[llm] Generating JSON with ${LLM_PROVIDER}/${requestedModel}`);
 
   if (LLM_PROVIDER !== 'anthropic') {
     console.error(`[llm] Unsupported provider: ${LLM_PROVIDER}`);
@@ -101,114 +193,140 @@ async function generateJSON({ system, user, jsonContext, model, maxTokens }) {
   // Build the user message with context
   const fullUserMessage = `${user}\n\nContext data (JSON):\n\`\`\`json\n${contextStr}\n\`\`\``;
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: usedModel,
-        max_tokens: usedMaxTokens,
-        system: system,
-        messages: [
-          {
-            role: 'user',
-            content: fullUserMessage,
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[llm] API error ${response.status}: ${errorText}`);
-      return {
-        error: true,
-        message: `Anthropic API error: ${response.status}`,
-        details: errorText,
-      };
+  // Build list of models to try: requested model first, then fallbacks
+  const modelsToTry = [requestedModel];
+  for (const fallback of FALLBACK_MODELS) {
+    if (!modelsToTry.includes(fallback)) {
+      modelsToTry.push(fallback);
     }
+  }
 
-    const data = await response.json();
+  let lastError = null;
+  let usedModel = requestedModel;
 
-    // Extract text content
-    const textContent = data.content?.find(c => c.type === 'text')?.text;
+  // Try models in order until one works
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const tryModel = modelsToTry[i];
+    const isRetry = i > 0;
 
-    if (!textContent) {
-      console.error(`[llm] No text content in response`);
-      return {
-        error: true,
-        message: 'No text content in API response',
-      };
+    if (isRetry) {
+      console.log(`[llm] Retrying with fallback model: ${tryModel}`);
     }
-
-    console.log(`[llm] Received response: ${textContent.length} chars`);
-
-    // Parse JSON from response
-    // Claude sometimes wraps JSON in markdown code blocks
-    let jsonStr = textContent.trim();
-
-    // Remove markdown code blocks if present
-    if (jsonStr.startsWith('```json')) {
-      jsonStr = jsonStr.slice(7);
-    } else if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.slice(3);
-    }
-
-    if (jsonStr.endsWith('```')) {
-      jsonStr = jsonStr.slice(0, -3);
-    }
-
-    jsonStr = jsonStr.trim();
 
     try {
-      const parsed = JSON.parse(jsonStr);
+      const result = await makeAnthropicRequest({
+        model: tryModel,
+        maxTokens: usedMaxTokens,
+        system,
+        fullUserMessage,
+      });
 
-      console.log(`[llm] Successfully parsed JSON response`);
+      if (!result.ok) {
+        console.error(`[llm] API error ${result.status} for model ${tryModel}: ${result.errorText}`);
 
-      return {
-        error: false,
-        result: parsed,
-        model: usedModel,
-        usage: {
-          input_tokens: data.usage?.input_tokens,
-          output_tokens: data.usage?.output_tokens,
-        },
-      };
-    } catch (parseErr) {
-      console.error(`[llm] Failed to parse JSON response:`, parseErr.message);
-      console.error(`[llm] Raw response:`, textContent.substring(0, 500));
+        // If model not found and we have more models to try, continue
+        if (result.isModelError && i < modelsToTry.length - 1) {
+          console.log(`[llm] Model ${tryModel} not found, will try fallback`);
+          lastError = { status: result.status, errorText: result.errorText };
+          continue;
+        }
 
+        // No more fallbacks or different error
+        return {
+          error: true,
+          message: `Anthropic API error: ${result.status}`,
+          details: result.errorText,
+        };
+      }
+
+      // Success
+      usedModel = tryModel;
+      const data = result.data;
+
+      if (isRetry) {
+        console.log(`[llm] Successfully used fallback model: ${tryModel}`);
+      }
+
+      // Extract text content
+      const textContent = data.content?.find(c => c.type === 'text')?.text;
+
+      if (!textContent) {
+        console.error(`[llm] No text content in response`);
+        return {
+          error: true,
+          message: 'No text content in API response',
+        };
+      }
+
+      console.log(`[llm] Received response: ${textContent.length} chars (model: ${usedModel})`);
+
+      // Parse JSON from response
+      // Claude sometimes wraps JSON in markdown code blocks
+      let jsonStr = textContent.trim();
+
+      // Remove markdown code blocks if present
+      if (jsonStr.startsWith('```json')) {
+        jsonStr = jsonStr.slice(7);
+      } else if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.slice(3);
+      }
+
+      if (jsonStr.endsWith('```')) {
+        jsonStr = jsonStr.slice(0, -3);
+      }
+
+      jsonStr = jsonStr.trim();
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+
+        console.log(`[llm] Successfully parsed JSON response`);
+
+        return {
+          error: false,
+          result: parsed,
+          model: usedModel,
+          usage: {
+            input_tokens: data.usage?.input_tokens,
+            output_tokens: data.usage?.output_tokens,
+          },
+        };
+      } catch (parseErr) {
+        console.error(`[llm] Failed to parse JSON response:`, parseErr.message);
+        console.error(`[llm] Raw response:`, textContent.substring(0, 500));
+
+        return {
+          error: true,
+          message: 'Failed to parse JSON from API response',
+          raw_response: textContent.substring(0, 1000),
+        };
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.error(`[llm] Request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+        return {
+          error: true,
+          message: `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`,
+        };
+      }
+
+      console.error(`[llm] Request failed for model ${tryModel}:`, err);
+      lastError = err;
+
+      // For network errors, don't retry with different model
       return {
         error: true,
-        message: 'Failed to parse JSON from API response',
-        raw_response: textContent.substring(0, 1000),
+        message: err.message || 'Unknown error',
       };
     }
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      console.error(`[llm] Request timed out after ${REQUEST_TIMEOUT_MS}ms`);
-      return {
-        error: true,
-        message: `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`,
-      };
-    }
-
-    console.error(`[llm] Request failed:`, err);
-    return {
-      error: true,
-      message: err.message || 'Unknown error',
-    };
   }
+
+  // All models failed
+  return {
+    error: true,
+    message: lastError?.message || 'All models failed',
+    details: lastError?.errorText,
+  };
 }
 
 /**
