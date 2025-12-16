@@ -623,16 +623,20 @@ async function getProductFullDetail(sku) {
   const master = await getMasterProductBySku(sku);
   if (!master) return null;
 
-  const overrides = await getAllStoreOverrides(sku);
-  const syncStatuses = await getAllStoreSyncStatuses(sku);
+  const overridesArray = await getAllStoreOverrides(sku);
+  const syncStatusesArray = await getAllStoreSyncStatuses(sku);
 
+  // Return structure matching what UI expects
   return {
-    master,
-    overrides: overrides.reduce((acc, o) => {
+    product: master,  // UI expects 'product', not 'master'
+    overrides: overridesArray,  // Return as array for UI iteration
+    syncStatuses: syncStatusesArray,  // Return as array for UI iteration
+    // Also include keyed versions for easy lookup
+    overridesByStore: overridesArray.reduce((acc, o) => {
       acc[o.store_id] = o;
       return acc;
     }, {}),
-    syncStatuses: syncStatuses.reduce((acc, s) => {
+    syncStatusesByStore: syncStatusesArray.reduce((acc, s) => {
       acc[s.store_id] = s;
       return acc;
     }, {}),

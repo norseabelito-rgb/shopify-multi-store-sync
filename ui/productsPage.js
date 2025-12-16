@@ -163,10 +163,11 @@ function productsPage() {
       display: none;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 10px 16px;
       border-radius: 8px;
       background: var(--accent-soft);
       border: 1px solid rgba(79, 140, 255, 0.3);
+      margin-left: auto;
     }
 
     .bulk-actions.visible {
@@ -177,6 +178,106 @@ function productsPage() {
       font-size: 12px;
       color: var(--accent);
       font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Store Tabs in Drawer */
+    .store-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin: 16px 0;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .store-tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .store-tab:hover {
+      color: var(--text);
+      background: rgba(79, 140, 255, 0.1);
+    }
+
+    .store-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .store-tab-content {
+      display: none;
+    }
+
+    .store-tab-content.active {
+      display: block;
+    }
+
+    /* Override indicator */
+    .field-override-indicator {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-left: 8px;
+      text-transform: uppercase;
+    }
+
+    .field-override-indicator.inherited {
+      background: rgba(148, 163, 184, 0.2);
+      color: var(--muted);
+    }
+
+    .field-override-indicator.overridden {
+      background: rgba(79, 140, 255, 0.2);
+      color: var(--accent);
+    }
+
+    /* Rich text preview */
+    .description-preview {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .description-preview p { margin: 0 0 8px; }
+    .description-preview ul, .description-preview ol { margin: 8px 0; padding-left: 20px; }
+    .description-preview li { margin: 4px 0; }
+    .description-preview strong, .description-preview b { font-weight: 600; }
+    .description-preview em, .description-preview i { font-style: italic; }
+
+    /* Loading skeleton */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.1) 25%, rgba(148, 163, 184, 0.2) 50%, rgba(148, 163, 184, 0.1) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes skeleton-loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-text {
+      height: 16px;
+      margin-bottom: 8px;
+    }
+
+    .skeleton-input {
+      height: 40px;
+      margin-bottom: 16px;
     }
 
     /* Table Container */
@@ -1143,9 +1244,14 @@ function productsPage() {
     }
 
     // Drawer
+    let currentDrawerData = null; // Store drawer data for saving overrides
+    let activeStoreTab = 'master'; // Track active tab
+
     function openDrawer(sku) {
       currentSku = sku;
       isNewProduct = !sku;
+      currentDrawerData = null;
+      activeStoreTab = 'master';
 
       drawerTitle.textContent = isNewProduct ? 'Produs Nou' : 'Editare Produs';
       drawerOverlay.classList.add('open');
@@ -1154,12 +1260,34 @@ function productsPage() {
       if (isNewProduct) {
         renderDrawerForm({});
       } else {
+        // Show loading skeleton
+        renderDrawerSkeleton();
         loadProductDetail(sku).then(detail => {
           if (detail) {
+            currentDrawerData = detail;
             renderDrawerForm(detail);
+          } else {
+            drawerContent.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Produs negasit</div><div class="empty-text">SKU: ' + escapeHtml(sku) + '</div></div>';
           }
+        }).catch(err => {
+          drawerContent.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">Eroare la incarcare</div><div class="empty-text">' + escapeHtml(err.message) + '</div></div>';
         });
       }
+    }
+
+    function renderDrawerSkeleton() {
+      drawerContent.innerHTML = '' +
+        '<div class="section-header">Date Master</div>' +
+        '<div class="skeleton skeleton-text" style="width: 60%;"></div>' +
+        '<div class="skeleton skeleton-input"></div>' +
+        '<div class="skeleton skeleton-text" style="width: 40%;"></div>' +
+        '<div class="skeleton skeleton-input"></div>' +
+        '<div class="skeleton skeleton-text" style="width: 50%;"></div>' +
+        '<div class="skeleton skeleton-input" style="height: 80px;"></div>' +
+        '<div style="display: flex; gap: 12px;">' +
+          '<div class="skeleton skeleton-input" style="flex: 1;"></div>' +
+          '<div class="skeleton skeleton-input" style="flex: 1;"></div>' +
+        '</div>';
     }
 
     function closeDrawer() {
@@ -1167,82 +1295,173 @@ function productsPage() {
       drawer.classList.remove('open');
       currentSku = null;
       isNewProduct = false;
+      currentDrawerData = null;
+      activeStoreTab = 'master';
     }
 
     function renderDrawerForm(detail) {
       const product = detail.product || {};
       const overrides = detail.overrides || [];
       const syncStatuses = detail.syncStatuses || [];
+      const overridesByStore = detail.overridesByStore || {};
+      const syncStatusesByStore = detail.syncStatusesByStore || {};
 
-      drawerContent.innerHTML = '' +
-        '<div class="section-header">Date Master</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">SKU (unic, nemodificabil)</label>' +
-          '<input type="text" class="form-input" id="field-sku" value="' + escapeHtml(product.sku || '') + '" ' + (isNewProduct ? '' : 'disabled') + '>' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">Titlu</label>' +
-          '<input type="text" class="form-input" id="field-title" value="' + escapeHtml(product.title_default || '') + '">' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">Descriere</label>' +
-          '<textarea class="form-input" id="field-description">' + escapeHtml(product.description_default || '') + '</textarea>' +
-        '</div>' +
-        '<div class="form-row">' +
-          '<div class="form-group">' +
-            '<label class="form-label">Pret (RON)</label>' +
-            '<input type="number" step="0.01" class="form-input" id="field-price" value="' + (product.price_default || '') + '">' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label class="form-label">Pret vechi (comparare)</label>' +
-            '<input type="number" step="0.01" class="form-input" id="field-compare-price" value="' + (product.compare_at_price_default || '') + '">' +
-          '</div>' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">Cost produs</label>' +
-          '<input type="number" step="0.01" class="form-input" id="field-cost" value="' + (product.cost || '') + '">' +
-        '</div>' +
-        '<div class="form-row">' +
-          '<div class="form-group">' +
-            '<label class="form-label">SEO Title</label>' +
-            '<input type="text" class="form-input" id="field-seo-title" value="' + escapeHtml(product.seo_title_default || '') + '" maxlength="70">' +
-            '<div class="form-hint">Max 70 caractere</div>' +
-          '</div>' +
-          '<div class="form-group">' +
-            '<label class="form-label">SEO Meta</label>' +
-            '<input type="text" class="form-input" id="field-seo-meta" value="' + escapeHtml(product.seo_meta_default || '') + '" maxlength="160">' +
-            '<div class="form-hint">Max 160 caractere</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label class="form-label">Google Drive Folder URL</label>' +
-          '<input type="text" class="form-input" id="field-drive-url" value="' + escapeHtml(product.drive_folder_url || '') + '">' +
-        '</div>';
+      // Build store tabs
+      let tabsHtml = '';
+      let tabContentsHtml = '';
 
-      // Sync status per store
       if (!isNewProduct && stores.length > 0) {
-        let syncHtml = '<div class="section-header">Status Sincronizare</div>';
+        tabsHtml = '<div class="store-tabs">' +
+          '<button class="store-tab active" data-tab="master">Master</button>';
 
         stores.forEach(store => {
-          const sync = syncStatuses.find(s => s.store_id === store.store_id) || {};
+          const storeId = store.store_id;
+          const sync = syncStatusesByStore[storeId] || {};
+          const hasOverride = !!overridesByStore[storeId];
+          const statusIcon = sync.status === 'active' ? '✓' : sync.status === 'draft' ? '○' : sync.status === 'failed' ? '✗' : '–';
+          tabsHtml += '<button class="store-tab" data-tab="' + escapeHtml(storeId) + '">' +
+            escapeHtml(store.store_name || storeId) +
+            ' <span style="opacity: 0.6;">' + statusIcon + '</span>' +
+            (hasOverride ? ' <span style="color: var(--accent);">●</span>' : '') +
+            '</button>';
+        });
+        tabsHtml += '</div>';
+      }
+
+      // Master tab content
+      const masterContent = '' +
+        '<div class="store-tab-content active" data-tab-content="master">' +
+          '<div class="section-header">Date Master (Globale)</div>' +
+          '<div class="form-group">' +
+            '<label class="form-label">SKU (unic, nemodificabil)</label>' +
+            '<input type="text" class="form-input" id="field-sku" value="' + escapeHtml(product.sku || '') + '" ' + (isNewProduct ? '' : 'disabled') + '>' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label class="form-label">Titlu</label>' +
+            '<input type="text" class="form-input" id="field-title" value="' + escapeHtml(product.title_default || '') + '">' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label class="form-label">Descriere (HTML)</label>' +
+            '<textarea class="form-input" id="field-description" style="min-height: 120px;">' + escapeHtml(product.description_default || '') + '</textarea>' +
+            (product.description_default ? '<div class="form-label" style="margin-top: 8px;">Preview:</div><div class="description-preview">' + product.description_default + '</div>' : '') +
+          '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label class="form-label">Pret (RON)</label>' +
+              '<input type="number" step="0.01" class="form-input" id="field-price" value="' + (product.price_default || '') + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label class="form-label">Pret vechi (comparare)</label>' +
+              '<input type="number" step="0.01" class="form-input" id="field-compare-price" value="' + (product.compare_at_price_default || '') + '">' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label class="form-label">Cost produs</label>' +
+            '<input type="number" step="0.01" class="form-input" id="field-cost" value="' + (product.cost || '') + '">' +
+          '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label class="form-label">SEO Title</label>' +
+              '<input type="text" class="form-input" id="field-seo-title" value="' + escapeHtml(product.seo_title_default || '') + '" maxlength="70">' +
+              '<div class="form-hint">Max 70 caractere (' + (product.seo_title_default || '').length + '/70)</div>' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label class="form-label">SEO Meta</label>' +
+              '<input type="text" class="form-input" id="field-seo-meta" value="' + escapeHtml(product.seo_meta_default || '') + '" maxlength="160">' +
+              '<div class="form-hint">Max 160 caractere (' + (product.seo_meta_default || '').length + '/160)</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label class="form-label">Google Drive Folder URL</label>' +
+            '<input type="text" class="form-input" id="field-drive-url" value="' + escapeHtml(product.drive_folder_url || '') + '">' +
+          '</div>' +
+        '</div>';
+
+      // Store tab contents (for overrides)
+      let storeContentsHtml = '';
+      if (!isNewProduct && stores.length > 0) {
+        stores.forEach(store => {
+          const storeId = store.store_id;
+          const override = overridesByStore[storeId] || {};
+          const sync = syncStatusesByStore[storeId] || {};
           const status = sync.status || 'not_pushed';
           const lastPushed = sync.last_pushed_at ? formatDate(sync.last_pushed_at) : 'Niciodata';
 
-          syncHtml += '' +
-            '<div class="store-override-card">' +
-              '<div class="store-override-header">' +
-                '<span class="store-name">' + escapeHtml(store.store_name || store.store_id) + '</span>' +
-                getStatusBadge(status) +
+          const getIndicator = (field) => {
+            const isOverridden = override[field + '_override'] != null;
+            return '<span class="field-override-indicator ' + (isOverridden ? 'overridden' : 'inherited') + '">' +
+              (isOverridden ? 'Modificat' : 'Mostenit') + '</span>';
+          };
+
+          const getEffectiveValue = (field, defaultField) => {
+            return override[field + '_override'] != null ? override[field + '_override'] : (product[defaultField] || '');
+          };
+
+          storeContentsHtml += '' +
+            '<div class="store-tab-content" data-tab-content="' + escapeHtml(storeId) + '">' +
+              '<div class="section-header">Override pentru ' + escapeHtml(store.store_name || storeId) + '</div>' +
+              '<div class="store-override-card" style="margin-bottom: 16px;">' +
+                '<div class="store-override-header">' +
+                  '<span class="store-name">Status Shopify</span>' +
+                  getStatusBadge(status) +
+                '</div>' +
+                '<div class="sync-status-row">' +
+                  '<span>Ultima sincronizare: ' + lastPushed + '</span>' +
+                  '<button class="btn btn-success" style="padding: 4px 12px; font-size: 11px;" onclick="pushSingleProduct(\\'' + escapeHtml(currentSku) + '\\', \\'' + escapeHtml(storeId) + '\\')">Push</button>' +
+                '</div>' +
+                (sync.last_push_error ? '<div style="color: var(--danger); font-size: 11px; margin-top: 8px;">Eroare: ' + escapeHtml(sync.last_push_error) + '</div>' : '') +
               '</div>' +
-              '<div class="sync-status-row">' +
-                '<span>Ultima sincronizare: ' + lastPushed + '</span>' +
-                '<button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="pushSingleProduct(\\'' + currentSku + '\\', \\'' + store.store_id + '\\')">Push</button>' +
+              '<div class="form-hint" style="margin-bottom: 16px;">Lasa gol pentru a mosteni valoarea din Master. Completeaza pentru a suprascrie doar pentru acest magazin.</div>' +
+              '<div class="form-group">' +
+                '<label class="form-label">Titlu ' + getIndicator('title') + '</label>' +
+                '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="title_override" value="' + escapeHtml(override.title_override || '') + '" placeholder="' + escapeHtml(product.title_default || 'Mostenit din Master') + '">' +
+              '</div>' +
+              '<div class="form-group">' +
+                '<label class="form-label">Descriere (HTML) ' + getIndicator('description') + '</label>' +
+                '<textarea class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="description_override" style="min-height: 100px;" placeholder="Mostenit din Master">' + escapeHtml(override.description_override || '') + '</textarea>' +
+              '</div>' +
+              '<div class="form-row">' +
+                '<div class="form-group">' +
+                  '<label class="form-label">Pret (RON) ' + getIndicator('price') + '</label>' +
+                  '<input type="number" step="0.01" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="price_override" value="' + (override.price_override || '') + '" placeholder="' + (product.price_default || 'Mostenit') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label class="form-label">Pret vechi ' + getIndicator('compare_at_price') + '</label>' +
+                  '<input type="number" step="0.01" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="compare_at_price_override" value="' + (override.compare_at_price_override || '') + '" placeholder="' + (product.compare_at_price_default || 'Mostenit') + '">' +
+                '</div>' +
+              '</div>' +
+              '<div class="form-row">' +
+                '<div class="form-group">' +
+                  '<label class="form-label">SEO Title ' + getIndicator('seo_title') + '</label>' +
+                  '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="seo_title_override" value="' + escapeHtml(override.seo_title_override || '') + '" maxlength="70" placeholder="' + escapeHtml(product.seo_title_default || 'Mostenit') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label class="form-label">SEO Meta ' + getIndicator('seo_meta') + '</label>' +
+                  '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="seo_meta_override" value="' + escapeHtml(override.seo_meta_override || '') + '" maxlength="160" placeholder="' + escapeHtml(product.seo_meta_default || 'Mostenit') + '">' +
+                '</div>' +
               '</div>' +
             '</div>';
         });
-
-        drawerContent.innerHTML += syncHtml;
       }
+
+      drawerContent.innerHTML = tabsHtml + masterContent + storeContentsHtml;
+
+      // Attach tab click handlers
+      drawerContent.querySelectorAll('.store-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const tabId = tab.dataset.tab;
+          activeStoreTab = tabId;
+
+          // Update active tab button
+          drawerContent.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          // Update active content
+          drawerContent.querySelectorAll('.store-tab-content').forEach(c => c.classList.remove('active'));
+          const content = drawerContent.querySelector('[data-tab-content="' + tabId + '"]');
+          if (content) content.classList.add('active');
+        });
+      });
     }
 
     async function saveCurrentProduct() {
@@ -1269,7 +1488,65 @@ function productsPage() {
       }
 
       try {
+        // Save master product
         await saveProduct(data.sku, data);
+
+        // Collect and save store overrides
+        if (!isNewProduct) {
+          const overrideFields = document.querySelectorAll('.store-override-field');
+          const overridesByStore = {};
+
+          overrideFields.forEach(field => {
+            const storeId = field.dataset.store;
+            const fieldName = field.dataset.field;
+            let value = field.value.trim();
+
+            // Handle numeric fields
+            if (['price_override', 'compare_at_price_override'].includes(fieldName)) {
+              value = value ? parseFloat(value) : null;
+            } else {
+              value = value || null;
+            }
+
+            if (!overridesByStore[storeId]) {
+              overridesByStore[storeId] = {};
+            }
+            overridesByStore[storeId][fieldName] = value;
+          });
+
+          // Save overrides for each store that has at least one non-null value
+          const overridePromises = [];
+          for (const storeId of Object.keys(overridesByStore)) {
+            const storeOverrides = overridesByStore[storeId];
+            const hasAnyValue = Object.values(storeOverrides).some(v => v !== null && v !== '');
+
+            if (hasAnyValue) {
+              // Clean null values to keep only actual overrides
+              const cleanOverrides = {};
+              for (const [key, val] of Object.entries(storeOverrides)) {
+                if (val !== null && val !== '') {
+                  cleanOverrides[key] = val;
+                }
+              }
+
+              overridePromises.push(
+                fetch('/products/' + encodeURIComponent(data.sku) + '/overrides/' + encodeURIComponent(storeId), {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(cleanOverrides),
+                }).then(r => {
+                  if (!r.ok) throw new Error('Override save failed for ' + storeId);
+                  return r.json();
+                })
+              );
+            }
+          }
+
+          if (overridePromises.length > 0) {
+            await Promise.all(overridePromises);
+          }
+        }
+
         showToast(isNewProduct ? 'Produs creat cu succes' : 'Produs salvat cu succes');
         closeDrawer();
         loadProducts();

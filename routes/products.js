@@ -18,8 +18,8 @@ const {
   getEffectiveProduct,
   getProductsForTable,
   getProductFullDetail,
-  getSyncStatus,
-  getProductSyncAcrossStores,
+  getStoreSyncStatus,
+  getAllStoreSyncStatuses,
 } = require('../services/productsService');
 
 const {
@@ -296,9 +296,9 @@ router.get('/:sku/effective/:storeId', async (req, res) => {
 router.get('/:sku/sync', async (req, res) => {
   try {
     const { sku } = req.params;
-    const syncStatus = await getProductSyncAcrossStores(sku);
+    const syncStatuses = await getAllStoreSyncStatuses(sku);
 
-    res.json({ sku, stores: syncStatus });
+    res.json({ sku, stores: syncStatuses });
   } catch (err) {
     console.error('[products] GET /:sku/sync error:', err);
     res.status(500).json({ error: err.message || String(err) });
@@ -309,7 +309,7 @@ router.get('/:sku/sync', async (req, res) => {
 router.get('/:sku/sync/:storeId', async (req, res) => {
   try {
     const { sku, storeId } = req.params;
-    const syncStatus = await getSyncStatus(sku, storeId);
+    const syncStatus = await getStoreSyncStatus(sku, storeId);
 
     res.json({ syncStatus: syncStatus || { status: 'not_pushed' } });
   } catch (err) {

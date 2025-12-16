@@ -17,7 +17,7 @@ const {
   updateProductInStore,
 } = require('../lib/shopify');
 const { loadStoresRows } = require('../lib/stores');
-const { getEffectiveProduct, updateSyncStatus, logSkuCollision } = require('./productsService');
+const { getEffectiveProduct, upsertStoreSyncStatus, logSkuCollision } = require('./productsService');
 
 // Constants
 const CASHSYNC_TAG = 'CASHSYNC';
@@ -282,13 +282,11 @@ async function pushProductToStore(sku, storeId, options = {}) {
 
       // Log collision to database
       await logSkuCollision({
-        storeId,
-        originalSku: sku,
-        newSku: renameResult.newSku,
-        existingProductId: Number(collisionProduct.productNumericId),
-        existingProductTitle: collisionProduct.title,
-        resolution: 'renamed',
-        resolvedBy: 'system',
+        store_id: storeId,
+        original_sku: sku,
+        new_sku: renameResult.newSku,
+        shopify_product_id: Number(collisionProduct.productNumericId),
+        notes: `Renamed from "${collisionProduct.title}" to avoid collision`,
       });
 
       collisionResolved = true;
@@ -336,11 +334,12 @@ async function pushProductToStore(sku, storeId, options = {}) {
       );
 
       // Update sync status in DB
-      await updateSyncStatus(sku, storeId, {
+      await upsertStoreSyncStatus(sku, storeId, {
         status: 'draft',
-        shopifyProductId: Number(updatedProduct.id),
-        lastPushedAt: new Date(),
-        lastError: null,
+        shopify_product_id: Number(updatedProduct.id),
+        last_pushed_at: new Date().toISOString(),
+        last_push_error: null,
+        has_cashsync_tag: true,
       });
 
       result = {
@@ -354,9 +353,9 @@ async function pushProductToStore(sku, storeId, options = {}) {
     } catch (err) {
       console.error(`[push] Failed to update product:`, err);
 
-      await updateSyncStatus(sku, storeId, {
+      await upsertStoreSyncStatus(sku, storeId, {
         status: 'failed',
-        lastError: err.message,
+        last_push_error: err.message,
       });
 
       result = {
@@ -373,11 +372,13 @@ async function pushProductToStore(sku, storeId, options = {}) {
       const createdProduct = await createProductInStore(store, accessToken, payload);
 
       // Update sync status in DB
-      await updateSyncStatus(sku, storeId, {
+      await upsertStoreSyncStatus(sku, storeId, {
         status: 'draft',
-        shopifyProductId: Number(createdProduct.id),
-        lastPushedAt: new Date(),
-        lastError: null,
+        shopify_product_id: Number(createdProduct.id),
+        last_pushed_at: new Date().toISOString(),
+        last_push_error: null,
+        has_cashsync_tag: true,
+        created_by_system: true,
       });
 
       result = {
@@ -391,9 +392,9 @@ async function pushProductToStore(sku, storeId, options = {}) {
     } catch (err) {
       console.error(`[push] Failed to create product:`, err);
 
-      await updateSyncStatus(sku, storeId, {
+      await upsertStoreSyncStatus(sku, storeId, {
         status: 'failed',
-        lastError: err.message,
+        last_push_error: err.message,
       });
 
       result = {
