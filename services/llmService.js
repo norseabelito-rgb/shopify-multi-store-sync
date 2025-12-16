@@ -88,7 +88,7 @@ async function generateJSON({ system, user, jsonContext, model, maxTokens }) {
     console.error(`[llm] Missing ANTHROPIC_API_KEY`);
     return {
       error: true,
-      message: 'Missinng ANTHROPIC_API_KEY environment variable',
+      message: 'Missing ANTHROPIC_API_KEY environment variable',
     };
   }
 
