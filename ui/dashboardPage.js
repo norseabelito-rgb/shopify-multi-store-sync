@@ -4524,7 +4524,18 @@ function dashboardPage() {
             month: metrics.month_orders,
             year: metrics.year_orders,
             last_sync: metrics.last_sync_at,
+            refresh_triggered: metrics.refresh_triggered,
+            refresh_running: metrics.refresh_running,
           });
+
+          // Auto-refresh if background refresh is running
+          if (metrics.refresh_running) {
+            console.log('[metrics] Background refresh detected, will auto-refresh in 7 seconds...');
+            setTimeout(() => {
+              console.log('[metrics] Auto-refreshing metrics after background refresh...');
+              loadMetrics();
+            }, 7000); // 7 seconds delay
+          }
         } catch (err) {
           console.error('[metrics] Failed to load homepage metrics:', err);
           // Fallback to showing zeros or dashes

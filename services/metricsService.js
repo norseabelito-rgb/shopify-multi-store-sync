@@ -286,8 +286,145 @@ async function getStoreMetrics(storeId) {
 }
 
 /**
+ * Get the maximum agg_date from orders_daily_agg for a store
+ * @param {string} storeId - Store ID or 'ALL' for all stores
+ * @returns {Promise<string|null>} Maximum agg_date in YYYY-MM-DD format or null if no data
+ */
+async function getMaxAggDate(storeId) {
+  const result = await query(
+    `SELECT MAX(agg_date) AS max_date
+     FROM orders_daily_agg
+     WHERE store_id = $1`,
+    [storeId]
+  );
+  return result.rows[0]?.max_date || null;
+}
+
+/**
+ * Try to acquire a Postgres advisory lock for refresh operation
+ * Uses different lock keys for each store_id to allow parallel refreshes
+ * Lock key format: hashcode(storeId) as bigint
+ *
+ * @param {string} storeId - Store ID or 'ALL'
+ * @returns {Promise<boolean>} True if lock acquired, false if already locked
+ */
+async function tryAcquireRefreshLock(storeId) {
+  // Generate a numeric lock key from storeId
+  // Use simple hash: sum of char codes
+  let lockKey = 0;
+  for (let i = 0; i < storeId.length; i++) {
+    lockKey = (lockKey * 31 + storeId.charCodeAt(i)) & 0x7FFFFFFF; // Keep positive 32-bit int
+  }
+
+  const result = await query('SELECT pg_try_advisory_lock($1) AS acquired', [lockKey]);
+  const acquired = result.rows[0]?.acquired || false;
+
+  console.log(`[metrics] Advisory lock for ${storeId} (key=${lockKey}): ${acquired ? 'ACQUIRED' : 'FAILED (already locked)'}`);
+  return acquired;
+}
+
+/**
+ * Release a Postgres advisory lock
+ * @param {string} storeId - Store ID or 'ALL'
+ */
+async function releaseRefreshLock(storeId) {
+  let lockKey = 0;
+  for (let i = 0; i < storeId.length; i++) {
+    lockKey = (lockKey * 31 + storeId.charCodeAt(i)) & 0x7FFFFFFF;
+  }
+
+  await query('SELECT pg_advisory_unlock($1)', [lockKey]);
+  console.log(`[metrics] Advisory lock released for ${storeId} (key=${lockKey})`);
+}
+
+/**
+ * Incrementally refresh orders_daily_agg from fromDate to toDate (inclusive)
+ * Only aggregates missing dates, does NOT re-backfill entire year
+ *
+ * @param {string} storeId - Store ID or 'ALL' (not used for filtering, just for context)
+ * @param {string} fromDate - Start date in YYYY-MM-DD format
+ * @param {string} toDate - End date in YYYY-MM-DD format
+ * @returns {Promise<object>} Summary { dates_refreshed, from_date, to_date }
+ */
+async function incrementalRefresh(storeId, fromDate, toDate) {
+  console.log(`[metrics] Starting incremental refresh for ${storeId}: ${fromDate} → ${toDate}`);
+
+  let datesRefreshed = 0;
+  const currentDate = new Date(fromDate);
+  const endDate = new Date(toDate);
+
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+
+    try {
+      await aggregateDailyOrders(dateStr);
+      datesRefreshed++;
+    } catch (err) {
+      console.error(`[metrics] Failed to refresh ${dateStr}:`, err.message);
+      // Continue with next date even if one fails
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  console.log(`[metrics] ✓ Incremental refresh complete for ${storeId}: ${datesRefreshed} dates refreshed (${fromDate} → ${toDate})`);
+
+  return {
+    dates_refreshed: datesRefreshed,
+    from_date: fromDate,
+    to_date: toDate,
+  };
+}
+
+/**
+ * Background refresh job: checks staleness and runs incremental refresh with advisory lock
+ * This runs asynchronously without blocking the response
+ *
+ * @param {string} storeId - Store ID or 'ALL'
+ * @param {string} today - Today's date in YYYY-MM-DD format
+ * @param {string} maxAggDate - Current max agg_date in YYYY-MM-DD format
+ */
+async function backgroundRefreshJob(storeId, today, maxAggDate) {
+  let lockAcquired = false;
+
+  try {
+    // Try to acquire lock
+    lockAcquired = await tryAcquireRefreshLock(storeId);
+
+    if (!lockAcquired) {
+      console.log(`[metrics] Background refresh skipped for ${storeId}: another refresh is already running`);
+      return;
+    }
+
+    // Calculate missing date range
+    const fromDate = new Date(maxAggDate);
+    fromDate.setDate(fromDate.getDate() + 1);
+    const fromDateStr = fromDate.toISOString().split('T')[0];
+
+    console.log(`[metrics] Background refresh starting for ${storeId}: ${fromDateStr} → ${today}`);
+
+    // Run incremental refresh
+    await incrementalRefresh(storeId, fromDateStr, today);
+
+    console.log(`[metrics] ✓ Background refresh completed for ${storeId}`);
+  } catch (err) {
+    console.error(`[metrics] ✗ Background refresh failed for ${storeId}:`, err);
+  } finally {
+    // Always release lock if acquired
+    if (lockAcquired) {
+      try {
+        await releaseRefreshLock(storeId);
+      } catch (err) {
+        console.error(`[metrics] Failed to release lock for ${storeId}:`, err);
+      }
+    }
+  }
+}
+
+/**
  * Get homepage metrics from orders_daily_agg
  * Returns aggregated data for today, week, month, year, and last 30 days sparkline
+ * Implements lazy incremental refresh: checks if data is stale and triggers background update
  *
  * @param {string} storeId - Store ID or 'ALL' for all stores
  * @returns {Promise<object>} Metrics object
@@ -299,6 +436,49 @@ async function getHomeMetrics(storeId = 'ALL') {
   const now = new Date();
   const bucharestNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
   const today = bucharestNow.toISOString().split('T')[0];
+
+  // Check for staleness and trigger background refresh if needed
+  let refreshTriggered = false;
+  let refreshRunning = false;
+  let lastAggDate = null;
+
+  try {
+    // Get max agg_date for this store
+    const maxAggDate = await getMaxAggDate(storeId);
+    lastAggDate = maxAggDate;
+
+    if (maxAggDate && maxAggDate < today) {
+      // Data is stale - missing dates between maxAggDate and today
+      console.log(`[metrics] Stale data detected for ${storeId}: max_agg_date=${maxAggDate}, today=${today}`);
+
+      // Try to acquire lock and trigger background refresh (non-blocking)
+      const lockAcquired = await tryAcquireRefreshLock(storeId);
+
+      if (lockAcquired) {
+        refreshTriggered = true;
+        refreshRunning = true;
+
+        // Trigger background refresh without awaiting
+        setImmediate(() => {
+          backgroundRefreshJob(storeId, today, maxAggDate)
+            .catch(err => console.error(`[metrics] Background refresh error for ${storeId}:`, err));
+        });
+
+        console.log(`[metrics] Background refresh triggered for ${storeId}: ${maxAggDate} → ${today}`);
+      } else {
+        // Another refresh is already running
+        refreshRunning = true;
+        console.log(`[metrics] Refresh already running for ${storeId}, skipping trigger`);
+      }
+    } else if (!maxAggDate) {
+      console.log(`[metrics] No data in orders_daily_agg for ${storeId} - run backfill first`);
+    } else {
+      console.log(`[metrics] Data is up-to-date for ${storeId}: max_agg_date=${maxAggDate}, today=${today}`);
+    }
+  } catch (err) {
+    console.error(`[metrics] Failed to check staleness for ${storeId}:`, err);
+    // Continue with query even if staleness check fails
+  }
 
   // Calculate date boundaries
   const todayDate = new Date(today);
@@ -393,9 +573,14 @@ async function getHomeMetrics(storeId = 'ALL') {
     })),
     last_sync_at: lastSync.last_sync_at,
     last_sync_status: lastSync.last_sync_status,
+    // Lazy refresh status fields
+    refresh_triggered: refreshTriggered,
+    refresh_running: refreshRunning,
+    last_agg_date: lastAggDate,
+    target_date: today,
   };
 
-  console.log(`[metrics] Metrics for ${storeId}: today=${metrics.today_orders}, week=${metrics.week_orders}, month=${metrics.month_orders}, year=${metrics.year_orders}, last_sync=${lastSync.last_sync_at}`);
+  console.log(`[metrics] Metrics for ${storeId}: today=${metrics.today_orders}, week=${metrics.week_orders}, month=${metrics.month_orders}, year=${metrics.year_orders}, last_sync=${lastSync.last_sync_at}, refresh_triggered=${refreshTriggered}, refresh_running=${refreshRunning}`);
 
   return metrics;
 }
