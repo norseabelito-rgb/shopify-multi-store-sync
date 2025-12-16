@@ -1380,6 +1380,7 @@ function dashboardPage() {
       border-radius: 12px;
       border: 1px solid var(--border);
       padding: 16px;
+      overflow: hidden;
     }
 
     .reports-month-selector {
@@ -1390,16 +1391,19 @@ function dashboardPage() {
     }
 
     .reports-month-label {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      flex: 1;
+      text-align: center;
     }
 
     .reports-calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
+      gap: 4px;
+      width: 100%;
     }
 
     .reports-calendar-cell {
@@ -1410,9 +1414,11 @@ function dashboardPage() {
       justify-content: center;
       background: rgba(15, 23, 42, 0.6);
       border: 1px solid var(--border-soft);
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
+      min-width: 0;
+      font-size: 11px;
     }
 
     .reports-calendar-cell.empty {
@@ -1515,6 +1521,20 @@ function dashboardPage() {
       text-align: center;
       color: var(--muted);
       margin: 0;
+      font-size: 14px;
+    }
+
+    .reports-error-banner {
+      background: rgba(251, 113, 133, 0.15);
+      border: 1px solid var(--danger);
+      border-radius: 10px;
+      padding: 16px;
+      color: var(--danger);
+    }
+
+    .reports-error-banner strong {
+      display: block;
+      margin-bottom: 6px;
       font-size: 14px;
     }
 
@@ -1764,6 +1784,18 @@ function dashboardPage() {
       gap: 10px;
       margin-top: 20px;
       justify-content: flex-end;
+    }
+
+    .reports-save-indicator {
+      color: var(--success);
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      padding: 10px;
+      margin-top: 10px;
+      background: rgba(34, 197, 94, 0.15);
+      border-radius: 8px;
+      border: 1px solid var(--success);
     }
 
     .reports-projects-checkboxes {
@@ -2638,6 +2670,7 @@ function dashboardPage() {
           projectId: '',
         },
         loading: false,
+        error: null,
       };
 
       function formatNumber(n) {
@@ -4730,9 +4763,17 @@ function dashboardPage() {
 
       async function loadReportsPeople() {
         try {
+          console.log('[reports] Loading people...');
           const res = await fetch('/daily-reports/people?active=true');
+          console.log('[reports] People response status:', res.status);
+
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+
           const data = await res.json();
           reportsState.people = data.people || [];
+          console.log('[reports] Loaded people:', reportsState.people.length);
         } catch (err) {
           console.error('[reports] Failed to load people:', err);
           reportsState.people = [];
@@ -4741,9 +4782,17 @@ function dashboardPage() {
 
       async function loadReportsProjects() {
         try {
+          console.log('[reports] Loading projects...');
           const res = await fetch('/daily-reports/projects?active=true');
+          console.log('[reports] Projects response status:', res.status);
+
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+
           const data = await res.json();
           reportsState.projects = data.projects || [];
+          console.log('[reports] Loaded projects:', reportsState.projects.length);
           renderProjectsFilter();
         } catch (err) {
           console.error('[reports] Failed to load projects:', err);
@@ -4771,9 +4820,19 @@ function dashboardPage() {
           reportsState.currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         try {
-          const res = await fetch('/daily-reports/calendar?year=' + year + '&month=' + month);
+          const url = '/daily-reports/calendar?year=' + year + '&month=' + month;
+          console.log('[reports] Loading calendar:', url);
+
+          const res = await fetch(url);
+          console.log('[reports] Calendar response status:', res.status);
+
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+
           const data = await res.json();
           reportsState.calendarStats = data.stats || [];
+          console.log('[reports] Loaded calendar stats:', reportsState.calendarStats.length, 'days');
           renderReportsCalendar();
         } catch (err) {
           console.error('[reports] Failed to load calendar:', err);
@@ -4843,6 +4902,7 @@ function dashboardPage() {
 
       async function loadReportsForDate(dateStr) {
         reportsState.loading = true;
+        reportsState.error = null;
         renderReportsSummary();
         renderReportsCards();
 
@@ -4855,23 +4915,35 @@ function dashboardPage() {
             params.set('q', reportsState.filters.peopleSearch);
           }
 
-          const res = await fetch('/daily-reports?' + params.toString());
-          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const url = '/daily-reports?' + params.toString();
+          console.log('[reports] Loading reports:', url);
+
+          const res = await fetch(url);
+          console.log('[reports] Response status:', res.status);
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error('HTTP ' + res.status + ': ' + errorText);
+          }
 
           const data = await res.json();
+          console.log('[reports] Loaded reports:', {
+            reportsCount: (data.reports || []).length,
+            summary: data.summary
+          });
+
           reportsState.reports = data.reports || [];
           reportsState.summary = data.summary || null;
-
-          renderReportsSummary();
-          renderReportsCards();
+          reportsState.error = null;
         } catch (err) {
           console.error('[reports] Failed to load reports for date:', err);
           reportsState.reports = [];
           reportsState.summary = null;
-          renderReportsSummary();
-          renderReportsCards();
+          reportsState.error = err.message || String(err);
         } finally {
           reportsState.loading = false;
+          renderReportsSummary();
+          renderReportsCards();
         }
       }
 
@@ -4881,6 +4953,15 @@ function dashboardPage() {
 
         if (!reportsState.selectedDate) {
           container.innerHTML = '<p class="reports-summary-prompt">← Select a date to view team reports</p>';
+          return;
+        }
+
+        if (reportsState.error) {
+          container.innerHTML =
+            '<div class="reports-error-banner">' +
+              '<strong>Error loading reports</strong><br />' +
+              '<span style="font-size: 12px;">' + escapeHtml(reportsState.error) + '</span>' +
+            '</div>';
           return;
         }
 
@@ -4939,6 +5020,11 @@ function dashboardPage() {
           return;
         }
 
+        if (reportsState.error) {
+          container.innerHTML = '';
+          return;
+        }
+
         if (reportsState.loading) {
           container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">Loading reports...</p>';
           return;
@@ -4953,6 +5039,21 @@ function dashboardPage() {
         // Get all active people (for missing people cards)
         const allPeople = reportsState.people;
 
+        if (allPeople.length === 0) {
+          container.innerHTML =
+            '<div style="text-align: center; padding: 60px 20px;">' +
+              '<p style="color: var(--muted); font-size: 16px; margin-bottom: 16px;">No team members found</p>' +
+              '<button id="reports-empty-add-people-btn" class="btn-primary">Add Team Members</button>' +
+            '</div>';
+
+          // Attach listener for the add people button
+          const addPeopleBtn = document.getElementById('reports-empty-add-people-btn');
+          if (addPeopleBtn) {
+            addPeopleBtn.onclick = () => openPeopleManagementModal();
+          }
+          return;
+        }
+
         // Filter by search if needed
         let filteredPeople = allPeople;
         if (reportsState.filters.peopleSearch) {
@@ -4964,7 +5065,7 @@ function dashboardPage() {
         }
 
         if (filteredPeople.length === 0) {
-          container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">No people found</p>';
+          container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">No people found matching your search</p>';
           return;
         }
 
@@ -5121,9 +5222,10 @@ function dashboardPage() {
                   '</div>' +
                 '</div>' +
                 '<div class="reports-form-actions">' +
-                  '<button type="submit" class="btn-primary">Save Report</button>' +
+                  '<button type="submit" class="btn-primary" id="editor-save-btn">Save Report</button>' +
                   '<button type="button" class="btn-secondary reports-editor-cancel">Cancel</button>' +
                 '</div>' +
+                '<div id="editor-save-indicator" class="reports-save-indicator" style="display:none;">✓ Saved!</div>' +
               '</form>' +
             '</div>' +
           '</div>';
@@ -5167,24 +5269,52 @@ function dashboardPage() {
             edited_by_person_id: person.id, // TODO: Replace with authenticated user ID when UAM is implemented
           };
 
+          const saveBtn = document.getElementById('editor-save-btn');
+          const saveIndicator = document.getElementById('editor-save-indicator');
+
           try {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            console.log('[reports] Saving report:', payload);
+
             const res = await fetch('/daily-reports/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
 
+            console.log('[reports] Save response status:', res.status);
+
             if (!res.ok) {
-              const errData = await res.json();
+              const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
               throw new Error(errData.error || 'Failed to save report');
             }
 
-            closeModal();
+            const result = await res.json();
+            console.log('[reports] Report saved successfully:', result);
+
+            // Show success indicator
+            if (saveIndicator) {
+              saveIndicator.style.display = 'block';
+              setTimeout(() => {
+                if (saveIndicator) saveIndicator.style.display = 'none';
+              }, 2000);
+            }
+
+            // Reload data
             await loadReportsForDate(reportsState.selectedDate);
             await loadReportsCalendar();
+
+            // Close modal after a brief delay to show the indicator
+            setTimeout(() => {
+              closeModal();
+            }, 1500);
           } catch (err) {
             console.error('[reports] Failed to save report:', err);
             alert('Failed to save report: ' + err.message);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Report';
           }
         };
       }
