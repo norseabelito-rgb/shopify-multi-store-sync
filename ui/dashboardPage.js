@@ -2026,6 +2026,297 @@ function dashboardPage() {
         grid-template-columns: repeat(3, 1fr);
       }
     }
+
+    /* ==================== AI INSIGHTS SECTION ==================== */
+
+    .ai-insights-section {
+      background: var(--panel-soft);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 14px 16px 14px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .ai-insights-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .ai-insights-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ai-insights-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #cbd5f5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-insights-title .ai-icon {
+      width: 16px;
+      height: 16px;
+      opacity: 0.8;
+    }
+
+    .ai-insights-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .ai-insights-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-regenerate-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .ai-regenerate-btn:hover:not(:disabled) {
+      background: rgba(79, 140, 255, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .ai-regenerate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .ai-regenerate-btn.loading svg {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .ai-cache-badge {
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .ai-cache-badge.hit {
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--success);
+    }
+
+    .ai-insights-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .ai-insights-main {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ai-insight-summary {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .ai-insight-bullets {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #d1d5db;
+    }
+
+    .ai-insight-bullets li {
+      margin-bottom: 4px;
+    }
+
+    .ai-insights-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ai-insight-actions-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .ai-insight-actions-list {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #93c5fd;
+    }
+
+    .ai-insight-actions-list li {
+      margin-bottom: 4px;
+    }
+
+    .ai-insight-numbers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .ai-number-chip {
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.8);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ai-number-chip .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .ai-number-chip .value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .ai-number-chip.warning .value {
+      color: #fbbf24;
+    }
+
+    .ai-number-chip.danger .value {
+      color: var(--danger);
+    }
+
+    .ai-insights-footer {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .ai-confidence {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-confidence-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .ai-confidence-badge.high {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .ai-confidence-badge.medium {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+    }
+
+    .ai-confidence-badge.low {
+      background: rgba(251, 113, 133, 0.15);
+      color: var(--danger);
+    }
+
+    .ai-insights-skeleton {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .skeleton-line {
+      height: 14px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.1) 25%, rgba(148, 163, 184, 0.2) 50%, rgba(148, 163, 184, 0.1) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.medium { width: 70%; }
+    .skeleton-line.long { width: 90%; }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .ai-insights-error {
+      padding: 16px;
+      background: rgba(251, 113, 133, 0.1);
+      border: 1px solid rgba(251, 113, 133, 0.2);
+      border-radius: 8px;
+      color: #fecaca;
+      font-size: 12px;
+    }
+
+    .ai-data-gaps {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #fef3c7;
+    }
+
+    .ai-data-gaps-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .ai-insights-content {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2190,6 +2481,39 @@ function dashboardPage() {
                 Total comenzi cumulate în anul curent.
               </p>
             </article>
+          </section>
+
+          <!-- AI INSIGHTS SECTION -->
+          <section class="ai-insights-section" id="ai-insights-section">
+            <div class="ai-insights-header">
+              <div class="ai-insights-title-block">
+                <div class="ai-insights-title">
+                  <svg class="ai-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                  </svg>
+                  AI Insights
+                </div>
+                <div class="ai-insights-subtitle">Returns / Money Loss Analysis</div>
+              </div>
+              <div class="ai-insights-actions">
+                <span class="ai-cache-badge" id="ai-cache-badge" style="display:none;">cached</span>
+                <button class="ai-regenerate-btn" id="ai-regenerate-btn" title="Regenerate insight">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <path d="M13.65 2.35C12.2 0.9 10.21 0 8 0 3.58 0 0.01 3.58 0.01 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
+                  </svg>
+                  <span>Regenerate</span>
+                </button>
+              </div>
+            </div>
+            <div id="ai-insights-body">
+              <!-- Content loaded dynamically -->
+              <div class="ai-insights-skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line long"></div>
+              </div>
+            </div>
           </section>
 
           <section class="panel">
@@ -2688,6 +3012,12 @@ function dashboardPage() {
       const storesCountHome = document.getElementById('stores-count-home');
       const homeTableWrapper = document.getElementById('home-table-wrapper');
       const homeEmpty = document.getElementById('home-empty');
+
+      // AI Insights elements
+      const aiInsightsSection = document.getElementById('ai-insights-section');
+      const aiInsightsBody = document.getElementById('ai-insights-body');
+      const aiRegenerateBtn = document.getElementById('ai-regenerate-btn');
+      const aiCacheBadge = document.getElementById('ai-cache-badge');
 
       const storesCountMy = document.getElementById('stores-count-mystores');
       const myGridWrapper = document.getElementById('mystores-grid-wrapper');
@@ -4620,6 +4950,230 @@ function dashboardPage() {
         }
       }
 
+      // ==================== AI INSIGHTS FUNCTIONS ====================
+
+      let aiInsightsLoading = false;
+
+      function renderAiInsightsSkeleton() {
+        if (!aiInsightsBody) return;
+        aiInsightsBody.innerHTML = \`
+          <div class="ai-insights-skeleton">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
+        \`;
+      }
+
+      function renderAiInsightsError(message) {
+        if (!aiInsightsBody) return;
+        aiInsightsBody.innerHTML = \`
+          <div class="ai-insights-error">
+            <strong>Unable to load AI insights</strong><br>
+            \${escapeHtml(message)}
+          </div>
+        \`;
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function formatCurrency(amount) {
+        if (amount == null) return '–';
+        return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      }
+
+      function renderAiInsights(data) {
+        if (!aiInsightsBody) return;
+
+        const insight = data.insight;
+        const cache = data.cache || {};
+
+        // Update cache badge
+        if (aiCacheBadge) {
+          if (cache.hit) {
+            aiCacheBadge.textContent = 'cached';
+            aiCacheBadge.className = 'ai-cache-badge hit';
+            aiCacheBadge.style.display = 'inline';
+          } else {
+            aiCacheBadge.style.display = 'none';
+          }
+        }
+
+        // Check for error in insight
+        if (insight.error) {
+          renderAiInsightsError(insight.summary || 'Unknown error');
+          return;
+        }
+
+        // Build bullets HTML
+        const bulletsHtml = (insight.bullets || [])
+          .map(b => '<li>' + escapeHtml(b) + '</li>')
+          .join('');
+
+        // Build actions HTML
+        const actionsHtml = (insight.actions || [])
+          .map(a => '<li>' + escapeHtml(a) + '</li>')
+          .join('');
+
+        // Build numbers chips
+        const numbers = insight.numbers || {};
+        let numbersHtml = '';
+
+        if (numbers.return_rate_percent != null) {
+          const rateClass = numbers.return_rate_percent > 10 ? 'danger' : numbers.return_rate_percent > 5 ? 'warning' : '';
+          numbersHtml += \`
+            <div class="ai-number-chip \${rateClass}">
+              <span class="label">Return Rate</span>
+              <span class="value">\${numbers.return_rate_percent.toFixed(1)}%</span>
+            </div>
+          \`;
+        }
+
+        if (numbers.total_refunded_month != null) {
+          numbersHtml += \`
+            <div class="ai-number-chip">
+              <span class="label">Refunded (Month)</span>
+              <span class="value">\${formatCurrency(numbers.total_refunded_month)}</span>
+            </div>
+          \`;
+        }
+
+        if (numbers.top_refund_store) {
+          numbersHtml += \`
+            <div class="ai-number-chip">
+              <span class="label">Top Returns</span>
+              <span class="value">\${escapeHtml(numbers.top_refund_store)}</span>
+            </div>
+          \`;
+        }
+
+        // Build data gaps section
+        let dataGapsHtml = '';
+        if (insight.data_gaps && insight.data_gaps.length > 0) {
+          const gapsListHtml = insight.data_gaps.map(g => '<li>' + escapeHtml(g) + '</li>').join('');
+          dataGapsHtml = \`
+            <div class="ai-data-gaps">
+              <div class="ai-data-gaps-title">Data Gaps</div>
+              <ul style="margin:0;padding-left:16px;">\${gapsListHtml}</ul>
+            </div>
+          \`;
+        }
+
+        // Confidence badge
+        const confidence = insight.confidence || 'medium';
+        const confidenceLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
+
+        // Generated time
+        let generatedTimeStr = '';
+        if (insight.generated_at) {
+          const genDate = new Date(insight.generated_at);
+          generatedTimeStr = genDate.toLocaleString('en-US', {
+            timeZone: 'Europe/Bucharest',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+        }
+
+        aiInsightsBody.innerHTML = \`
+          <div class="ai-insights-content">
+            <div class="ai-insights-main">
+              <div class="ai-insight-summary">\${escapeHtml(insight.summary || '')}</div>
+              <ul class="ai-insight-bullets">\${bulletsHtml}</ul>
+              \${dataGapsHtml}
+            </div>
+            <div class="ai-insights-sidebar">
+              <div>
+                <div class="ai-insight-actions-title">Recommended Actions</div>
+                <ol class="ai-insight-actions-list">\${actionsHtml}</ol>
+              </div>
+              <div class="ai-insight-numbers">\${numbersHtml}</div>
+            </div>
+          </div>
+          <div class="ai-insights-footer">
+            <div class="ai-confidence">
+              <span>Confidence:</span>
+              <span class="ai-confidence-badge \${confidence}">\${confidenceLabel}</span>
+              \${insight.fallback ? '<span style="margin-left:8px;">(Basic analysis - AI unavailable)</span>' : ''}
+            </div>
+            <div>\${generatedTimeStr ? 'Generated at ' + generatedTimeStr : ''}</div>
+          </div>
+        \`;
+      }
+
+      async function loadAiInsights(force = false) {
+        if (!aiInsightsBody) return;
+        if (aiInsightsLoading) return;
+
+        aiInsightsLoading = true;
+
+        // Show skeleton while loading
+        renderAiInsightsSkeleton();
+
+        // Update button state
+        if (aiRegenerateBtn) {
+          aiRegenerateBtn.disabled = true;
+          aiRegenerateBtn.classList.add('loading');
+        }
+
+        try {
+          const storeId = selectedStoreId === 'all' ? 'ALL' : selectedStoreId;
+          const url = '/ai/insights/home?store_id=' + encodeURIComponent(storeId) + (force ? '&force=1' : '');
+
+          console.log('[ai-insights] Loading insights for:', storeId, force ? '(force refresh)' : '');
+
+          const res = await fetch(url);
+
+          if (!res.ok) {
+            if (res.status === 429) {
+              const errorData = await res.json();
+              throw new Error('Rate limited. Please wait ' + (errorData.retry_after || 30) + ' seconds.');
+            }
+            throw new Error('HTTP ' + res.status);
+          }
+
+          const data = await res.json();
+
+          console.log('[ai-insights] Loaded:', {
+            cache_hit: data.cache?.hit,
+            confidence: data.insight?.confidence,
+            llm_available: data.llm?.available,
+          });
+
+          renderAiInsights(data);
+
+          // If refresh is running, auto-reload after delay
+          if (data.refresh?.returns_refresh_running) {
+            console.log('[ai-insights] Returns refresh running, will auto-reload in 10 seconds...');
+            setTimeout(() => loadAiInsights(false), 10000);
+          }
+        } catch (err) {
+          console.error('[ai-insights] Failed to load:', err);
+          renderAiInsightsError(err.message || 'Unknown error');
+        } finally {
+          aiInsightsLoading = false;
+
+          // Reset button state
+          if (aiRegenerateBtn) {
+            aiRegenerateBtn.disabled = false;
+            aiRegenerateBtn.classList.remove('loading');
+          }
+        }
+      }
+
+      // Regenerate button handler
+      if (aiRegenerateBtn) {
+        aiRegenerateBtn.addEventListener('click', () => {
+          loadAiInsights(true);
+        });
+      }
+
       // Manual refresh metrics handler
       let refreshPollInterval = null;
 
@@ -4797,6 +5351,9 @@ function dashboardPage() {
 
           // Load DB-first metrics from orders_daily_agg table
           await loadMetrics();
+
+          // Load AI Insights (non-blocking)
+          loadAiInsights();
 
           if (prevStoreId !== selectedStoreId) {
             setView(currentView);
