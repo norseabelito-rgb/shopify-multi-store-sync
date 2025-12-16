@@ -1,11 +1,11 @@
 // routes/ai.js
-// API routes for AI-powered insights
+// API routes for AI-powered insights (Product Sales / Romanian)
 
 const express = require('express');
 const router = express.Router();
 
-const { getHomeReturnsInsight, invalidateCache, cleanExpiredCache } = require('../services/aiInsightsService');
-const { manualReturnsRefresh, getReturnsSnapshot, getTodayBucharest } = require('../services/returnsService');
+const { getHomeProductInsight, invalidateCache, cleanExpiredCache } = require('../services/aiInsightsService');
+const { buildSalesSnapshot, getTodayBucharest } = require('../services/productSalesService');
 const { getStatus: getLLMStatus } = require('../services/llmService');
 
 // Rate limiting for regenerate button
@@ -31,7 +31,7 @@ function requireTasksSecret(req, res, next) {
 
 /**
  * GET /ai/insights/home
- * Get AI-generated returns insight for the home view
+ * Get AI-generated product sales insight for the home view (Romanian)
  *
  * Query params:
  * - store_id: Store ID or 'ALL' (default: 'ALL')
@@ -54,7 +54,7 @@ router.get('/insights/home', async (req, res) => {
 
         return res.status(429).json({
           error: 'Rate limited',
-          message: `Please wait ${waitSeconds} seconds before regenerating`,
+          message: `Așteaptă ${waitSeconds} secunde înainte de regenerare`,
           retry_after: waitSeconds,
         });
       }
@@ -63,13 +63,13 @@ router.get('/insights/home', async (req, res) => {
       regenerateRateLimits.set(storeId, now);
     }
 
-    const result = await getHomeReturnsInsight(storeId, force);
+    const result = await getHomeProductInsight(storeId, force);
 
     res.json(result);
   } catch (err) {
     console.error('[ai-routes] Error getting home insight:', err);
     res.status(500).json({
-      error: 'Internal server error',
+      error: 'Eroare internă',
       message: err.message,
     });
   }
@@ -97,7 +97,7 @@ router.post('/insights/home/refresh', async (req, res) => {
 
       return res.status(429).json({
         error: 'Rate limited',
-        message: `Please wait ${waitSeconds} seconds before regenerating`,
+        message: `Așteaptă ${waitSeconds} secunde înainte de regenerare`,
         retry_after: waitSeconds,
       });
     }
@@ -105,13 +105,13 @@ router.post('/insights/home/refresh', async (req, res) => {
     // Update rate limit timestamp
     regenerateRateLimits.set(storeId, now);
 
-    const result = await getHomeReturnsInsight(storeId, true);
+    const result = await getHomeProductInsight(storeId, true);
 
     res.json(result);
   } catch (err) {
     console.error('[ai-routes] Error refreshing home insight:', err);
     res.status(500).json({
-      error: 'Internal server error',
+      error: 'Eroare internă',
       message: err.message,
     });
   }
@@ -136,21 +136,21 @@ router.get('/status', async (req, res) => {
 });
 
 /**
- * GET /ai/returns/snapshot
- * Get returns snapshot data (for debugging/monitoring)
+ * GET /ai/sales/snapshot
+ * Get sales snapshot data (for debugging/monitoring)
  *
  * Query params:
  * - store_id: Store ID or 'ALL' (default: 'ALL')
  */
-router.get('/returns/snapshot', async (req, res) => {
+router.get('/sales/snapshot', async (req, res) => {
   try {
     const storeId = req.query.store_id || 'ALL';
 
-    const snapshot = await getReturnsSnapshot(storeId);
+    const snapshot = await buildSalesSnapshot(storeId);
 
     res.json(snapshot);
   } catch (err) {
-    console.error('[ai-routes] Error getting returns snapshot:', err);
+    console.error('[ai-routes] Error getting sales snapshot:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -204,43 +204,24 @@ router.post('/cache/cleanup', async (req, res) => {
 // ==================== TASKS ENDPOINTS (require x-tasks-secret) ====================
 
 /**
- * POST /ai/tasks/returns/refresh
- * Trigger returns aggregation refresh for a date range
+ * POST /ai/tasks/cache/cleanup
+ * Trigger cleanup of expired cache entries
  * Requires x-tasks-secret header
- *
- * Body or Query:
- * - from_date: Start date YYYY-MM-DD (default: 30 days ago)
- * - to_date: End date YYYY-MM-DD (default: today)
  */
-router.post('/tasks/returns/refresh', requireTasksSecret, async (req, res) => {
+router.post('/tasks/cache/cleanup', requireTasksSecret, async (req, res) => {
   try {
-    const today = getTodayBucharest();
+    console.log(`[ai-routes] POST /tasks/cache/cleanup`);
 
-    // Calculate default from_date (30 days ago)
-    const defaultFromDate = new Date(today);
-    defaultFromDate.setDate(defaultFromDate.getDate() - 30);
-    const defaultFromDateStr = defaultFromDate.toISOString().split('T')[0];
+    const deleted = await cleanExpiredCache();
 
-    const fromDate = req.body?.from_date || req.query?.from_date || defaultFromDateStr;
-    const toDate = req.body?.to_date || req.query?.to_date || today;
-
-    console.log(`[ai-routes] POST /tasks/returns/refresh from=${fromDate} to=${toDate}`);
-
-    // Return 202 and run in background
-    res.status(202).json({
+    res.json({
       ok: true,
-      message: 'Returns refresh job started',
-      from_date: fromDate,
-      to_date: toDate,
-      started_at: new Date().toISOString(),
+      message: 'Cache cleanup completed',
+      deleted,
+      completed_at: new Date().toISOString(),
     });
-
-    // Run refresh in background
-    manualReturnsRefresh('ALL', fromDate, toDate)
-      .then(result => console.log('[ai-routes] Returns refresh completed:', result))
-      .catch(err => console.error('[ai-routes] Returns refresh failed:', err));
   } catch (err) {
-    console.error('[ai-routes] Error triggering returns refresh:', err);
+    console.error('[ai-routes] Error cleaning cache:', err);
     res.status(500).json({ error: err.message });
   }
 });

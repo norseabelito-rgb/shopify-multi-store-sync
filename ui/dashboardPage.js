@@ -2250,19 +2250,197 @@ function dashboardPage() {
       letter-spacing: 0.08em;
     }
 
-    .ai-confidence-badge.high {
+    .ai-confidence-badge.high,
+    .ai-confidence-badge.ridicata {
       background: rgba(34, 197, 94, 0.15);
       color: var(--success);
     }
 
-    .ai-confidence-badge.medium {
+    .ai-confidence-badge.medium,
+    .ai-confidence-badge.medie {
       background: rgba(251, 191, 36, 0.15);
       color: #fbbf24;
     }
 
-    .ai-confidence-badge.low {
+    .ai-confidence-badge.low,
+    .ai-confidence-badge.scazuta {
       background: rgba(251, 113, 133, 0.15);
       color: var(--danger);
+    }
+
+    /* Product Sales specific styles */
+    .ai-insights-sales {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ai-insights-sales .ai-insights-main {
+      flex: 1;
+    }
+
+    .ai-insights-sales .ai-insights-sidebar {
+      flex-shrink: 0;
+    }
+
+    .ai-insights-header-summary {
+      margin-bottom: 4px;
+    }
+
+    .ai-insight-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .ai-season-context {
+      margin-top: 6px;
+      padding: 6px 10px;
+      background: rgba(96, 165, 250, 0.1);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #93c5fd;
+    }
+
+    .ai-section {
+      margin-bottom: 12px;
+    }
+
+    .ai-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .ai-section-compact {
+      margin-bottom: 8px;
+    }
+
+    .ai-products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .ai-product-card {
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+    }
+
+    .ai-product-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .ai-sku {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .ai-product-why {
+      font-size: 11px;
+      color: #93c5fd;
+      margin-bottom: 4px;
+    }
+
+    .ai-product-metrics {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .ai-product-stores {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .ai-product-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .ai-action-tag {
+      padding: 2px 6px;
+      background: rgba(34, 197, 94, 0.15);
+      border-radius: 4px;
+      font-size: 9px;
+      color: var(--success);
+    }
+
+    .ai-momentum-list,
+    .ai-bestsellers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ai-momentum-item,
+    .ai-bestseller-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .ai-momentum-name,
+    .ai-bestseller-name {
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .ai-momentum-trend {
+      color: var(--success);
+      font-size: 10px;
+    }
+
+    .ai-momentum-action {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .ai-bestseller-consistency {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .ai-insights-secondary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .ai-number-chip.positive .value {
+      color: var(--success);
+    }
+
+    .ai-number-chip.negative .value {
+      color: var(--danger);
+    }
+
+    @media (max-width: 700px) {
+      .ai-insights-secondary {
+        grid-template-columns: 1fr;
+      }
+      .ai-products-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .ai-insights-skeleton {
@@ -2483,7 +2661,7 @@ function dashboardPage() {
             </article>
           </section>
 
-          <!-- AI INSIGHTS SECTION -->
+          <!-- AI INSIGHTS SECTION - Product Sales (Romanian) -->
           <section class="ai-insights-section" id="ai-insights-section">
             <div class="ai-insights-header">
               <div class="ai-insights-title-block">
@@ -2491,17 +2669,17 @@ function dashboardPage() {
                   <svg class="ai-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                   </svg>
-                  AI Insights
+                  Produse de Promovat
                 </div>
-                <div class="ai-insights-subtitle">Returns / Money Loss Analysis</div>
+                <div class="ai-insights-subtitle">Analiză AI - Ce să promovezi acum</div>
               </div>
               <div class="ai-insights-actions">
                 <span class="ai-cache-badge" id="ai-cache-badge" style="display:none;">cached</span>
-                <button class="ai-regenerate-btn" id="ai-regenerate-btn" title="Regenerate insight">
+                <button class="ai-regenerate-btn" id="ai-regenerate-btn" title="Regenerează analiza">
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                     <path d="M13.65 2.35C12.2 0.9 10.21 0 8 0 3.58 0 0.01 3.58 0.01 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
                   </svg>
-                  <span>Regenerate</span>
+                  <span>Regenerează</span>
                 </button>
               </div>
             </div>
@@ -4971,7 +5149,7 @@ function dashboardPage() {
         if (!aiInsightsBody) return;
         aiInsightsBody.innerHTML = \`
           <div class="ai-insights-error">
-            <strong>Unable to load AI insights</strong><br>
+            <strong>Nu s-au putut încărca recomandările AI</strong><br>
             \${escapeHtml(message)}
           </div>
         \`;
@@ -4985,7 +5163,7 @@ function dashboardPage() {
 
       function formatCurrency(amount) {
         if (amount == null) return '–';
-        return amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return Math.round(amount).toLocaleString('ro-RO');
       }
 
       function renderAiInsights(data) {
@@ -4993,6 +5171,7 @@ function dashboardPage() {
 
         const insight = data.insight;
         const cache = data.cache || {};
+        const metrics = data.metrics || {};
 
         // Update cache badge
         if (aiCacheBadge) {
@@ -5007,73 +5186,144 @@ function dashboardPage() {
 
         // Check for error in insight
         if (insight.error) {
-          renderAiInsightsError(insight.summary || 'Unknown error');
+          renderAiInsightsError(insight.sumar || 'Eroare necunoscută');
           return;
         }
 
-        // Build bullets HTML
-        const bulletsHtml = (insight.bullets || [])
-          .map(b => '<li>' + escapeHtml(b) + '</li>')
-          .join('');
+        // Build recommended products HTML
+        const produseRecomandate = insight.produse_recomandate || [];
+        let produseRecomandateHtml = '';
+        if (produseRecomandate.length > 0) {
+          const produseItems = produseRecomandate.map(p => {
+            const actiuniHtml = (p.actiuni || []).map(a => '<span class="ai-action-tag">' + escapeHtml(a) + '</span>').join(' ');
+            const magazineHtml = p.magazine_recomandate && p.magazine_recomandate.length > 0
+              ? '<div class="ai-product-stores">Magazine: ' + p.magazine_recomandate.map(m => escapeHtml(m)).join(', ') + '</div>'
+              : '';
+            return \`
+              <div class="ai-product-card">
+                <div class="ai-product-name">\${escapeHtml(p.nume)}\${p.sku ? ' <span class="ai-sku">(' + escapeHtml(p.sku) + ')</span>' : ''}</div>
+                <div class="ai-product-why">\${escapeHtml(p.de_ce || '')}</div>
+                <div class="ai-product-metrics">\${escapeHtml(p.metrici || '')}</div>
+                \${magazineHtml}
+                <div class="ai-product-actions">\${actiuniHtml}</div>
+              </div>
+            \`;
+          }).join('');
+          produseRecomandateHtml = \`
+            <div class="ai-section">
+              <div class="ai-section-title">Produse Recomandate</div>
+              <div class="ai-products-grid">\${produseItems}</div>
+            </div>
+          \`;
+        }
 
-        // Build actions HTML
-        const actionsHtml = (insight.actions || [])
-          .map(a => '<li>' + escapeHtml(a) + '</li>')
-          .join('');
+        // Build momentum products HTML
+        const produseMomentum = insight.produse_momentum || [];
+        let produseMomentumHtml = '';
+        if (produseMomentum.length > 0) {
+          const momentumItems = produseMomentum.map(p => \`
+            <div class="ai-momentum-item">
+              <span class="ai-momentum-name">\${escapeHtml(p.nume)}</span>
+              <span class="ai-momentum-trend">\${escapeHtml(p.trend || '')}</span>
+              <span class="ai-momentum-action">\${escapeHtml(p.actiune || '')}</span>
+            </div>
+          \`).join('');
+          produseMomentumHtml = \`
+            <div class="ai-section ai-section-compact">
+              <div class="ai-section-title">Produse cu Momentum</div>
+              <div class="ai-momentum-list">\${momentumItems}</div>
+            </div>
+          \`;
+        }
 
-        // Build numbers chips
-        const numbers = insight.numbers || {};
+        // Build steady bestsellers HTML
+        const bestsellersStabili = insight.bestsellers_stabili || [];
+        let bestsellersHtml = '';
+        if (bestsellersStabili.length > 0) {
+          const bestsellersItems = bestsellersStabili.map(p => \`
+            <div class="ai-bestseller-item">
+              <span class="ai-bestseller-name">\${escapeHtml(p.nume)}</span>
+              <span class="ai-bestseller-consistency">\${escapeHtml(p.consistenta || '')}</span>
+            </div>
+          \`).join('');
+          bestsellersHtml = \`
+            <div class="ai-section ai-section-compact">
+              <div class="ai-section-title">Bestsellers Stabili</div>
+              <div class="ai-bestsellers-list">\${bestsellersItems}</div>
+            </div>
+          \`;
+        }
+
+        // Build numbers chips (from insight.numere)
+        const numere = insight.numere || {};
         let numbersHtml = '';
 
-        if (numbers.return_rate_percent != null) {
-          const rateClass = numbers.return_rate_percent > 10 ? 'danger' : numbers.return_rate_percent > 5 ? 'warning' : '';
-          numbersHtml += \`
-            <div class="ai-number-chip \${rateClass}">
-              <span class="label">Return Rate</span>
-              <span class="value">\${numbers.return_rate_percent.toFixed(1)}%</span>
-            </div>
-          \`;
-        }
-
-        if (numbers.total_refunded_month != null) {
+        if (numere.venit_7_zile != null) {
           numbersHtml += \`
             <div class="ai-number-chip">
-              <span class="label">Refunded (Month)</span>
-              <span class="value">\${formatCurrency(numbers.total_refunded_month)}</span>
+              <span class="label">Venit 7 zile</span>
+              <span class="value">\${formatCurrency(numere.venit_7_zile)} RON</span>
             </div>
           \`;
         }
 
-        if (numbers.top_refund_store) {
+        if (numere.comenzi_7_zile != null) {
           numbersHtml += \`
             <div class="ai-number-chip">
-              <span class="label">Top Returns</span>
-              <span class="value">\${escapeHtml(numbers.top_refund_store)}</span>
+              <span class="label">Comenzi 7 zile</span>
+              <span class="value">\${numere.comenzi_7_zile}</span>
             </div>
           \`;
         }
 
-        // Build data gaps section
+        if (numere.trend_procent != null) {
+          const trendClass = numere.trend_procent > 0 ? 'positive' : numere.trend_procent < 0 ? 'negative' : '';
+          const trendSign = numere.trend_procent > 0 ? '+' : '';
+          numbersHtml += \`
+            <div class="ai-number-chip \${trendClass}">
+              <span class="label">Trend</span>
+              <span class="value">\${trendSign}\${numere.trend_procent.toFixed(1)}%</span>
+            </div>
+          \`;
+        }
+
+        if (numere.produs_top) {
+          numbersHtml += \`
+            <div class="ai-number-chip">
+              <span class="label">Top Produs</span>
+              <span class="value">\${escapeHtml(numere.produs_top)}</span>
+            </div>
+          \`;
+        }
+
+        // Season context
+        let seasonHtml = '';
+        if (insight.context_sezon) {
+          seasonHtml = \`<div class="ai-season-context">\${escapeHtml(insight.context_sezon)}</div>\`;
+        }
+
+        // Build data gaps section (Romanian)
         let dataGapsHtml = '';
-        if (insight.data_gaps && insight.data_gaps.length > 0) {
-          const gapsListHtml = insight.data_gaps.map(g => '<li>' + escapeHtml(g) + '</li>').join('');
+        if (insight.gaps_date && insight.gaps_date.length > 0) {
+          const gapsListHtml = insight.gaps_date.map(g => '<li>' + escapeHtml(g) + '</li>').join('');
           dataGapsHtml = \`
             <div class="ai-data-gaps">
-              <div class="ai-data-gaps-title">Data Gaps</div>
+              <div class="ai-data-gaps-title">Date Lipsă</div>
               <ul style="margin:0;padding-left:16px;">\${gapsListHtml}</ul>
             </div>
           \`;
         }
 
-        // Confidence badge
-        const confidence = insight.confidence || 'medium';
-        const confidenceLabel = confidence.charAt(0).toUpperCase() + confidence.slice(1);
+        // Confidence badge (Romanian)
+        const confidence = insight.incredere || 'medie';
+        const confidenceLabels = { scazuta: 'Scăzută', medie: 'Medie', ridicata: 'Ridicată' };
+        const confidenceLabel = confidenceLabels[confidence] || confidence;
 
         // Generated time
         let generatedTimeStr = '';
         if (insight.generated_at) {
           const genDate = new Date(insight.generated_at);
-          generatedTimeStr = genDate.toLocaleString('en-US', {
+          generatedTimeStr = genDate.toLocaleString('ro-RO', {
             timeZone: 'Europe/Bucharest',
             hour: '2-digit',
             minute: '2-digit',
@@ -5082,27 +5332,31 @@ function dashboardPage() {
         }
 
         aiInsightsBody.innerHTML = \`
-          <div class="ai-insights-content">
+          <div class="ai-insights-content ai-insights-sales">
+            <div class="ai-insights-header-summary">
+              <div class="ai-insight-title">\${escapeHtml(insight.titlu || 'Produse de Promovat')}</div>
+              <div class="ai-insight-summary">\${escapeHtml(insight.sumar || '')}</div>
+              \${seasonHtml}
+            </div>
             <div class="ai-insights-main">
-              <div class="ai-insight-summary">\${escapeHtml(insight.summary || '')}</div>
-              <ul class="ai-insight-bullets">\${bulletsHtml}</ul>
+              \${produseRecomandateHtml}
+              <div class="ai-insights-secondary">
+                \${produseMomentumHtml}
+                \${bestsellersHtml}
+              </div>
               \${dataGapsHtml}
             </div>
             <div class="ai-insights-sidebar">
-              <div>
-                <div class="ai-insight-actions-title">Recommended Actions</div>
-                <ol class="ai-insight-actions-list">\${actionsHtml}</ol>
-              </div>
               <div class="ai-insight-numbers">\${numbersHtml}</div>
             </div>
           </div>
           <div class="ai-insights-footer">
             <div class="ai-confidence">
-              <span>Confidence:</span>
+              <span>Încredere:</span>
               <span class="ai-confidence-badge \${confidence}">\${confidenceLabel}</span>
-              \${insight.fallback ? '<span style="margin-left:8px;">(Basic analysis - AI unavailable)</span>' : ''}
+              \${insight.fallback ? '<span style="margin-left:8px;">(Analiză de bază - AI indisponibil)</span>' : ''}
             </div>
-            <div>\${generatedTimeStr ? 'Generated at ' + generatedTimeStr : ''}</div>
+            <div>\${generatedTimeStr ? 'Generat la ' + generatedTimeStr : ''}</div>
           </div>
         \`;
       }
@@ -5148,9 +5402,9 @@ function dashboardPage() {
 
           renderAiInsights(data);
 
-          // If refresh is running, auto-reload after delay
-          if (data.refresh?.returns_refresh_running) {
-            console.log('[ai-insights] Returns refresh running, will auto-reload in 10 seconds...');
+          // If data refresh is running, auto-reload after delay
+          if (data.refresh?.data_refresh_running) {
+            console.log('[ai-insights] Date în curs de actualizare, reîncărcare în 10 secunde...');
             setTimeout(() => loadAiInsights(false), 10000);
           }
         } catch (err) {

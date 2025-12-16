@@ -1,16 +1,16 @@
 // services/aiInsightsService.js
-// AI Insights service for generating actionable analytics
+// AI Insights service for generating actionable product sales analytics
 // Implements caching, context building, and LLM orchestration
+// Output language: Romanian
 
 const crypto = require('crypto');
 const { query } = require('../lib/db');
-const { generateJSON, getStatus: getLLMStatus, LLM_MODEL } = require('./llmService');
-const { getReturnsSnapshot, getTopReturnStores, getTopRefundedProducts, getTodayBucharest } = require('./returnsService');
-const { getHomeMetrics } = require('./metricsService');
+const { generateJSON, getStatus: getLLMStatus } = require('./llmService');
+const { buildSalesSnapshot, getTodayBucharest } = require('./productSalesService');
 
 // Configuration
 const CACHE_TTL_MINUTES = 30;
-const PROMPT_VERSION = 'v1.0';
+const PROMPT_VERSION = 'v2.0-sales-ro';
 
 /**
  * Generate a deterministic hash of the context object
@@ -83,177 +83,131 @@ async function cacheInsight({ cacheKey, storeId, insightType, contextHash, model
     console.log(`[ai-insights] Cached insight for ${cacheKey}, expires at ${expiresAt.toISOString()}`);
   } catch (err) {
     console.error(`[ai-insights] Failed to cache insight:`, err);
-    // Don't throw - caching is optional
   }
 }
 
 /**
- * Build the system prompt for returns insights
+ * Build the system prompt for product sales insights (Romanian)
  * @returns {string} System prompt
  */
-function buildReturnsSystemPrompt() {
-  return `You are a sharp e-commerce analyst focused on identifying money loss from returns/refunds.
-Your job is to analyze the provided data and generate actionable insights.
+function buildSalesSystemPrompt() {
+  return `Ești un analist e-commerce expert. Analizezi datele de vânzări și generezi recomandări concrete pentru ce produse să promovezi ACUM.
 
-RULES:
-1. Output ONLY valid JSON. No markdown, no explanations, no code blocks.
-2. Be concise and specific. Use numbers and percentages.
-3. Focus on WHERE money is being lost and WHY.
-4. If data is missing (e.g., no refund reasons), acknowledge it and suggest tracking improvements.
-5. Don't hallucinate data. Only reference what's in the context.
-6. Use a professional but direct tone.
-7. Currency is assumed to be store currency (often RON or EUR).
+REGULI STRICTE:
+1. Răspunde DOAR cu JSON valid. Fără markdown, fără explicații în afara JSON-ului.
+2. Scrie în ROMÂNĂ - scurt, direct, acționabil.
+3. Folosește cifrele din context. NU inventa date.
+4. Concentrează-te pe: ce se vinde bine, ce are momentum, ce să promovezi și unde.
+5. Ia în calcul sezonalitatea (luna curentă, evenimente).
+6. Dacă lipsesc date, menționează în "gaps_date" și oferă ce poți.
+7. Moneda: RON sau EUR (din context).
 
-OUTPUT FORMAT (strict JSON):
+FORMAT JSON STRICT:
 {
-  "title": "string (short title, 5-10 words)",
-  "summary": "string (1-2 sentence executive summary)",
-  "bullets": ["string (3-6 key findings, each 1 line)"],
-  "actions": ["string (3-5 concrete next steps)"],
-  "risks": ["string (0-3 potential risks or concerns, optional)"],
-  "numbers": {
-    "return_rate_percent": number or null,
-    "total_refunded_month": number or null,
-    "top_refund_store": "string or null",
-    "top_refund_product": "string or null"
+  "titlu": "string (5-8 cuvinte, titlu scurt)",
+  "sumar": "string (1-2 propoziții, rezumat executiv)",
+  "produse_recomandate": [
+    {
+      "nume": "string (numele produsului)",
+      "sku": "string sau null",
+      "de_ce": "string (motivul recomandării, max 15 cuvinte)",
+      "metrici": "string (ex: '45 buc, 12.500 RON, +25% față de săpt. trecută')",
+      "magazine_recomandate": ["string"] sau null,
+      "actiuni": ["string (1-2 acțiuni concrete)"]
+    }
+  ],
+  "produse_momentum": [
+    {
+      "nume": "string",
+      "trend": "string (ex: 'Urcat 3 poziții', 'Nou în top 10')",
+      "actiune": "string"
+    }
+  ],
+  "bestsellers_stabili": [
+    {
+      "nume": "string",
+      "consistenta": "string (ex: 'Top 3 constant ultimele 30 zile')"
+    }
+  ],
+  "context_sezon": "string sau null (ce e relevant pentru luna/sezonul curent)",
+  "numere": {
+    "venit_7_zile": number,
+    "trend_procent": number sau null,
+    "produs_top": "string",
+    "comenzi_7_zile": number
   },
-  "confidence": "low" | "medium" | "high",
-  "data_gaps": ["string (list any missing data that would improve analysis)"]
+  "incredere": "scazuta" | "medie" | "ridicata",
+  "gaps_date": ["string (ce date lipsesc pentru analiză mai bună)"]
 }`;
 }
 
 /**
- * Build the user prompt for returns insights
+ * Build the user prompt for product sales insights (Romanian)
+ * @param {object} context - Sales context
  * @returns {string} User prompt
  */
-function buildReturnsUserPrompt() {
-  return `Analyze the returns/refunds data below and generate insights focused on money loss.
+function buildSalesUserPrompt(context) {
+  const seasonInfo = context.season
+    ? `Luna curentă: ${context.current_month} (${context.season.name}). Evenimente relevante: ${context.season.events.join(', ') || 'niciunul'}.`
+    : '';
 
-Key questions to answer:
-1. What is the overall return rate and trend?
-2. Which stores have the highest return rates?
-3. Which products are being returned most often?
-4. How much money is being lost to refunds?
-5. What patterns or anomalies do you see?
-6. What specific actions should be taken?
+  return `Analizează datele de vânzări și generează recomandări pentru CE PRODUSE SĂ PROMOVEZ ACUM.
 
-If refund reasons are not available, note this as a data gap and recommend tracking them.
+${seasonInfo}
 
-Generate the analysis as JSON following the specified format.`;
+Întrebări cheie:
+1. Care sunt TOP 5 produse de promovat acum și de ce?
+2. Ce produse au momentum (cresc rapid)?
+3. Ce bestsellers sunt constante și sigure?
+4. Pe ce magazine să mă concentrez pentru fiecare produs?
+5. Ce acțiuni concrete recomandezi? (ex: pune pe homepage, bundling, reducere test, etc.)
+
+Răspunde în română, format JSON strict.`;
 }
 
 /**
- * Get home returns insight for a store
- * Main entry point for AI-powered returns analytics
+ * Get home product sales insight for a store
+ * Main entry point for AI-powered sales analytics
  *
  * @param {string} storeId - Store ID or 'ALL'
  * @param {boolean} forceRefresh - Skip cache and regenerate
  * @returns {Promise<object>} Insight response
  */
-async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
-  console.log(`[ai-insights] Getting home returns insight for ${storeId}, force=${forceRefresh}`);
+async function getHomeProductInsight(storeId = 'ALL', forceRefresh = false) {
+  console.log(`[ai-insights] Getting product sales insight for ${storeId}, force=${forceRefresh}`);
 
   const today = getTodayBucharest();
-  const cacheKey = `home:returns:${storeId}:${today}`;
+  const cacheKey = `home:sales:${storeId}:${today}`;
 
   // Check LLM availability
   const llmStatus = getLLMStatus();
 
   // Build context from DB
   let context;
-  let returnsRefreshRunning = false;
-  let returnsLastAggDate = null;
+  let dataRefreshRunning = false;
 
   try {
-    // Fetch all data in parallel
-    const [ordersMetrics, returnsSnapshot, topStores, topProducts] = await Promise.all([
-      getHomeMetrics(storeId),
-      getReturnsSnapshot(storeId),
-      getTopReturnStores(30, 5),
-      getTopRefundedProducts(storeId, 30, 10),
-    ]);
+    // Build sales snapshot (DB-first, no Shopify calls)
+    context = await buildSalesSnapshot(storeId);
+    dataRefreshRunning = false; // Sales queries are synchronous
 
-    returnsRefreshRunning = returnsSnapshot.refresh_running || ordersMetrics.refresh_running;
-    returnsLastAggDate = returnsSnapshot.last_agg_date;
-
-    // Calculate return rates
-    const weekReturnRate = ordersMetrics.week_orders > 0
-      ? ((returnsSnapshot.week_returns / ordersMetrics.week_orders) * 100).toFixed(2)
-      : null;
-
-    const monthReturnRate = ordersMetrics.month_orders > 0
-      ? ((returnsSnapshot.month_returns / ordersMetrics.month_orders) * 100).toFixed(2)
-      : null;
-
-    context = {
-      store_id: storeId,
-      date: today,
-      timezone: 'Europe/Bucharest',
-
-      // Orders metrics
-      orders: {
-        today: ordersMetrics.today_orders,
-        week: ordersMetrics.week_orders,
-        month: ordersMetrics.month_orders,
-        year: ordersMetrics.year_orders,
-        today_revenue: ordersMetrics.today_revenue,
-        week_revenue: ordersMetrics.week_revenue,
-        month_revenue: ordersMetrics.month_revenue,
-        year_revenue: ordersMetrics.year_revenue,
-      },
-
-      // Returns metrics
-      returns: {
-        today: returnsSnapshot.today_returns,
-        today_amount: returnsSnapshot.today_refund_amount,
-        week: returnsSnapshot.week_returns,
-        week_amount: returnsSnapshot.week_refund_amount,
-        month: returnsSnapshot.month_returns,
-        month_amount: returnsSnapshot.month_refund_amount,
-        year: returnsSnapshot.year_returns,
-        year_amount: returnsSnapshot.year_refund_amount,
-      },
-
-      // Calculated rates
-      return_rates: {
-        week_percent: weekReturnRate ? parseFloat(weekReturnRate) : null,
-        month_percent: monthReturnRate ? parseFloat(monthReturnRate) : null,
-      },
-
-      // Top stores by return rate
-      top_return_stores: topStores,
-
-      // Top refunded products
-      top_refunded_products: topProducts,
-
-      // Data freshness
-      data_freshness: {
-        returns_last_agg_date: returnsSnapshot.last_agg_date,
-        orders_last_sync: ordersMetrics.last_sync_at,
-      },
-    };
-
-    console.log(`[ai-insights] Built context: ${JSON.stringify(context).length} chars`);
+    console.log(`[ai-insights] Built sales context: ${JSON.stringify(context).length} chars`);
   } catch (err) {
-    console.error(`[ai-insights] Failed to build context:`, err);
+    console.error(`[ai-insights] Failed to build sales context:`, err);
 
     // Return error response without LLM call
     return {
       insight: {
         error: true,
-        title: 'Data Unavailable',
-        summary: 'Unable to fetch returns data. Please try again later.',
-        bullets: [`Error: ${err.message}`],
-        actions: ['Check database connectivity', 'Verify returns aggregation is running'],
-        numbers: {},
-        confidence: 'low',
+        titlu: 'Date indisponibile',
+        sumar: 'Nu am putut extrage datele de vânzări. Încearcă din nou.',
+        produse_recomandate: [],
+        numere: {},
+        incredere: 'scazuta',
         generated_at: new Date().toISOString(),
       },
       cache: { hit: false, expires_at: null },
-      refresh: {
-        returns_refresh_running: false,
-        returns_last_agg_date: null,
-      },
+      refresh: { data_refresh_running: false },
       llm: llmStatus,
     };
   }
@@ -273,11 +227,9 @@ async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
           expires_at: cached.expires_at,
           generated_at: cached.generated_at,
         },
-        refresh: {
-          returns_refresh_running: returnsRefreshRunning,
-          returns_last_agg_date: returnsLastAggDate,
-        },
+        refresh: { data_refresh_running: dataRefreshRunning },
         llm: llmStatus,
+        metrics: extractMetricsSummary(context),
       };
     }
   }
@@ -286,26 +238,24 @@ async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
   if (!llmStatus.available) {
     console.log(`[ai-insights] LLM not available: ${llmStatus.reason}`);
 
-    // Return fallback insight without AI
-    const fallbackInsight = generateFallbackInsight(context);
+    // Return fallback insight without AI (in Romanian)
+    const fallbackInsight = generateSalesFallbackInsight(context);
 
     return {
       insight: fallbackInsight,
       cache: { hit: false, expires_at: null },
-      refresh: {
-        returns_refresh_running: returnsRefreshRunning,
-        returns_last_agg_date: returnsLastAggDate,
-      },
+      refresh: { data_refresh_running: dataRefreshRunning },
       llm: llmStatus,
+      metrics: extractMetricsSummary(context),
     };
   }
 
   // Generate insight via LLM
-  console.log(`[ai-insights] Generating insight via LLM...`);
+  console.log(`[ai-insights] Generating sales insight via LLM...`);
 
   const llmResponse = await generateJSON({
-    system: buildReturnsSystemPrompt(),
-    user: buildReturnsUserPrompt(),
+    system: buildSalesSystemPrompt(),
+    user: buildSalesUserPrompt(context),
     jsonContext: context,
   });
 
@@ -313,17 +263,15 @@ async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
     console.error(`[ai-insights] LLM generation failed:`, llmResponse.message);
 
     // Return fallback with error info
-    const fallbackInsight = generateFallbackInsight(context);
+    const fallbackInsight = generateSalesFallbackInsight(context);
     fallbackInsight.llm_error = llmResponse.message;
 
     return {
       insight: fallbackInsight,
       cache: { hit: false, expires_at: null },
-      refresh: {
-        returns_refresh_running: returnsRefreshRunning,
-        returns_last_agg_date: returnsLastAggDate,
-      },
+      refresh: { data_refresh_running: dataRefreshRunning },
       llm: { ...llmStatus, error: llmResponse.message },
+      metrics: extractMetricsSummary(context),
     };
   }
 
@@ -338,7 +286,7 @@ async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
   await cacheInsight({
     cacheKey,
     storeId,
-    insightType: 'home_returns',
+    insightType: 'home_sales',
     contextHash,
     model: llmResponse.model,
     payload: insight,
@@ -353,82 +301,118 @@ async function getHomeReturnsInsight(storeId = 'ALL', forceRefresh = false) {
       expires_at: expiresAt.toISOString(),
       generated_at: new Date().toISOString(),
     },
-    refresh: {
-      returns_refresh_running: returnsRefreshRunning,
-      returns_last_agg_date: returnsLastAggDate,
-    },
+    refresh: { data_refresh_running: dataRefreshRunning },
     llm: {
       ...llmStatus,
       usage: llmResponse.usage,
     },
+    metrics: extractMetricsSummary(context),
   };
 }
 
 /**
- * Generate a fallback insight when LLM is unavailable
- * Uses simple rules-based analysis
- * @param {object} context - The data context
- * @returns {object} Fallback insight
+ * Extract a summary of key metrics for UI display (even without LLM)
+ * @param {object} context - Sales context
+ * @returns {object} Metrics summary
  */
-function generateFallbackInsight(context) {
-  const bullets = [];
-  const actions = [];
-  const numbers = {};
+function extractMetricsSummary(context) {
+  const last7d = context.last_7_days || {};
+  const last30d = context.last_30_days || {};
+  const topProduct = context.top_products_7d?.[0];
 
-  // Basic analysis
-  const monthReturns = context.returns?.month || 0;
-  const monthOrders = context.orders?.month || 0;
-  const monthRefundAmount = context.returns?.month_amount || 0;
+  return {
+    venit_7_zile: last7d.total_revenue || 0,
+    venit_30_zile: last30d.total_revenue || 0,
+    comenzi_7_zile: last7d.order_count || 0,
+    comenzi_30_zile: last30d.order_count || 0,
+    unitati_7_zile: last7d.total_units || 0,
+    trend_7_zile: last7d.trend_percent,
+    trend_30_zile: last30d.trend_percent,
+    produs_top: topProduct?.product_title || null,
+    produs_top_venit: topProduct?.total_revenue || 0,
+    nr_produse_vandute: context.top_products_7d?.length || 0,
+  };
+}
 
-  if (monthOrders > 0) {
-    const returnRate = ((monthReturns / monthOrders) * 100).toFixed(1);
-    numbers.return_rate_percent = parseFloat(returnRate);
-    bullets.push(`Monthly return rate: ${returnRate}% (${monthReturns} returns out of ${monthOrders} orders)`);
-  } else {
-    bullets.push('No order data available for this period');
+/**
+ * Generate a fallback insight when LLM is unavailable (Romanian)
+ * Uses simple rules-based analysis
+ * @param {object} context - The sales context
+ * @returns {object} Fallback insight in Romanian
+ */
+function generateSalesFallbackInsight(context) {
+  const last7d = context.last_7_days || {};
+  const topProducts = context.top_products_7d || [];
+  const momentumProducts = context.momentum_products || [];
+  const steadyBestsellers = context.steady_bestsellers || [];
+  const season = context.season || {};
+
+  // Build recommended products from top sellers
+  const produseRecomandate = topProducts.slice(0, 5).map((p, idx) => ({
+    nume: p.product_title,
+    sku: p.sku !== 'N/A' ? p.sku : null,
+    de_ce: idx === 0 ? 'Cel mai bine vândut (7 zile)' : `Top ${idx + 1} vânzări`,
+    metrici: `${p.units_sold} buc, ${formatNumber(p.total_revenue)} RON`,
+    magazine_recomandate: p.store_count > 1 ? p.stores_selling : null,
+    actiuni: [idx < 2 ? 'Menține vizibilitate maximă' : 'Monitorizează stocul'],
+  }));
+
+  // Build momentum products
+  const produseMomentum = momentumProducts.slice(0, 3).map(p => ({
+    nume: p.product_title,
+    trend: p.momentum_label || 'În creștere',
+    actiune: 'Crește vizibilitatea',
+  }));
+
+  // Build steady bestsellers
+  const bestsellersStabili = steadyBestsellers.slice(0, 3).map(p => ({
+    nume: p.product_title,
+    consistenta: p.consistency_label || 'Vânzări constante',
+  }));
+
+  // Season context
+  let contextSezon = null;
+  if (season.events?.length > 0) {
+    contextSezon = `${season.name.charAt(0).toUpperCase() + season.name.slice(1)}: ${season.events.join(', ')}`;
   }
 
-  numbers.total_refunded_month = monthRefundAmount;
-  if (monthRefundAmount > 0) {
-    bullets.push(`Total refunded this month: ${monthRefundAmount.toLocaleString()} (store currency)`);
-  }
+  // Numbers
+  const numere = {
+    venit_7_zile: last7d.total_revenue || 0,
+    trend_procent: last7d.trend_percent,
+    produs_top: topProducts[0]?.product_title || null,
+    comenzi_7_zile: last7d.order_count || 0,
+  };
 
-  // Top stores
-  if (context.top_return_stores?.length > 0) {
-    const top = context.top_return_stores[0];
-    numbers.top_refund_store = top.store_id;
-    bullets.push(`Highest return rate: ${top.store_id} at ${top.return_rate}%`);
-  }
-
-  // Top products
-  if (context.top_refunded_products?.length > 0) {
-    const top = context.top_refunded_products[0];
-    numbers.top_refund_product = top.product_title;
-    bullets.push(`Most refunded product: "${top.product_title}" (${top.refund_count} refunds)`);
-  }
-
-  // Default actions
-  actions.push('Review top refunded products for quality issues');
-  actions.push('Analyze stores with high return rates');
-  actions.push('Consider implementing refund reason tracking');
-
-  if (monthReturns === 0 && monthOrders > 0) {
-    bullets.push('No refunds recorded this month - data may need aggregation');
-    actions.unshift('Trigger returns data refresh to ensure accuracy');
+  // Determine confidence
+  let incredere = 'scazuta';
+  if (last7d.order_count >= 50 && topProducts.length >= 5) {
+    incredere = 'medie';
   }
 
   return {
-    title: 'Returns Overview (Basic Analysis)',
-    summary: `This month: ${monthReturns} returns totaling ${monthRefundAmount.toLocaleString()} refunded. AI analysis unavailable - showing basic metrics.`,
-    bullets,
-    actions,
-    risks: [],
-    numbers,
-    confidence: 'low',
-    data_gaps: ['AI analysis unavailable - configure ANTHROPIC_API_KEY for detailed insights'],
+    titlu: 'Produse de Promovat (Analiză de Bază)',
+    sumar: `Ultimele 7 zile: ${formatNumber(last7d.total_revenue || 0)} RON din ${last7d.order_count || 0} comenzi. Analiză AI indisponibilă - metrici de bază.`,
+    produse_recomandate: produseRecomandate,
+    produse_momentum: produseMomentum,
+    bestsellers_stabili: bestsellersStabili,
+    context_sezon: contextSezon,
+    numere,
+    incredere,
+    gaps_date: ['Analiză AI indisponibilă - configurează ANTHROPIC_API_KEY pentru insight-uri detaliate'],
     generated_at: new Date().toISOString(),
     fallback: true,
   };
+}
+
+/**
+ * Format number with thousands separator
+ * @param {number} num - Number to format
+ * @returns {string} Formatted number
+ */
+function formatNumber(num) {
+  if (num == null) return '0';
+  return Math.round(num).toLocaleString('ro-RO');
 }
 
 /**
@@ -473,7 +457,7 @@ async function cleanExpiredCache() {
 }
 
 module.exports = {
-  getHomeReturnsInsight,
+  getHomeProductInsight,
   invalidateCache,
   cleanExpiredCache,
   CACHE_TTL_MINUTES,
