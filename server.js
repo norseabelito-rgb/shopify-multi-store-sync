@@ -7,6 +7,7 @@ const dashboardRouter = require('./routes/dashboard');
 const marketingRouter = require('./routes/marketing');
 const shopifyRouter = require('./routes/shopify');
 const aiRouter = require('./routes/ai');
+const productsRouter = require('./routes/products');
 const { initDb } = require('./lib/db');
 const { runDeploymentVerification } = require('./services/deploymentVerification');
 // logsTestRouter removed - no longer needed
@@ -185,6 +186,7 @@ app.use('/', apiRouter);           // /stores, /orders, /customers, /preview, /s
 app.use('/marketing', marketingRouter);
 app.use('/shopify', shopifyRouter);
 app.use('/ai', aiRouter);          // /ai/insights/home, /ai/status, /ai/tasks/*
+app.use('/products', productsRouter); // /products/* - Products Module (master, overrides, CSV, push)
 app.use('/', dashboardRouter);
 
 // 404

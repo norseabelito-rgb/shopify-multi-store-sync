@@ -2543,6 +2543,10 @@ function dashboardPage() {
       <div>
         <div class="sidebar-section-label">Ops</div>
         <div class="nav-list">
+          <a href="/products/ui" class="nav-item" style="text-decoration: none;">
+            <span>Products</span>
+            <small>Master</small>
+          </a>
           <button class="nav-item" data-view="orders">
             <span>Orders</span>
           </button>
