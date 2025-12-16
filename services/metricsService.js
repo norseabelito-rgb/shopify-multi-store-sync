@@ -178,6 +178,114 @@ async function backfill2025() {
 }
 
 /**
+ * Get last sync timestamp for a store or all stores
+ * @param {string} storeId - Store ID or 'ALL' for all stores
+ * @returns {Promise<object|null>} { last_sync_at, last_sync_status, store_id }
+ */
+async function getLastSync(storeId = 'ALL') {
+  try {
+    if (storeId === 'ALL') {
+      // For "All stores", get the most recent sync across all stores
+      const result = await query(`
+        SELECT
+          'ALL' as store_id,
+          MAX(COALESCE(last_run_finished_at, last_run_started_at)) as last_sync_at,
+          CASE
+            WHEN COUNT(*) FILTER (WHERE last_run_error IS NOT NULL AND last_run_error != '') > 0 THEN 'error'
+            WHEN MAX(COALESCE(last_run_finished_at, last_run_started_at)) IS NULL THEN 'never'
+            ELSE 'success'
+          END as last_sync_status
+        FROM sync_state
+      `);
+
+      return result.rows[0] || { store_id: 'ALL', last_sync_at: null, last_sync_status: 'never' };
+    } else {
+      // For specific store
+      const result = await query(`
+        SELECT
+          store_id,
+          COALESCE(last_run_finished_at, last_run_started_at) as last_sync_at,
+          CASE
+            WHEN last_run_error IS NOT NULL AND last_run_error != '' THEN 'error'
+            WHEN last_run_finished_at IS NULL AND last_run_started_at IS NULL THEN 'never'
+            ELSE 'success'
+          END as last_sync_status
+        FROM sync_state
+        WHERE store_id = $1
+      `, [storeId]);
+
+      return result.rows[0] || { store_id: storeId, last_sync_at: null, last_sync_status: 'never' };
+    }
+  } catch (err) {
+    console.error('[metrics] Failed to get last sync:', err);
+    return { store_id: storeId, last_sync_at: null, last_sync_status: 'error' };
+  }
+}
+
+/**
+ * Get per-store metrics from orders_daily_agg (replaces Shopify API calls)
+ * @param {string} storeId - Store ID
+ * @returns {Promise<object>} Store metrics
+ */
+async function getStoreMetrics(storeId) {
+  // Get today's date in Bucharest timezone
+  const now = new Date();
+  const bucharestNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+  const today = bucharestNow.toISOString().split('T')[0];
+
+  // Calculate date boundaries
+  const todayDate = new Date(today);
+
+  // Week start (Monday)
+  const weekStart = new Date(todayDate);
+  const dayOfWeek = weekStart.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  weekStart.setDate(weekStart.getDate() - daysToMonday);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  // Month start
+  const monthStart = `${today.substring(0, 7)}-01`;
+
+  // Year start
+  const yearStart = `${today.substring(0, 4)}-01-01`;
+
+  // Query orders_daily_agg for this specific store
+  const [todayRes, weekRes, monthRes, yearRes] = await Promise.all([
+    query(
+      `SELECT COALESCE(SUM(orders_count), 0)::INT AS count
+       FROM orders_daily_agg
+       WHERE store_id = $1 AND agg_date = $2`,
+      [storeId, today]
+    ),
+    query(
+      `SELECT COALESCE(SUM(orders_count), 0)::INT AS count
+       FROM orders_daily_agg
+       WHERE store_id = $1 AND agg_date >= $2 AND agg_date <= $3`,
+      [storeId, weekStartStr, today]
+    ),
+    query(
+      `SELECT COALESCE(SUM(orders_count), 0)::INT AS count
+       FROM orders_daily_agg
+       WHERE store_id = $1 AND agg_date >= $2 AND agg_date <= $3`,
+      [storeId, monthStart, today]
+    ),
+    query(
+      `SELECT COALESCE(SUM(orders_count), 0)::INT AS count
+       FROM orders_daily_agg
+       WHERE store_id = $1 AND agg_date >= $2 AND agg_date <= $3`,
+      [storeId, yearStart, today]
+    ),
+  ]);
+
+  return {
+    today_orders: todayRes.rows[0]?.count || 0,
+    week_orders: weekRes.rows[0]?.count || 0,
+    month_orders: monthRes.rows[0]?.count || 0,
+    year_orders: yearRes.rows[0]?.count || 0,
+  };
+}
+
+/**
  * Get homepage metrics from orders_daily_agg
  * Returns aggregated data for today, week, month, year, and last 30 days sparkline
  *
@@ -212,6 +320,14 @@ async function getHomeMetrics(storeId = 'ALL') {
   const thirtyDaysAgo = new Date(todayDate);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+  // Log date boundaries for debugging
+  console.log(`[metrics] Date boundaries (Europe/Bucharest):`, {
+    today,
+    week_start: weekStartStr,
+    month_start: monthStart,
+    year_start: yearStart,
+  });
 
   // Query aggregated data
   const [todayRes, weekRes, monthRes, yearRes, sparklineRes] = await Promise.all([
@@ -257,6 +373,9 @@ async function getHomeMetrics(storeId = 'ALL') {
     ),
   ]);
 
+  // Get last sync timestamp
+  const lastSync = await getLastSync(storeId);
+
   const metrics = {
     store_id: storeId,
     today_orders: todayRes.rows[0]?.count || 0,
@@ -272,9 +391,11 @@ async function getHomeMetrics(storeId = 'ALL') {
       orders_count: r.orders_count,
       revenue: Number(r.gross_revenue),
     })),
+    last_sync_at: lastSync.last_sync_at,
+    last_sync_status: lastSync.last_sync_status,
   };
 
-  console.log(`[metrics] Metrics for ${storeId}: today=${metrics.today_orders}, week=${metrics.week_orders}, month=${metrics.month_orders}, year=${metrics.year_orders}`);
+  console.log(`[metrics] Metrics for ${storeId}: today=${metrics.today_orders}, week=${metrics.week_orders}, month=${metrics.month_orders}, year=${metrics.year_orders}, last_sync=${lastSync.last_sync_at}`);
 
   return metrics;
 }
@@ -283,5 +404,7 @@ module.exports = {
   aggregateDailyOrders,
   backfill2025,
   getHomeMetrics,
+  getStoreMetrics,
+  getLastSync,
   getYesterdayBucharestDate,
 };

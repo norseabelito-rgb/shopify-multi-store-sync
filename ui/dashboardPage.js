@@ -262,6 +262,31 @@ function dashboardPage() {
       font-size: 9px;
     }
 
+    .sync-status {
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sync-label {
+      opacity: 0.7;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .sync-time {
+      color: var(--text);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
     /* STAT CARDS (top) */
 
     .grid-top {
@@ -2046,6 +2071,10 @@ function dashboardPage() {
           <div class="context-pill">
             <span>Context</span>
             <span id="context-label">All stores</span>
+          </div>
+          <div class="sync-status" id="sync-status-display" style="display:none;">
+            <span class="sync-label">Last sync:</span>
+            <span class="sync-time" id="sync-time">–</span>
           </div>
         </header>
 
@@ -4452,12 +4481,49 @@ function dashboardPage() {
           if (statMonthHome) statMonthHome.textContent = formatNumber(metrics.month_orders || 0);
           if (statYearHome) statYearHome.textContent = formatNumber(metrics.year_orders || 0);
 
+          // Update last sync timestamp
+          const syncDisplay = document.getElementById('sync-status-display');
+          const syncTime = document.getElementById('sync-time');
+          if (syncDisplay && syncTime && metrics.last_sync_at) {
+            // Convert to Europe/Bucharest timezone and format
+            const syncDate = new Date(metrics.last_sync_at);
+            const bucharestTime = syncDate.toLocaleString('en-US', {
+              timeZone: 'Europe/Bucharest',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
+            const bucharestDate = syncDate.toLocaleDateString('en-US', {
+              timeZone: 'Europe/Bucharest',
+              month: 'short',
+              day: 'numeric'
+            });
+
+            // Show date if not today
+            const today = new Date().toLocaleDateString('en-US', {
+              timeZone: 'Europe/Bucharest',
+              month: 'short',
+              day: 'numeric'
+            });
+
+            if (bucharestDate === today) {
+              syncTime.textContent = bucharestTime;
+            } else {
+              syncTime.textContent = bucharestDate + ', ' + bucharestTime;
+            }
+
+            syncDisplay.style.display = 'flex';
+          } else if (syncDisplay) {
+            syncDisplay.style.display = 'none';
+          }
+
           console.log('[metrics] Loaded homepage metrics:', {
             store_id: storeId,
             today: metrics.today_orders,
             week: metrics.week_orders,
             month: metrics.month_orders,
             year: metrics.year_orders,
+            last_sync: metrics.last_sync_at,
           });
         } catch (err) {
           console.error('[metrics] Failed to load homepage metrics:', err);
@@ -4466,6 +4532,9 @@ function dashboardPage() {
           if (statWeekHome) statWeekHome.textContent = '–';
           if (statMonthHome) statMonthHome.textContent = '–';
           if (statYearHome) statYearHome.textContent = '–';
+
+          const syncDisplay = document.getElementById('sync-status-display');
+          if (syncDisplay) syncDisplay.style.display = 'none';
         }
       }
 

@@ -88,84 +88,17 @@ async function fetchStoreStats(storeId, rawDomain) {
     'Content-Type': 'application/json',
   };
 
-  // date boundaries (UTC) – pentru comenzi
-  const now = new Date();
-  const yyyy = now.getUTCFullYear();
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(now.getUTCDate()).padStart(2, '0');
-
-  // azi (00:00 UTC)
-  const todayStart = `${yyyy}-${mm}-${dd}T00:00:00Z`;
-
-  // început de săptămână (luni 00:00 UTC)
-  const dayOfWeek = now.getUTCDay(); // 0 = duminică
-  const diffToMonday = (dayOfWeek + 6) % 7; // 0 pentru luni, 1 pentru marți etc.
-  const weekStartDate = new Date(now);
-  weekStartDate.setUTCDate(now.getUTCDate() - diffToMonday);
-  weekStartDate.setUTCHours(0, 0, 0, 0);
-  const wYYYY = weekStartDate.getUTCFullYear();
-  const wMM = String(weekStartDate.getUTCMonth() + 1).padStart(2, '0');
-  const wDD = String(weekStartDate.getUTCDate()).padStart(2, '0');
-  const weekStart = `${wYYYY}-${wMM}-${wDD}T00:00:00Z`;
-
-  // început de lună
-  const monthStart = `${yyyy}-${mm}-01T00:00:00Z`;
-
-  // început de an
-  const yearStart = `${yyyy}-01-01T00:00:00Z`;
-
   try {
-    const [
-      activeRes,
-      draftRes,
-      todayOrdersRes,
-      weekOrdersRes,
-      monthOrdersRes,
-      yearOrdersRes,
-    ] = await Promise.all([
+    // Only fetch product counts - order metrics now come from DB
+    const [activeRes, draftRes] = await Promise.all([
       fetch(`${baseUrl}/products/count.json?status=active`, { headers }),
       fetch(`${baseUrl}/products/count.json?status=draft`, { headers }),
-      fetch(
-        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
-          todayStart
-        )}`,
-        { headers }
-      ),
-      fetch(
-        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
-          weekStart
-        )}`,
-        { headers }
-      ),
-      fetch(
-        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
-          monthStart
-        )}`,
-        { headers }
-      ),
-      fetch(
-        `${baseUrl}/orders/count.json?status=any&created_at_min=${encodeURIComponent(
-          yearStart
-        )}`,
-        { headers }
-      ),
     ]);
 
-    if (
-      !activeRes.ok ||
-      !draftRes.ok ||
-      !todayOrdersRes.ok ||
-      !weekOrdersRes.ok ||
-      !monthOrdersRes.ok ||
-      !yearOrdersRes.ok
-    ) {
+    if (!activeRes.ok || !draftRes.ok) {
       const info = {
         activeStatus: activeRes.status,
         draftStatus: draftRes.status,
-        todayStatus: todayOrdersRes.status,
-        weekStatus: weekOrdersRes.status,
-        monthStatus: monthOrdersRes.status,
-        yearStatus: yearOrdersRes.status,
       };
       console.error('[fetchStoreStats] HTTP error', {
         storeId,
@@ -175,28 +108,17 @@ async function fetchStoreStats(storeId, rawDomain) {
       return {
         active_products: null,
         draft_products: null,
-        today_orders: null,
-        week_orders: null,
-        month_orders: null,
-        year_orders: null,
         _debug: 'HTTP:' + JSON.stringify(info),
       };
     }
 
     const activeJson = await activeRes.json();
     const draftJson = await draftRes.json();
-    const todayJson = await todayOrdersRes.json();
-    const weekJson = await weekOrdersRes.json();
-    const monthJson = await monthOrdersRes.json();
-    const yearJson = await yearOrdersRes.json();
 
     return {
       active_products: activeJson.count ?? 0,
       draft_products: draftJson.count ?? 0,
-      today_orders: todayJson.count ?? 0,
-      week_orders: weekJson.count ?? 0,
-      month_orders: monthJson.count ?? 0,
-      year_orders: yearJson.count ?? 0,
+      // NOTE: Order counts removed - now fetched from DB via getStoreMetrics()
       _debug: null,
     };
   } catch (err) {
@@ -204,10 +126,6 @@ async function fetchStoreStats(storeId, rawDomain) {
     return {
       active_products: null,
       draft_products: null,
-      today_orders: null,
-      week_orders: null,
-      month_orders: null,
-      year_orders: null,
       _debug: 'EX:' + String(err.message || err),
     };
   }
@@ -351,11 +269,30 @@ router.get('/stores', async (req, res) => {
     const storesSheet = await loadSheet(spreadsheetId, 'Stores');
     const stores = storesSheet.rows || [];
 
+    // Import DB-first metrics service
+    const { getStoreMetrics } = require('../services/metricsService');
+
     const enriched = await Promise.all(
       stores.map(async (s) => {
         const cleanDomain = (s.shopify_domain || '').trim();
 
-        const stats = await fetchStoreStats(s.store_id, cleanDomain);
+        // CHANGED: Use DB-first metrics from orders_daily_agg instead of Shopify API
+        // This ensures consistency with homepage metrics and uses Europe/Bucharest timezone
+        let orderMetrics;
+        try {
+          orderMetrics = await getStoreMetrics(s.store_id);
+        } catch (err) {
+          console.error(`[stores] Failed to get metrics for ${s.store_id}:`, err);
+          orderMetrics = {
+            today_orders: 0,
+            week_orders: 0,
+            month_orders: 0,
+            year_orders: 0,
+          };
+        }
+
+        // Keep product stats from Shopify API (these are not in orders_daily_agg)
+        const productStats = await fetchStoreStats(s.store_id, cleanDomain);
 
         return {
           store_id: s.store_id,
@@ -363,13 +300,14 @@ router.get('/stores', async (req, res) => {
           shopify_domain: cleanDomain,
           currency: s.currency,
           language: s.language,
-          active_products: stats.active_products,
-          draft_products: stats.draft_products,
-          today_orders: stats.today_orders,
-          week_orders: stats.week_orders,
-          month_orders: stats.month_orders,
-          year_orders: stats.year_orders,
-          _debug: stats._debug || null,
+          active_products: productStats.active_products,
+          draft_products: productStats.draft_products,
+          // DB-first order metrics (consistent with homepage)
+          today_orders: orderMetrics.today_orders,
+          week_orders: orderMetrics.week_orders,
+          month_orders: orderMetrics.month_orders,
+          year_orders: orderMetrics.year_orders,
+          _debug: productStats._debug || null,
         };
       })
     );
