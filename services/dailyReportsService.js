@@ -1,7 +1,7 @@
 // services/dailyReportsService.js
 // Service for managing day-centric daily reports with projects and audit
 
-const { query } = require('../lib/db');
+const { query, getPool } = require('../lib/db');
 
 /**
  * Normalize date to YYYY-MM-DD format
@@ -125,7 +125,8 @@ async function upsertReportEntry({ personId, date, did, next, blockers, projectI
   const normalizedDate = normalizeDate(date);
 
   // Start transaction
-  const client = await query.getPool().connect();
+  const pool = getPool();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
