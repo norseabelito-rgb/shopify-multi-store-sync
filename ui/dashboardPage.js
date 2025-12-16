@@ -2053,33 +2053,33 @@ function dashboardPage() {
         <section id="view-home" class="view active">
           <section class="grid-top">
             <article class="stat-card">
-              <div class="stat-label">Produse active</div>
-              <div class="stat-main">
-                <div class="stat-value" id="stat-active-home">–</div>
-                <div class="stat-chip">Catalog</div>
-              </div>
-              <p class="stat-desc">
-                Total produse active în Shopify (conform Stores + API).
-              </p>
-            </article>
-            <article class="stat-card">
-              <div class="stat-label">Produse draft</div>
-              <div class="stat-main">
-                <div class="stat-value" id="stat-draft-home">–</div>
-                <div class="stat-chip">Pregătite</div>
-              </div>
-              <p class="stat-desc">
-                Produse pregătite pentru listare în magazine.
-              </p>
-            </article>
-            <article class="stat-card">
               <div class="stat-label">Comenzi azi</div>
               <div class="stat-main">
                 <div class="stat-value" id="stat-today-home">–</div>
                 <div class="stat-chip">Azi</div>
               </div>
               <p class="stat-desc">
-                Comenzi înregistrate în ultimele 24h pentru contextul curent.
+                Comenzi înregistrate astăzi (Europe/Bucharest timezone).
+              </p>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Comenzi săptămâna</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-week-home">–</div>
+                <div class="stat-chip">Săptămână</div>
+              </div>
+              <p class="stat-desc">
+                Comenzi din săptămâna curentă (luni - astăzi).
+              </p>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Comenzi luna</div>
+              <div class="stat-main">
+                <div class="stat-value" id="stat-month-home">–</div>
+                <div class="stat-chip">Lună</div>
+              </div>
+              <p class="stat-desc">
+                Comenzi în luna curentă (început lună - astăzi).
               </p>
             </article>
             <article class="stat-card">
@@ -2089,7 +2089,7 @@ function dashboardPage() {
                 <div class="stat-chip">YTD</div>
               </div>
               <p class="stat-desc">
-                Total comenzi cumulate în anul curent (context curent).
+                Total comenzi cumulate în anul curent.
               </p>
             </article>
           </section>
@@ -2581,9 +2581,9 @@ function dashboardPage() {
       const navItems = document.querySelectorAll('.nav-item[data-view]');
       const views = document.querySelectorAll('.view');
 
-      const statActiveHome = document.getElementById('stat-active-home');
-      const statDraftHome = document.getElementById('stat-draft-home');
       const statTodayHome = document.getElementById('stat-today-home');
+      const statWeekHome = document.getElementById('stat-week-home');
+      const statMonthHome = document.getElementById('stat-month-home');
       const statYearHome = document.getElementById('stat-year-home');
       const storesCountHome = document.getElementById('stores-count-home');
       const homeTableWrapper = document.getElementById('home-table-wrapper');
@@ -4438,6 +4438,37 @@ function dashboardPage() {
         }
       }
 
+      // Load homepage metrics from DB-first endpoint (orders_daily_agg table)
+      async function loadMetrics() {
+        try {
+          const storeId = selectedStoreId === 'all' ? 'ALL' : selectedStoreId;
+          const res = await fetch('/metrics/home?store_id=' + encodeURIComponent(storeId));
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const metrics = await res.json();
+
+          // Update homepage stat cards with DB-first metrics
+          if (statTodayHome) statTodayHome.textContent = formatNumber(metrics.today_orders || 0);
+          if (statWeekHome) statWeekHome.textContent = formatNumber(metrics.week_orders || 0);
+          if (statMonthHome) statMonthHome.textContent = formatNumber(metrics.month_orders || 0);
+          if (statYearHome) statYearHome.textContent = formatNumber(metrics.year_orders || 0);
+
+          console.log('[metrics] Loaded homepage metrics:', {
+            store_id: storeId,
+            today: metrics.today_orders,
+            week: metrics.week_orders,
+            month: metrics.month_orders,
+            year: metrics.year_orders,
+          });
+        } catch (err) {
+          console.error('[metrics] Failed to load homepage metrics:', err);
+          // Fallback to showing zeros or dashes
+          if (statTodayHome) statTodayHome.textContent = '–';
+          if (statWeekHome) statWeekHome.textContent = '–';
+          if (statMonthHome) statMonthHome.textContent = '–';
+          if (statYearHome) statYearHome.textContent = '–';
+        }
+      }
+
       async function loadStores(prevStoreId = selectedStoreId) {
         try {
           const res = await fetch('/stores');
@@ -4505,29 +4536,15 @@ function dashboardPage() {
             return na.localeCompare(nb);
           });
 
-          // totals for home
-          const totals = visibleStores.reduce(
-            (acc, s) => {
-              acc.active += s.active_products || 0;
-              acc.draft += s.draft_products || 0;
-              acc.today += s.today_orders || 0;
-              acc.year += s.year_orders || 0;
-              return acc;
-            },
-            { active: 0, draft: 0, today: 0, year: 0 }
-          );
-
-          statActiveHome.textContent = formatNumber(totals.active);
-          statDraftHome.textContent = formatNumber(totals.draft);
-          statTodayHome.textContent = formatNumber(totals.today);
-          statYearHome.textContent = formatNumber(totals.year);
-
           storesCountHome.textContent =
             visibleStores.length + (visibleStores.length === 1 ? ' store' : ' stores');
           storesCountMy.textContent = storesCountHome.textContent;
 
           buildHomeTable(visibleStores);
           renderMyStoresCards(visibleStores);
+
+          // Load DB-first metrics from orders_daily_agg table
+          await loadMetrics();
 
           if (prevStoreId !== selectedStoreId) {
             setView(currentView);

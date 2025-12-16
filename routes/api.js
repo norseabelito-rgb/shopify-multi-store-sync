@@ -1165,6 +1165,71 @@ router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
   }
 });
 
+// ==================== METRICS SYSTEM ENDPOINTS ====================
+// Daily aggregation and homepage metrics using orders_daily_agg table
+const { aggregateDailyOrders, backfill2025, getHomeMetrics, getYesterdayBucharestDate } = require('../services/metricsService');
+
+// POST /tasks/metrics/daily-snapshot - Daily snapshot job (protected by x-tasks-secret)
+// Aggregates orders for a specific date (default: yesterday in Europe/Bucharest TZ)
+router.post('/tasks/metrics/daily-snapshot', requireTasksSecret, async (req, res) => {
+  const date = req.query.date || getYesterdayBucharestDate();
+
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Daily snapshot job started in background',
+    date,
+    started_at: new Date().toISOString(),
+  });
+
+  // Run aggregation in background (non-blocking)
+  aggregateDailyOrders(date)
+    .then((summary) => {
+      console.log('[metrics/daily-snapshot] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[metrics/daily-snapshot] Job failed:', err);
+    });
+});
+
+// POST /tasks/metrics/backfill-2025 - Backfill entire year 2025 (protected by x-tasks-secret)
+// Iterates all dates in 2025 and fills orders_daily_agg
+router.post('/tasks/metrics/backfill-2025', requireTasksSecret, async (_req, res) => {
+  // Respond immediately with 202 Accepted
+  res.status(202).json({
+    ok: true,
+    message: 'Backfill 2025 job started in background',
+    started_at: new Date().toISOString(),
+  });
+
+  // Run backfill in background (non-blocking)
+  backfill2025()
+    .then((summary) => {
+      console.log('[metrics/backfill-2025] Job completed successfully:', JSON.stringify(summary, null, 2));
+    })
+    .catch((err) => {
+      console.error('[metrics/backfill-2025] Job failed:', err);
+    });
+});
+
+// GET /metrics/home - Get homepage metrics from orders_daily_agg (DB-first, no heavy scans)
+// Returns today/week/month/year orders and last 30 days sparkline data
+router.get('/metrics/home', async (req, res) => {
+  try {
+    const storeId = req.query.store_id || 'ALL';
+
+    const metrics = await getHomeMetrics(storeId);
+
+    res.json(metrics);
+  } catch (err) {
+    console.error('[metrics/home] Error:', err);
+    res.status(500).json({
+      error: 'Failed to get home metrics',
+      message: err.message || String(err),
+    });
+  }
+});
+
 // ==================== DAILY REPORTS ENDPOINTS (Day-Centric) ====================
 // Mount new day-centric daily reports router
 const dailyReportsRouter = require('./dailyReports');
