@@ -6,6 +6,7 @@ const apiRouter = require('./routes/api');
 const dashboardRouter = require('./routes/dashboard');
 const marketingRouter = require('./routes/marketing');
 const shopifyRouter = require('./routes/shopify');
+const aiRouter = require('./routes/ai');
 const { initDb } = require('./lib/db');
 const { runDeploymentVerification } = require('./services/deploymentVerification');
 // logsTestRouter removed - no longer needed
@@ -183,6 +184,7 @@ app.use(authMiddleware);
 app.use('/', apiRouter);           // /stores, /orders, /customers, /preview, /sync, /media etc.
 app.use('/marketing', marketingRouter);
 app.use('/shopify', shopifyRouter);
+app.use('/ai', aiRouter);          // /ai/insights/home, /ai/status, /ai/tasks/*
 app.use('/', dashboardRouter);
 
 // 404
