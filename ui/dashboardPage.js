@@ -287,6 +287,68 @@ function dashboardPage() {
       font-variant-numeric: tabular-nums;
     }
 
+    /* REFRESH BUTTON */
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .refresh-btn:hover:not(:disabled) {
+      background: rgba(15, 23, 42, 0.8);
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .refresh-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .refresh-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .refresh-btn svg {
+      transition: transform 0.6s ease;
+    }
+
+    .refresh-btn.refreshing svg {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .refresh-status {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .refresh-status.success {
+      color: var(--success, #10b981);
+    }
+
+    .refresh-status.error {
+      color: var(--danger, #ef4444);
+    }
+
     /* STAT CARDS (top) */
 
     .grid-top {
@@ -2076,6 +2138,13 @@ function dashboardPage() {
             <span class="sync-label">Last sync:</span>
             <span class="sync-time" id="sync-time">–</span>
           </div>
+          <button class="refresh-btn" id="refresh-metrics-btn" title="Refresh metrics">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13.65 2.35C12.2 0.9 10.21 0 8 0 3.58 0 0.01 3.58 0.01 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
+            </svg>
+            <span class="refresh-text">Refresh</span>
+            <span class="refresh-status" id="refresh-status"></span>
+          </button>
         </header>
 
         <!-- HOME VIEW -->
@@ -2614,6 +2683,8 @@ function dashboardPage() {
       const statWeekHome = document.getElementById('stat-week-home');
       const statMonthHome = document.getElementById('stat-month-home');
       const statYearHome = document.getElementById('stat-year-home');
+      const refreshMetricsBtn = document.getElementById('refresh-metrics-btn');
+      const refreshStatus = document.getElementById('refresh-status');
       const storesCountHome = document.getElementById('stores-count-home');
       const homeTableWrapper = document.getElementById('home-table-wrapper');
       const homeEmpty = document.getElementById('home-empty');
@@ -4547,6 +4618,107 @@ function dashboardPage() {
           const syncDisplay = document.getElementById('sync-status-display');
           if (syncDisplay) syncDisplay.style.display = 'none';
         }
+      }
+
+      // Manual refresh metrics handler
+      let refreshPollInterval = null;
+
+      async function refreshMetrics() {
+        if (!refreshMetricsBtn) return;
+
+        try {
+          const storeId = selectedStoreId === 'all' ? 'ALL' : selectedStoreId;
+
+          // Set button loading state
+          refreshMetricsBtn.disabled = true;
+          refreshMetricsBtn.classList.add('refreshing');
+          if (refreshStatus) {
+            refreshStatus.textContent = 'Refreshing…';
+            refreshStatus.className = 'refresh-status';
+          }
+
+          console.log('[metrics-manual] Triggering manual refresh for:', storeId);
+
+          // Call the public manual refresh endpoint (no auth required)
+          const res = await fetch('/metrics/refresh', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              store_id: storeId,
+              mode: 'today',
+            }),
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'HTTP ' + res.status);
+          }
+
+          const result = await res.json();
+          console.log('[metrics-manual] Refresh started:', result);
+
+          // Wait 3 seconds then start polling
+          setTimeout(async () => {
+            console.log('[metrics-manual] Polling for refresh completion...');
+            await loadMetrics();
+
+            // Start polling every 6 seconds if refresh is still running
+            if (refreshPollInterval) clearInterval(refreshPollInterval);
+
+            refreshPollInterval = setInterval(async () => {
+              const metricsRes = await fetch('/metrics/home?store_id=' + encodeURIComponent(storeId));
+              if (metricsRes.ok) {
+                const metrics = await metricsRes.json();
+
+                if (!metrics.refresh_running) {
+                  // Refresh completed
+                  console.log('[metrics-manual] Refresh completed');
+                  clearInterval(refreshPollInterval);
+                  refreshPollInterval = null;
+
+                  // Update UI to show completion
+                  refreshMetricsBtn.disabled = false;
+                  refreshMetricsBtn.classList.remove('refreshing');
+                  if (refreshStatus) {
+                    refreshStatus.textContent = 'Refreshed';
+                    refreshStatus.className = 'refresh-status success';
+                    setTimeout(() => {
+                      if (refreshStatus) refreshStatus.textContent = '';
+                    }, 3000);
+                  }
+
+                  // Load final metrics
+                  await loadMetrics();
+                }
+              }
+            }, 6000);
+          }, 3000);
+
+        } catch (err) {
+          console.error('[metrics-manual] Failed to trigger refresh:', err);
+
+          refreshMetricsBtn.disabled = false;
+          refreshMetricsBtn.classList.remove('refreshing');
+          if (refreshStatus) {
+            refreshStatus.textContent = 'Error';
+            refreshStatus.className = 'refresh-status error';
+            setTimeout(() => {
+              if (refreshStatus) refreshStatus.textContent = '';
+            }, 3000);
+          }
+
+          if (refreshPollInterval) {
+            clearInterval(refreshPollInterval);
+            refreshPollInterval = null;
+          }
+        }
+      }
+
+      // Attach refresh button handler
+      if (refreshMetricsBtn) {
+        refreshMetricsBtn.addEventListener('click', refreshMetrics);
       }
 
       async function loadStores(prevStoreId = selectedStoreId) {

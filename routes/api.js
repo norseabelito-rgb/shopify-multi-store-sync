@@ -1105,7 +1105,7 @@ router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
 
 // ==================== METRICS SYSTEM ENDPOINTS ====================
 // Daily aggregation and homepage metrics using orders_daily_agg table
-const { aggregateDailyOrders, backfill2025, getHomeMetrics, getYesterdayBucharestDate } = require('../services/metricsService');
+const { aggregateDailyOrders, backfill2025, getHomeMetrics, getYesterdayBucharestDate, manualRefresh } = require('../services/metricsService');
 
 // POST /tasks/metrics/daily-snapshot - Daily snapshot job (protected by x-tasks-secret)
 // Aggregates orders for a specific date (default: yesterday in Europe/Bucharest TZ)
@@ -1148,6 +1148,154 @@ router.post('/tasks/metrics/backfill-2025', requireTasksSecret, async (_req, res
     .catch((err) => {
       console.error('[metrics/backfill-2025] Job failed:', err);
     });
+});
+
+// POST /tasks/metrics/refresh - Manual refresh of orders_daily_agg (protected by x-tasks-secret)
+// Supports modes: today (default), range, last_n_days
+router.post('/tasks/metrics/refresh', requireTasksSecret, async (req, res) => {
+  try {
+    const { store_id = 'ALL', mode = 'today', from_date, to_date, days } = req.body || {};
+
+    // Get today in Europe/Bucharest timezone
+    const now = new Date();
+    const bucharestNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+    const today = bucharestNow.toISOString().split('T')[0];
+
+    let fromDate, toDate;
+
+    // Calculate date range based on mode
+    if (mode === 'range') {
+      if (!from_date || !to_date) {
+        return res.status(400).json({
+          ok: false,
+          error: 'mode=range requires from_date and to_date',
+        });
+      }
+      fromDate = from_date;
+      toDate = to_date;
+    } else if (mode === 'last_n_days') {
+      if (!days || days < 1 || days > 60) {
+        return res.status(400).json({
+          ok: false,
+          error: 'mode=last_n_days requires days (1-60)',
+        });
+      }
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - (days - 1));
+      fromDate = startDate.toISOString().split('T')[0];
+      toDate = today;
+    } else {
+      // mode === 'today' (default)
+      fromDate = today;
+      toDate = today;
+    }
+
+    console.log(`[metrics-manual] Manual refresh request: store_id=${store_id}, mode=${mode}, ${fromDate} → ${toDate}`);
+
+    // Respond immediately with 202 Accepted
+    res.status(202).json({
+      ok: true,
+      started: true,
+      store_id,
+      mode,
+      from_date: fromDate,
+      to_date: toDate,
+      started_at: new Date().toISOString(),
+    });
+
+    // Run manual refresh in background (non-blocking)
+    manualRefresh(store_id, fromDate, toDate)
+      .then((result) => {
+        if (result.ok) {
+          console.log(`[metrics-manual] Manual refresh completed successfully:`, JSON.stringify(result, null, 2));
+        } else {
+          console.log(`[metrics-manual] Manual refresh skipped:`, result.error);
+        }
+      })
+      .catch((err) => {
+        console.error('[metrics-manual] Manual refresh failed:', err);
+      });
+  } catch (err) {
+    console.error('[metrics-manual] Error processing request:', err);
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+    });
+  }
+});
+
+// POST /metrics/refresh - Public manual refresh endpoint (no auth required, for UI button)
+// This is a convenience wrapper around the tasks endpoint for UI use
+router.post('/metrics/refresh', async (req, res) => {
+  try {
+    const { store_id = 'ALL', mode = 'today', from_date, to_date, days } = req.body || {};
+
+    // Get today in Europe/Bucharest timezone
+    const now = new Date();
+    const bucharestNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+    const today = bucharestNow.toISOString().split('T')[0];
+
+    let fromDate, toDateCalc;
+
+    // Calculate date range based on mode
+    if (mode === 'range') {
+      if (!from_date || !to_date) {
+        return res.status(400).json({
+          ok: false,
+          error: 'mode=range requires from_date and to_date',
+        });
+      }
+      fromDate = from_date;
+      toDateCalc = to_date;
+    } else if (mode === 'last_n_days') {
+      if (!days || days < 1 || days > 60) {
+        return res.status(400).json({
+          ok: false,
+          error: 'mode=last_n_days requires days (1-60)',
+        });
+      }
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - (days - 1));
+      fromDate = startDate.toISOString().split('T')[0];
+      toDateCalc = today;
+    } else {
+      // mode === 'today' (default)
+      fromDate = today;
+      toDateCalc = today;
+    }
+
+    console.log(`[metrics-manual-ui] Public manual refresh request: store_id=${store_id}, mode=${mode}, ${fromDate} → ${toDateCalc}`);
+
+    // Respond immediately with 202 Accepted
+    res.status(202).json({
+      ok: true,
+      started: true,
+      store_id,
+      mode,
+      from_date: fromDate,
+      to_date: toDateCalc,
+      started_at: new Date().toISOString(),
+    });
+
+    // Run manual refresh in background (non-blocking)
+    manualRefresh(store_id, fromDate, toDateCalc)
+      .then((result) => {
+        if (result.ok) {
+          console.log(`[metrics-manual-ui] Manual refresh completed successfully:`, JSON.stringify(result, null, 2));
+        } else {
+          console.log(`[metrics-manual-ui] Manual refresh skipped:`, result.error);
+        }
+      })
+      .catch((err) => {
+        console.error('[metrics-manual-ui] Manual refresh failed:', err);
+      });
+  } catch (err) {
+    console.error('[metrics-manual-ui] Error processing request:', err);
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+    });
+  }
 });
 
 // GET /metrics/home - Get homepage metrics from orders_daily_agg (DB-first, no heavy scans)

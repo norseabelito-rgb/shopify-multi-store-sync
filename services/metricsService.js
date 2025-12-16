@@ -585,6 +585,62 @@ async function getHomeMetrics(storeId = 'ALL') {
   return metrics;
 }
 
+/**
+ * Manual refresh: recomputes orders_daily_agg for a date range with advisory lock
+ * Used by the manual "Refresh metrics" button in the UI
+ *
+ * @param {string} storeId - Store ID or 'ALL' (for lock context, not filtering)
+ * @param {string} fromDate - Start date in YYYY-MM-DD format
+ * @param {string} toDate - End date in YYYY-MM-DD format
+ * @returns {Promise<object>} { ok, lock_acquired, dates_refreshed, from_date, to_date, error? }
+ */
+async function manualRefresh(storeId, fromDate, toDate) {
+  console.log(`[metrics-manual] Manual refresh requested for ${storeId}: ${fromDate} → ${toDate}`);
+
+  let lockAcquired = false;
+
+  try {
+    // Try to acquire lock
+    lockAcquired = await tryAcquireRefreshLock(storeId);
+
+    if (!lockAcquired) {
+      console.log(`[metrics-manual] Lock acquisition failed for ${storeId}: another refresh is already running`);
+      return {
+        ok: false,
+        lock_acquired: false,
+        error: 'Refresh already running',
+      };
+    }
+
+    console.log(`[metrics-manual] Lock acquired for ${storeId}, starting manual refresh`);
+
+    // Run incremental refresh
+    const result = await incrementalRefresh(storeId, fromDate, toDate);
+
+    console.log(`[metrics-manual] ✓ Manual refresh completed for ${storeId}: ${result.dates_refreshed} dates refreshed`);
+
+    return {
+      ok: true,
+      lock_acquired: true,
+      dates_refreshed: result.dates_refreshed,
+      from_date: result.from_date,
+      to_date: result.to_date,
+    };
+  } catch (err) {
+    console.error(`[metrics-manual] ✗ Manual refresh failed for ${storeId}:`, err);
+    throw err;
+  } finally {
+    // Always release lock if acquired
+    if (lockAcquired) {
+      try {
+        await releaseRefreshLock(storeId);
+      } catch (err) {
+        console.error(`[metrics-manual] Failed to release lock for ${storeId}:`, err);
+      }
+    }
+  }
+}
+
 module.exports = {
   aggregateDailyOrders,
   backfill2025,
@@ -592,4 +648,5 @@ module.exports = {
   getStoreMetrics,
   getLastSync,
   getYesterdayBucharestDate,
+  manualRefresh,
 };
