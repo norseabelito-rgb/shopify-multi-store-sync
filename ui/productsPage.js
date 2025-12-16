@@ -1,6 +1,6 @@
 // ui/productsPage.js
 // Products Module UI
-// Table view with filters, detail drawer, CSV import/export, bulk push actions
+// Table view with filters, detail drawer, Excel import/export, bulk push actions
 
 function productsPage() {
   return `
@@ -533,7 +533,7 @@ function productsPage() {
       color: var(--muted);
     }
 
-    /* CSV Modal */
+    /* Excel Modal */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -742,9 +742,9 @@ function productsPage() {
         <p class="page-subtitle">Gestioneaza produsele master si sincronizeaza cu magazinele Shopify</p>
       </div>
       <div class="header-actions">
-        <button class="btn" id="btn-csv-import">Import CSV</button>
-        <button class="btn" id="btn-csv-export">Export CSV</button>
-        <button class="btn" id="btn-csv-template">Descarca Template</button>
+        <button class="btn" id="btn-excel-import">Import Excel</button>
+        <button class="btn" id="btn-excel-export">Export Excel</button>
+        <button class="btn" id="btn-excel-template">Descarca Template</button>
         <button class="btn btn-primary" id="btn-add-product">+ Produs Nou</button>
       </div>
     </div>
@@ -824,28 +824,28 @@ function productsPage() {
     </div>
   </div>
 
-  <!-- CSV Import Modal -->
-  <div class="modal-overlay" id="csv-modal">
+  <!-- Excel Import Modal -->
+  <div class="modal-overlay" id="excel-modal">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title">Import CSV</h3>
-        <button class="drawer-close" id="csv-modal-close">&times;</button>
+        <h3 class="modal-title">Import Excel</h3>
+        <button class="drawer-close" id="excel-modal-close">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="file-upload" id="csv-upload">
-          <div class="file-upload-icon">📄</div>
-          <div class="file-upload-text">Click sau drag & drop fisierul CSV</div>
-          <div class="file-upload-hint">Format: UTF-8, maxim 10MB</div>
-          <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+        <div class="file-upload" id="excel-upload">
+          <div class="file-upload-icon">📊</div>
+          <div class="file-upload-text">Click sau drag & drop fisierul Excel (.xlsx)</div>
+          <div class="file-upload-hint">Format: .xlsx, maxim 10MB</div>
+          <input type="file" id="excel-file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display: none;">
         </div>
-        <div id="csv-preview" style="margin-top: 16px; display: none;">
+        <div id="excel-preview" style="margin-top: 16px; display: none;">
           <div class="form-label">Preview</div>
-          <div id="csv-preview-content" style="font-size: 12px; color: var(--muted);"></div>
+          <div id="excel-preview-content" style="font-size: 12px; color: var(--muted);"></div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn" id="btn-csv-cancel">Anuleaza</button>
-        <button class="btn btn-primary" id="btn-csv-confirm" disabled>Importa</button>
+        <button class="btn" id="btn-excel-cancel">Anuleaza</button>
+        <button class="btn btn-primary" id="btn-excel-confirm" disabled>Importa</button>
       </div>
     </div>
   </div>
@@ -901,7 +901,7 @@ function productsPage() {
     let selectedSkus = new Set();
     let currentSku = null;
     let isNewProduct = false;
-    let csvContent = null;
+    let excelContent = null;
 
     // Elements
     const tbody = document.getElementById('products-tbody');
@@ -920,12 +920,12 @@ function productsPage() {
     const drawerTitle = document.getElementById('drawer-title');
     const drawerContent = document.getElementById('drawer-content');
 
-    const csvModal = document.getElementById('csv-modal');
-    const csvUpload = document.getElementById('csv-upload');
-    const csvFileInput = document.getElementById('csv-file-input');
-    const csvPreview = document.getElementById('csv-preview');
-    const csvPreviewContent = document.getElementById('csv-preview-content');
-    const btnCsvConfirm = document.getElementById('btn-csv-confirm');
+    const excelModal = document.getElementById('excel-modal');
+    const excelUpload = document.getElementById('excel-upload');
+    const excelFileInput = document.getElementById('excel-file-input');
+    const excelPreview = document.getElementById('excel-preview');
+    const excelPreviewContent = document.getElementById('excel-preview-content');
+    const btnExcelConfirm = document.getElementById('btn-excel-confirm');
 
     const pushModal = document.getElementById('push-modal');
     const pushStoreSelect = document.getElementById('push-store-select');
@@ -1063,7 +1063,7 @@ function productsPage() {
     // Render functions
     function renderTable() {
       if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Niciun produs</div><div class="empty-text">Adauga primul produs sau importa din CSV</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Niciun produs</div><div class="empty-text">Adauga primul produs sau importa din Excel</div></div></td></tr>';
         return;
       }
 
@@ -1301,77 +1301,77 @@ function productsPage() {
       }
     }
 
-    // CSV handling
-    function openCsvModal() {
-      csvContent = null;
-      csvPreview.style.display = 'none';
-      btnCsvConfirm.disabled = true;
-      csvModal.classList.add('open');
+    // Excel handling
+    function openExcelModal() {
+      excelContent = null;
+      excelPreview.style.display = 'none';
+      btnExcelConfirm.disabled = true;
+      excelModal.classList.add('open');
     }
 
-    function closeCsvModal() {
-      csvModal.classList.remove('open');
+    function closeExcelModal() {
+      excelModal.classList.remove('open');
     }
 
-    async function handleCsvFile(file) {
+    async function handleExcelFile(file) {
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = async (e) => {
-        csvContent = e.target.result;
+        excelContent = e.target.result;
 
         // Validate
         try {
-          const res = await fetch('/products/csv/validate', {
+          const res = await fetch('/products/excel/validate', {
             method: 'POST',
-            headers: { 'Content-Type': 'text/csv' },
-            body: csvContent,
+            headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+            body: excelContent,
           });
 
           const validation = await res.json();
 
-          csvPreview.style.display = 'block';
-          csvPreviewContent.innerHTML = '<strong>' + validation.productCount + ' produse gasite</strong>';
+          excelPreview.style.display = 'block';
+          excelPreviewContent.innerHTML = '<strong>' + validation.productCount + ' produse gasite</strong>';
 
           if (validation.errors.length > 0) {
-            csvPreviewContent.innerHTML += '<br><span style="color: var(--danger);">' + validation.errors.length + ' erori:</span><br>';
+            excelPreviewContent.innerHTML += '<br><span style="color: var(--danger);">' + validation.errors.length + ' erori:</span><br>';
             validation.errors.slice(0, 5).forEach(err => {
-              csvPreviewContent.innerHTML += '- Rand ' + err.row + ': ' + err.error + '<br>';
+              excelPreviewContent.innerHTML += '- Rand ' + err.row + ': ' + err.error + '<br>';
             });
           }
 
           if (validation.preview && validation.preview.length > 0) {
-            csvPreviewContent.innerHTML += '<br>Primele produse: ' + validation.preview.map(p => p.sku).join(', ');
+            excelPreviewContent.innerHTML += '<br>Primele produse: ' + validation.preview.map(p => p.sku).join(', ');
           }
 
-          btnCsvConfirm.disabled = !validation.valid;
+          btnExcelConfirm.disabled = !validation.valid;
         } catch (err) {
-          csvPreviewContent.innerHTML = '<span style="color: var(--danger);">Eroare la validare: ' + err.message + '</span>';
-          btnCsvConfirm.disabled = true;
+          excelPreviewContent.innerHTML = '<span style="color: var(--danger);">Eroare la validare: ' + err.message + '</span>';
+          btnExcelConfirm.disabled = true;
         }
       };
 
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     }
 
-    async function importCsv() {
-      if (!csvContent) return;
+    async function importExcel() {
+      if (!excelContent) return;
 
-      btnCsvConfirm.disabled = true;
-      btnCsvConfirm.textContent = 'Se importa...';
+      btnExcelConfirm.disabled = true;
+      btnExcelConfirm.textContent = 'Se importa...';
 
       try {
-        const res = await fetch('/products/csv/import', {
+        const res = await fetch('/products/excel/import', {
           method: 'POST',
-          headers: { 'Content-Type': 'text/csv' },
-          body: csvContent,
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+          body: excelContent,
         });
 
         const result = await res.json();
 
         if (result.success) {
           showToast('Import finalizat: ' + result.imported + ' noi, ' + result.updated + ' actualizate');
-          closeCsvModal();
+          closeExcelModal();
           loadProducts();
         } else {
           showToast('Import esuat: ' + (result.parseErrors?.[0]?.error || 'Eroare necunoscuta'), 'error');
@@ -1379,8 +1379,8 @@ function productsPage() {
       } catch (err) {
         showToast('Eroare la import: ' + err.message, 'error');
       } finally {
-        btnCsvConfirm.disabled = false;
-        btnCsvConfirm.textContent = 'Importa';
+        btnExcelConfirm.disabled = false;
+        btnExcelConfirm.textContent = 'Importa';
       }
     }
 
@@ -1485,9 +1485,9 @@ function productsPage() {
 
     // Button handlers
     document.getElementById('btn-add-product').addEventListener('click', () => openDrawer(null));
-    document.getElementById('btn-csv-import').addEventListener('click', openCsvModal);
-    document.getElementById('btn-csv-export').addEventListener('click', () => window.location.href = '/products/csv/export');
-    document.getElementById('btn-csv-template').addEventListener('click', () => window.location.href = '/products/csv/template');
+    document.getElementById('btn-excel-import').addEventListener('click', openExcelModal);
+    document.getElementById('btn-excel-export').addEventListener('click', () => window.location.href = '/products/excel/export');
+    document.getElementById('btn-excel-template').addEventListener('click', () => window.location.href = '/products/excel/template');
     document.getElementById('btn-bulk-push').addEventListener('click', openPushModal);
     document.getElementById('btn-bulk-delete').addEventListener('click', async () => {
       if (!confirm('Stergi ' + selectedSkus.size + ' produse?')) return;
@@ -1510,19 +1510,19 @@ function productsPage() {
     document.getElementById('btn-drawer-cancel').addEventListener('click', closeDrawer);
     document.getElementById('btn-drawer-save').addEventListener('click', saveCurrentProduct);
 
-    // CSV modal events
-    document.getElementById('csv-modal-close').addEventListener('click', closeCsvModal);
-    document.getElementById('btn-csv-cancel').addEventListener('click', closeCsvModal);
-    document.getElementById('btn-csv-confirm').addEventListener('click', importCsv);
+    // Excel modal events
+    document.getElementById('excel-modal-close').addEventListener('click', closeExcelModal);
+    document.getElementById('btn-excel-cancel').addEventListener('click', closeExcelModal);
+    document.getElementById('btn-excel-confirm').addEventListener('click', importExcel);
 
-    csvUpload.addEventListener('click', () => csvFileInput.click());
-    csvFileInput.addEventListener('change', () => handleCsvFile(csvFileInput.files[0]));
-    csvUpload.addEventListener('dragover', (e) => { e.preventDefault(); csvUpload.classList.add('dragover'); });
-    csvUpload.addEventListener('dragleave', () => csvUpload.classList.remove('dragover'));
-    csvUpload.addEventListener('drop', (e) => {
+    excelUpload.addEventListener('click', () => excelFileInput.click());
+    excelFileInput.addEventListener('change', () => handleExcelFile(excelFileInput.files[0]));
+    excelUpload.addEventListener('dragover', (e) => { e.preventDefault(); excelUpload.classList.add('dragover'); });
+    excelUpload.addEventListener('dragleave', () => excelUpload.classList.remove('dragover'));
+    excelUpload.addEventListener('drop', (e) => {
       e.preventDefault();
-      csvUpload.classList.remove('dragover');
-      handleCsvFile(e.dataTransfer.files[0]);
+      excelUpload.classList.remove('dragover');
+      handleExcelFile(e.dataTransfer.files[0]);
     });
 
     // Push modal events

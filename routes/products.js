@@ -1,6 +1,6 @@
 // routes/products.js
 // API Routes for Products Module
-// Master products, store overrides, CSV import/export, Shopify push
+// Master products, store overrides, Excel import/export, Shopify push
 
 const express = require('express');
 const router = express.Router();
@@ -23,11 +23,11 @@ const {
 } = require('../services/productsService');
 
 const {
-  generateCsvTemplate,
-  exportMasterProductsToCsv,
-  importFromCsv,
-  validateCsv,
-} = require('../services/productsCsvService');
+  generateExcelTemplate,
+  exportMasterProductsToExcel,
+  importFromExcel,
+  validateExcel,
+} = require('../services/productsExcelService');
 
 const {
   pushProductToStore,
@@ -318,69 +318,69 @@ router.get('/:sku/sync/:storeId', async (req, res) => {
   }
 });
 
-// ==================== CSV IMPORT/EXPORT ====================
+// ==================== EXCEL IMPORT/EXPORT ====================
 
-// GET /products/csv/template - Download CSV template
-router.get('/csv/template', async (req, res) => {
+// GET /products/excel/template - Download Excel template
+router.get('/excel/template', async (req, res) => {
   try {
-    const csv = generateCsvTemplate();
+    const buffer = generateExcelTemplate();
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="products_template.csv"');
-    res.send(csv);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="products_template.xlsx"');
+    res.send(buffer);
   } catch (err) {
-    console.error('[products] GET /csv/template error:', err);
+    console.error('[products] GET /excel/template error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });
 
-// GET /products/csv/export - Export all master products to CSV
-router.get('/csv/export', async (req, res) => {
+// GET /products/excel/export - Export all master products to Excel
+router.get('/excel/export', async (req, res) => {
   try {
-    const csv = await exportMasterProductsToCsv();
+    const buffer = await exportMasterProductsToExcel();
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="products_export.csv"');
-    res.send(csv);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="products_export.xlsx"');
+    res.send(buffer);
   } catch (err) {
-    console.error('[products] GET /csv/export error:', err);
+    console.error('[products] GET /excel/export error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });
 
-// POST /products/csv/validate - Validate CSV without importing
-router.post('/csv/validate', express.text({ type: 'text/csv', limit: '10mb' }), async (req, res) => {
+// POST /products/excel/validate - Validate Excel without importing
+router.post('/excel/validate', express.raw({ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', limit: '10mb' }), async (req, res) => {
   try {
-    const csvContent = req.body;
+    const buffer = req.body;
 
-    if (!csvContent) {
-      return res.status(400).json({ error: 'CSV content is required' });
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Fisierul Excel este necesar' });
     }
 
-    const validation = validateCsv(csvContent);
+    const validation = validateExcel(buffer);
 
     res.json(validation);
   } catch (err) {
-    console.error('[products] POST /csv/validate error:', err);
+    console.error('[products] POST /excel/validate error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });
 
-// POST /products/csv/import - Import products from CSV
-router.post('/csv/import', express.text({ type: 'text/csv', limit: '10mb' }), async (req, res) => {
+// POST /products/excel/import - Import products from Excel
+router.post('/excel/import', express.raw({ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', limit: '10mb' }), async (req, res) => {
   try {
-    const csvContent = req.body;
+    const buffer = req.body;
 
-    if (!csvContent) {
-      return res.status(400).json({ error: 'CSV content is required' });
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Fisierul Excel este necesar' });
     }
 
-    const result = await importFromCsv(csvContent);
+    const result = await importFromExcel(buffer);
 
-    console.log(`[products] CSV import: ${result.imported} inserted, ${result.updated} updated, ${result.errors?.length || 0} errors`);
+    console.log(`[products] Excel import: ${result.imported} inserted, ${result.updated} updated, ${result.errors?.length || 0} errors`);
     res.json(result);
   } catch (err) {
-    console.error('[products] POST /csv/import error:', err);
+    console.error('[products] POST /excel/import error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });
