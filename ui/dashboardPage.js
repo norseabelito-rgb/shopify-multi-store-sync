@@ -1358,17 +1358,334 @@ function dashboardPage() {
       background: var(--accent-soft);
     }
 
+    /* ==================== DAILY REPORTS (DAY-CENTRIC) ==================== */
+
+    .reports-container {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      height: calc(100vh - 120px);
+    }
+
+    /* Left Panel: Calendar + Filters */
+    .reports-left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .reports-calendar-section {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    .reports-month-selector {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .reports-month-label {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .reports-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
+    .reports-calendar-cell {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reports-calendar-cell.empty {
+      background: transparent;
+      border: none;
+      cursor: default;
+    }
+
+    .reports-calendar-cell:not(.empty):hover {
+      background: rgba(79, 140, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    .reports-calendar-cell.today {
+      border-color: var(--accent);
+      background: rgba(79, 140, 255, 0.2);
+    }
+
+    .reports-calendar-cell.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .reports-calendar-cell.has-reports {
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .reports-calendar-day {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .reports-calendar-count {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .reports-filters-section {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    .reports-section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 0 0 12px 0;
+    }
+
+    .reports-filter-group {
+      margin-bottom: 12px;
+    }
+
+    .reports-filter-label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .reports-filter-input,
+    .reports-filter-select {
+      width: 100%;
+      padding: 8px 10px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .reports-filter-input:focus,
+    .reports-filter-select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Right Panel: Summary + Cards */
+    .reports-right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .reports-summary {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    .reports-summary-prompt {
+      text-align: center;
+      color: var(--muted);
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .reports-summary-header h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .reports-summary-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .reports-stat-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .reports-stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .reports-stat-value {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .reports-cards-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+      gap: 16px;
+    }
+
+    .reports-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .reports-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 16px rgba(79, 140, 255, 0.15);
+    }
+
+    .reports-card-empty {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px dashed var(--border);
+    }
+
+    .reports-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .reports-card-person {
+      flex: 1;
+    }
+
+    .reports-card-name {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .reports-card-email {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .reports-card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .reports-card-action-btn {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .reports-card-action-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .reports-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .reports-card-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .reports-card-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .reports-card-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .reports-card-projects {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .reports-project-tag {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .reports-card-footer {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-soft);
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    /* Modals */
     .reports-modal {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      backdrop-filter: blur(4px);
     }
 
     .reports-modal-content {
@@ -1377,37 +1694,218 @@ function dashboardPage() {
       border: 1px solid var(--border);
       width: 90%;
       max-width: 600px;
-      max-height: 80vh;
+      max-height: 85vh;
       overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
 
     .reports-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px;
+      padding: 18px 20px;
       border-bottom: 1px solid var(--border-soft);
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+      z-index: 1;
     }
 
     .reports-modal-header h3 {
       margin: 0;
       font-size: 16px;
+      font-weight: 600;
     }
 
     .reports-modal-body {
-      padding: 16px;
+      padding: 20px;
     }
 
-    .reports-saved-indicator {
+    /* Forms */
+    .reports-form-group {
+      margin-bottom: 16px;
+    }
+
+    .reports-form-label {
+      display: block;
       font-size: 12px;
-      color: var(--success);
-      margin-top: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
     }
 
-    .reports-timestamp {
+    .reports-form-input,
+    .reports-form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .reports-form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .reports-form-input:focus,
+    .reports-form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .reports-form-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    .reports-projects-checkboxes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .reports-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .reports-checkbox-label:hover {
+      background: rgba(79, 140, 255, 0.1);
+      border-color: var(--accent);
+    }
+
+    .reports-checkbox-label input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    .reports-checkbox-label span {
+      font-size: 13px;
+    }
+
+    /* People & Projects Management Lists */
+    .reports-people-management-list,
+    .reports-projects-management-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .reports-person-mgmt-item,
+    .reports-project-mgmt-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+    }
+
+    .reports-person-name,
+    .reports-project-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .reports-person-actions,
+    .reports-project-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .reports-person-status-badge,
+    .reports-project-status-badge {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+
+    .reports-project-color-box {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* History */
+    .reports-history-item {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .reports-history-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .reports-history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .reports-history-body {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .reports-history-json {
+      margin: 0;
       font-size: 11px;
-      color: var(--muted);
-      margin-top: 4px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+      color: #a3e635;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 1200px) {
+      .reports-container {
+        grid-template-columns: 280px 1fr;
+      }
+
+      .reports-cards-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .reports-container {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .reports-left-panel {
+        max-height: 60vh;
+      }
+
+      .reports-summary-stats {
+        grid-template-columns: repeat(3, 1fr);
+      }
     }
   </style>
 </head>
@@ -1833,50 +2331,146 @@ function dashboardPage() {
         </section>
 
         <section id="view-daily-reports" class="view">
-          <div class="reports-header">
-            <div class="top-title-block">
-              <h2 class="page-title">Daily Reports</h2>
-              <p class="page-subtitle">Team daily reporting & calendar visualization</p>
-            </div>
-            <button id="reports-manage-people-btn" class="btn-primary">Manage People</button>
-          </div>
-
-          <div class="reports-month-selector">
-            <button id="reports-prev-month" class="btn-icon">&larr;</button>
-            <span id="reports-current-month">Loading...</span>
-            <button id="reports-next-month" class="btn-icon">&rarr;</button>
-          </div>
-
-          <div id="reports-calendar-grid" class="reports-calendar-grid"></div>
-
-          <div class="reports-main-layout">
-            <div class="reports-people-panel">
-              <div class="panel-header">
-                <div class="panel-title">People</div>
-                <input
-                  id="reports-people-search"
-                  type="search"
-                  placeholder="Search people..."
-                  class="reports-search-input"
-                />
+          <!-- Day-centric team view for daily reports -->
+          <div class="reports-container">
+            <!-- Left Panel: Calendar + Filters -->
+            <div class="reports-left-panel">
+              <div class="reports-calendar-section">
+                <div class="reports-month-selector">
+                  <button id="reports-prev-month" class="btn-icon">&larr;</button>
+                  <span id="reports-current-month" class="reports-month-label">Loading...</span>
+                  <button id="reports-next-month" class="btn-icon">&rarr;</button>
+                </div>
+                <div id="reports-calendar-grid" class="reports-calendar-grid"></div>
               </div>
-              <div id="reports-people-list" class="reports-people-list"></div>
+
+              <div class="reports-filters-section">
+                <h3 class="reports-section-title">Filters</h3>
+                <div class="reports-filter-group">
+                  <label class="reports-filter-label">People</label>
+                  <input
+                    id="reports-people-filter"
+                    type="search"
+                    placeholder="Search people..."
+                    class="reports-filter-input"
+                  />
+                </div>
+                <div class="reports-filter-group">
+                  <label class="reports-filter-label">Project</label>
+                  <select id="reports-project-filter" class="reports-filter-select">
+                    <option value="">All projects</option>
+                  </select>
+                </div>
+                <button id="reports-manage-people-btn" class="btn-secondary" style="width: 100%; margin-top: 12px;">Manage People</button>
+                <button id="reports-manage-projects-btn" class="btn-secondary" style="width: 100%; margin-top: 8px;">Manage Projects</button>
+              </div>
             </div>
 
-            <div class="reports-editor-panel">
-              <div id="reports-editor-content"></div>
+            <!-- Right Panel: Summary + Report Cards -->
+            <div class="reports-right-panel">
+              <div id="reports-summary" class="reports-summary">
+                <p class="reports-summary-prompt">← Select a date to view team reports</p>
+              </div>
+
+              <div id="reports-cards-container" class="reports-cards-container"></div>
             </div>
           </div>
 
+          <!-- Manage People Modal -->
           <div id="reports-people-modal" class="reports-modal" style="display:none;">
             <div class="reports-modal-content">
               <div class="reports-modal-header">
                 <h3>Manage People</h3>
-                <button id="reports-modal-close" class="btn-icon">&times;</button>
+                <button id="reports-people-modal-close" class="btn-icon">&times;</button>
               </div>
               <div class="reports-modal-body">
                 <button id="reports-add-person-btn" class="btn-primary">Add New Person</button>
-                <div id="reports-people-management-list"></div>
+                <div id="reports-people-list" class="reports-people-management-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add/Edit Person Modal -->
+          <div id="reports-person-form-modal" class="reports-modal" style="display:none;">
+            <div class="reports-modal-content" style="max-width: 500px;">
+              <div class="reports-modal-header">
+                <h3 id="reports-person-form-title">Add Person</h3>
+                <button id="reports-person-form-close" class="btn-icon">&times;</button>
+              </div>
+              <div class="reports-modal-body">
+                <form id="reports-person-form">
+                  <input type="hidden" id="person-form-id" />
+                  <div class="reports-form-group">
+                    <label class="reports-form-label">Display Name *</label>
+                    <input type="text" id="person-form-name" class="reports-form-input" required />
+                  </div>
+                  <div class="reports-form-group">
+                    <label class="reports-form-label">Email</label>
+                    <input type="email" id="person-form-email" class="reports-form-input" />
+                  </div>
+                  <div class="reports-form-group">
+                    <label class="reports-form-label">Phone</label>
+                    <input type="tel" id="person-form-phone" class="reports-form-input" />
+                  </div>
+                  <div class="reports-form-actions">
+                    <button type="submit" class="btn-primary">Save</button>
+                    <button type="button" id="person-form-cancel" class="btn-secondary">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Manage Projects Modal -->
+          <div id="reports-projects-modal" class="reports-modal" style="display:none;">
+            <div class="reports-modal-content">
+              <div class="reports-modal-header">
+                <h3>Manage Projects</h3>
+                <button id="reports-projects-modal-close" class="btn-icon">&times;</button>
+              </div>
+              <div class="reports-modal-body">
+                <button id="reports-add-project-btn" class="btn-primary">Add New Project</button>
+                <div id="reports-projects-list" class="reports-projects-management-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add/Edit Project Modal -->
+          <div id="reports-project-form-modal" class="reports-modal" style="display:none;">
+            <div class="reports-modal-content" style="max-width: 500px;">
+              <div class="reports-modal-header">
+                <h3 id="reports-project-form-title">Add Project</h3>
+                <button id="reports-project-form-close" class="btn-icon">&times;</button>
+              </div>
+              <div class="reports-modal-body">
+                <form id="reports-project-form">
+                  <input type="hidden" id="project-form-id" />
+                  <div class="reports-form-group">
+                    <label class="reports-form-label">Project Name *</label>
+                    <input type="text" id="project-form-name" class="reports-form-input" required />
+                  </div>
+                  <div class="reports-form-group">
+                    <label class="reports-form-label">Color (hex)</label>
+                    <input type="text" id="project-form-color" class="reports-form-input" placeholder="#3498db" />
+                  </div>
+                  <div class="reports-form-actions">
+                    <button type="submit" class="btn-primary">Save</button>
+                    <button type="button" id="project-form-cancel" class="btn-secondary">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- History Modal -->
+          <div id="reports-history-modal" class="reports-modal" style="display:none;">
+            <div class="reports-modal-content" style="max-width: 700px;">
+              <div class="reports-modal-header">
+                <h3>Report History</h3>
+                <button id="reports-history-modal-close" class="btn-icon">&times;</button>
+              </div>
+              <div class="reports-modal-body">
+                <div id="reports-history-content"></div>
               </div>
             </div>
           </div>
@@ -2030,14 +2624,19 @@ function dashboardPage() {
         customer: null,
       };
 
-      // Daily Reports State
+      // Daily Reports State (Day-centric)
       const reportsState = {
         currentMonth: new Date(),
         selectedDate: null,
-        selectedPerson: null,
         people: [],
+        projects: [],
+        reports: [],
+        summary: null,
         calendarStats: [],
-        currentReport: null,
+        filters: {
+          peopleSearch: '',
+          projectId: '',
+        },
         loading: false,
       };
 
@@ -2185,6 +2784,8 @@ function dashboardPage() {
           pageTitleEl.textContent = 'My Stores';
         } else if (view === 'tiktok') {
           pageTitleEl.textContent = 'TikTok Ads';
+        } else if (view === 'daily-reports') {
+          pageTitleEl.textContent = 'Daily Reports';
         } else {
           pageTitleEl.textContent = view.charAt(0).toUpperCase() + view.slice(1);
         }
@@ -3968,10 +4569,11 @@ function dashboardPage() {
         loadStores(previousStoreId);
       });
 
-      // ==================== DAILY REPORTS FUNCTIONS ====================
+      // ==================== DAILY REPORTS FUNCTIONS (DAY-CENTRIC) ====================
 
       function initDailyReports() {
         loadReportsPeople();
+        loadReportsProjects();
         loadReportsCalendar();
         setupReportsEventListeners();
       }
@@ -3980,9 +4582,11 @@ function dashboardPage() {
         const prevMonthBtn = document.getElementById('reports-prev-month');
         const nextMonthBtn = document.getElementById('reports-next-month');
         const managePeopleBtn = document.getElementById('reports-manage-people-btn');
-        const modalCloseBtn = document.getElementById('reports-modal-close');
-        const peopleSearchInput = document.getElementById('reports-people-search');
+        const manageProjectsBtn = document.getElementById('reports-manage-projects-btn');
+        const peopleFilter = document.getElementById('reports-people-filter');
+        const projectFilter = document.getElementById('reports-project-filter');
 
+        // Month navigation
         if (prevMonthBtn) {
           prevMonthBtn.onclick = () => {
             reportsState.currentMonth.setMonth(reportsState.currentMonth.getMonth() - 1);
@@ -3997,34 +4601,136 @@ function dashboardPage() {
           };
         }
 
+        // Filters
+        let filterDebounce = null;
+        if (peopleFilter) {
+          peopleFilter.addEventListener('input', (e) => {
+            clearTimeout(filterDebounce);
+            filterDebounce = setTimeout(() => {
+              reportsState.filters.peopleSearch = e.target.value.trim();
+              if (reportsState.selectedDate) {
+                loadReportsForDate(reportsState.selectedDate);
+              }
+            }, 300);
+          });
+        }
+
+        if (projectFilter) {
+          projectFilter.addEventListener('change', (e) => {
+            reportsState.filters.projectId = e.target.value;
+            if (reportsState.selectedDate) {
+              loadReportsForDate(reportsState.selectedDate);
+            }
+          });
+        }
+
+        // Manage People Modal
         if (managePeopleBtn) {
           managePeopleBtn.onclick = () => {
-            document.getElementById('reports-people-modal').style.display = 'flex';
-            loadPeopleManagementList();
+            openPeopleManagementModal();
           };
         }
 
-        if (modalCloseBtn) {
-          modalCloseBtn.onclick = () => {
+        const peopleModalClose = document.getElementById('reports-people-modal-close');
+        if (peopleModalClose) {
+          peopleModalClose.onclick = () => {
             document.getElementById('reports-people-modal').style.display = 'none';
           };
         }
 
-        if (peopleSearchInput) {
-          peopleSearchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            const filtered = reportsState.people.filter(p =>
-              (p.first_name + ' ' + p.last_name).toLowerCase().includes(query) ||
-              p.email.toLowerCase().includes(query)
-            );
-            renderReportsPeopleList(filtered);
-          });
+        const addPersonBtn = document.getElementById('reports-add-person-btn');
+        if (addPersonBtn) {
+          addPersonBtn.onclick = () => {
+            openPersonFormModal();
+          };
         }
+
+        const personFormClose = document.getElementById('reports-person-form-close');
+        if (personFormClose) {
+          personFormClose.onclick = () => {
+            document.getElementById('reports-person-form-modal').style.display = 'none';
+          };
+        }
+
+        const personFormCancel = document.getElementById('person-form-cancel');
+        if (personFormCancel) {
+          personFormCancel.onclick = () => {
+            document.getElementById('reports-person-form-modal').style.display = 'none';
+          };
+        }
+
+        const personForm = document.getElementById('reports-person-form');
+        if (personForm) {
+          personForm.onsubmit = async (e) => {
+            e.preventDefault();
+            await submitPersonForm();
+          };
+        }
+
+        // Manage Projects Modal
+        if (manageProjectsBtn) {
+          manageProjectsBtn.onclick = () => {
+            openProjectsManagementModal();
+          };
+        }
+
+        const projectsModalClose = document.getElementById('reports-projects-modal-close');
+        if (projectsModalClose) {
+          projectsModalClose.onclick = () => {
+            document.getElementById('reports-projects-modal').style.display = 'none';
+          };
+        }
+
+        const addProjectBtn = document.getElementById('reports-add-project-btn');
+        if (addProjectBtn) {
+          addProjectBtn.onclick = () => {
+            openProjectFormModal();
+          };
+        }
+
+        const projectFormClose = document.getElementById('reports-project-form-close');
+        if (projectFormClose) {
+          projectFormClose.onclick = () => {
+            document.getElementById('reports-project-form-modal').style.display = 'none';
+          };
+        }
+
+        const projectFormCancel = document.getElementById('project-form-cancel');
+        if (projectFormCancel) {
+          projectFormCancel.onclick = () => {
+            document.getElementById('reports-project-form-modal').style.display = 'none';
+          };
+        }
+
+        const projectForm = document.getElementById('reports-project-form');
+        if (projectForm) {
+          projectForm.onsubmit = async (e) => {
+            e.preventDefault();
+            await submitProjectForm();
+          };
+        }
+
+        // History Modal
+        const historyModalClose = document.getElementById('reports-history-modal-close');
+        if (historyModalClose) {
+          historyModalClose.onclick = () => {
+            document.getElementById('reports-history-modal').style.display = 'none';
+          };
+        }
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.reports-modal').forEach(modal => {
+          modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+              modal.style.display = 'none';
+            }
+          });
+        });
       }
 
       async function loadReportsPeople() {
         try {
-          const res = await fetch('/api/reports/people?active=true');
+          const res = await fetch('/daily-reports/people?active=true');
           const data = await res.json();
           reportsState.people = data.people || [];
         } catch (err) {
@@ -4033,18 +4739,46 @@ function dashboardPage() {
         }
       }
 
+      async function loadReportsProjects() {
+        try {
+          const res = await fetch('/daily-reports/projects?active=true');
+          const data = await res.json();
+          reportsState.projects = data.projects || [];
+          renderProjectsFilter();
+        } catch (err) {
+          console.error('[reports] Failed to load projects:', err);
+          reportsState.projects = [];
+        }
+      }
+
+      function renderProjectsFilter() {
+        const select = document.getElementById('reports-project-filter');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">All projects</option>' +
+          reportsState.projects.map(proj =>
+            '<option value="' + escapeHtml(proj.id) + '">' +
+              escapeHtml(proj.name) +
+            '</option>'
+          ).join('');
+      }
+
       async function loadReportsCalendar() {
-        const monthStr = reportsState.currentMonth.toISOString().slice(0, 7);
+        const year = reportsState.currentMonth.getFullYear();
+        const month = reportsState.currentMonth.getMonth() + 1;
+
         document.getElementById('reports-current-month').textContent =
-          reportsState.currentMonth.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+          reportsState.currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         try {
-          const res = await fetch('/api/reports/calendar?month=' + monthStr);
+          const res = await fetch('/daily-reports/calendar?year=' + year + '&month=' + month);
           const data = await res.json();
           reportsState.calendarStats = data.stats || [];
           renderReportsCalendar();
         } catch (err) {
           console.error('[reports] Failed to load calendar:', err);
+          reportsState.calendarStats = [];
+          renderReportsCalendar();
         }
       }
 
@@ -4058,16 +4792,29 @@ function dashboardPage() {
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
+        const firstDayOfWeek = firstDay.getDay();
 
+        // Build stats map
         const statsMap = {};
         reportsState.calendarStats.forEach(s => {
-          statsMap[s.date] = s;
+          statsMap[s.report_date] = s.submitted_count;
         });
 
+        // Get total active people count
+        const totalPeople = reportsState.people.length;
+
+        // Add empty cells for days before month starts
+        for (let i = 0; i < firstDayOfWeek; i++) {
+          const emptyCell = document.createElement('div');
+          emptyCell.className = 'reports-calendar-cell empty';
+          grid.appendChild(emptyCell);
+        }
+
+        // Add day cells
         for (let day = 1; day <= daysInMonth; day++) {
           const date = new Date(year, month, day);
           const dateStr = date.toISOString().split('T')[0];
-          const stat = statsMap[dateStr] || { submitted_count: 0, active_people_count: 0 };
+          const submittedCount = statsMap[dateStr] || 0;
           const isToday = dateStr === todayStr;
           const isSelected = reportsState.selectedDate === dateStr;
 
@@ -4075,11 +4822,12 @@ function dashboardPage() {
           cell.className = 'reports-calendar-cell';
           if (isToday) cell.classList.add('today');
           if (isSelected) cell.classList.add('selected');
+          if (submittedCount > 0) cell.classList.add('has-reports');
 
           cell.innerHTML =
             '<div class="reports-calendar-day">' + day + '</div>' +
             '<div class="reports-calendar-count">' +
-              stat.submitted_count + '/' + stat.active_people_count +
+              submittedCount + (totalPeople > 0 ? '/' + totalPeople : '') +
             '</div>';
 
           cell.onclick = () => selectReportsDate(dateStr);
@@ -4089,240 +4837,661 @@ function dashboardPage() {
 
       async function selectReportsDate(dateStr) {
         reportsState.selectedDate = dateStr;
-        reportsState.selectedPerson = null;
         renderReportsCalendar();
+        await loadReportsForDate(dateStr);
+      }
+
+      async function loadReportsForDate(dateStr) {
+        reportsState.loading = true;
+        renderReportsSummary();
+        renderReportsCards();
 
         try {
-          const res = await fetch('/api/reports/daily?date=' + dateStr);
+          const params = new URLSearchParams({ date: dateStr });
+          if (reportsState.filters.projectId) {
+            params.set('project_id', reportsState.filters.projectId);
+          }
+          if (reportsState.filters.peopleSearch) {
+            params.set('q', reportsState.filters.peopleSearch);
+          }
+
+          const res = await fetch('/daily-reports?' + params.toString());
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+
           const data = await res.json();
+          reportsState.reports = data.reports || [];
+          reportsState.summary = data.summary || null;
 
-          const peopleWithStatus = reportsState.people.map(p => ({
-            ...p,
-            hasReport: data.reports.some(r => r.person_id === p.id)
-          }));
-
-          renderReportsPeopleList(peopleWithStatus);
-          document.getElementById('reports-editor-content').innerHTML =
-            '<p style="color: var(--muted);">Select a person to view/edit their report</p>';
+          renderReportsSummary();
+          renderReportsCards();
         } catch (err) {
           console.error('[reports] Failed to load reports for date:', err);
+          reportsState.reports = [];
+          reportsState.summary = null;
+          renderReportsSummary();
+          renderReportsCards();
+        } finally {
+          reportsState.loading = false;
         }
       }
 
-      function renderReportsPeopleList(people) {
-        const list = document.getElementById('reports-people-list');
-        if (!list) return;
-
-        if (!people || people.length === 0) {
-          list.innerHTML = '<p style="color: var(--muted);">No people found</p>';
-          return;
-        }
-
-        list.innerHTML = people.map(p => {
-          const status = p.hasReport ? '✅' : '❌';
-          const selected = reportsState.selectedPerson?.id === p.id ? 'selected' : '';
-          return (
-            '<div class="reports-person-item ' + selected + '" data-person-id="' + p.id + '">' +
-              '<span class="reports-person-name">' +
-                escapeHtml(p.first_name + ' ' + p.last_name) +
-              '</span>' +
-              '<span class="reports-person-status">' + status + '</span>' +
-            '</div>'
-          );
-        }).join('');
-
-        list.querySelectorAll('.reports-person-item').forEach(item => {
-          item.onclick = () => {
-            const personId = item.getAttribute('data-person-id');
-            const person = people.find(p => p.id === personId);
-            if (person) selectPerson(person);
-          };
-        });
-      }
-
-      async function selectPerson(person) {
-        reportsState.selectedPerson = person;
-        renderReportsPeopleList(reportsState.people.map(p => ({
-          ...p,
-          hasReport: true
-        })));
-
-        if (!reportsState.selectedDate) {
-          document.getElementById('reports-editor-content').innerHTML =
-            '<p style="color: var(--muted);">Please select a date first</p>';
-          return;
-        }
-
-        try {
-          const res = await fetch(
-            '/api/reports/daily/mine?person_id=' + person.id + '&date=' + reportsState.selectedDate
-          );
-          const data = await res.json();
-          reportsState.currentReport = data.report;
-          renderReportEditor(person, data.report);
-        } catch (err) {
-          console.error('[reports] Failed to load report:', err);
-          renderReportEditor(person, null);
-        }
-      }
-
-      function renderReportEditor(person, report) {
-        const editor = document.getElementById('reports-editor-content');
-        if (!editor) return;
-
-        const summary = report?.raw_json?.summary || '';
-        const blockers = report?.raw_json?.blockers || '';
-        const items = report?.raw_json?.items || [];
-
-        editor.innerHTML =
-          '<div class="reports-editor-form">' +
-            '<h3>' + escapeHtml(person.first_name + ' ' + person.last_name) + '</h3>' +
-            '<p style="color: var(--muted); font-size: 12px;">Date: ' +
-              reportsState.selectedDate +
-            '</p>' +
-
-            '<div class="reports-form-group">' +
-              '<label class="reports-form-label">Summary *</label>' +
-              '<textarea id="report-summary" class="reports-form-textarea" placeholder="What did you work on today?">' +
-                escapeHtml(summary) +
-              '</textarea>' +
-            '</div>' +
-
-            '<div class="reports-form-group">' +
-              '<label class="reports-form-label">Blockers / Needs</label>' +
-              '<textarea id="report-blockers" class="reports-form-textarea" placeholder="Any blockers or help needed?">' +
-                escapeHtml(blockers) +
-              '</textarea>' +
-            '</div>' +
-
-            '<div class="reports-form-group">' +
-              '<label class="reports-form-label">Items</label>' +
-              '<div id="report-items-list" class="reports-items-list"></div>' +
-              '<button id="report-add-item-btn" class="btn-secondary">Add Item</button>' +
-            '</div>' +
-
-            '<button id="report-submit-btn" class="btn-primary">Save Report</button>' +
-            '<div id="report-saved-indicator" class="reports-saved-indicator" style="display:none;">Saved!</div>' +
-            (report ? '<div class="reports-timestamp">Last updated: ' +
-              formatDateTime(report.updated_at) + '</div>' : '') +
-          '</div>';
-
-        renderReportItems(items);
-
-        document.getElementById('report-add-item-btn').onclick = () => {
-          items.push({ title: '', description: '', status: 'in-progress', links: [] });
-          renderReportItems(items);
-        };
-
-        document.getElementById('report-submit-btn').onclick = () => submitReport(person);
-      }
-
-      function renderReportItems(items) {
-        const container = document.getElementById('report-items-list');
+      function renderReportsSummary() {
+        const container = document.getElementById('reports-summary');
         if (!container) return;
 
-        container.innerHTML = items.map((item, idx) =>
-          '<div class="reports-item-card" data-item-index="' + idx + '">' +
-            '<div class="reports-item-header">' +
-              '<label class="reports-form-label">Item ' + (idx + 1) + '</label>' +
-              '<button class="reports-item-remove" data-item-index="' + idx + '">Remove</button>' +
+        if (!reportsState.selectedDate) {
+          container.innerHTML = '<p class="reports-summary-prompt">← Select a date to view team reports</p>';
+          return;
+        }
+
+        if (reportsState.loading) {
+          container.innerHTML =
+            '<div class="reports-summary-header">' +
+              '<h3>Loading...</h3>' +
+            '</div>';
+          return;
+        }
+
+        const summary = reportsState.summary;
+        if (!summary) {
+          container.innerHTML =
+            '<div class="reports-summary-header">' +
+              '<h3>' + reportsState.selectedDate + '</h3>' +
+              '<p style="color: var(--muted);">No summary data available</p>' +
+            '</div>';
+          return;
+        }
+
+        const date = new Date(reportsState.selectedDate + 'T00:00:00');
+        const formattedDate = date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        container.innerHTML =
+          '<div class="reports-summary-header">' +
+            '<h3>' + formattedDate + '</h3>' +
+            '<div class="reports-summary-stats">' +
+              '<div class="reports-stat-card">' +
+                '<div class="reports-stat-label">Total People</div>' +
+                '<div class="reports-stat-value">' + (summary.total_people || 0) + '</div>' +
+              '</div>' +
+              '<div class="reports-stat-card">' +
+                '<div class="reports-stat-label">Submitted</div>' +
+                '<div class="reports-stat-value" style="color: var(--success);">' + (summary.submitted || 0) + '</div>' +
+              '</div>' +
+              '<div class="reports-stat-card">' +
+                '<div class="reports-stat-label">Missing</div>' +
+                '<div class="reports-stat-value" style="color: var(--danger);">' + (summary.missing || 0) + '</div>' +
+              '</div>' +
             '</div>' +
-            '<input type="text" class="reports-form-input item-title" placeholder="Title *" value="' +
-              escapeHtml(item.title) + '" />' +
-            '<textarea class="reports-form-textarea item-description" placeholder="Description">' +
-              escapeHtml(item.description || '') +
-            '</textarea>' +
-            '<select class="reports-form-input item-status">' +
-              '<option value="in-progress" ' + (item.status === 'in-progress' ? 'selected' : '') + '>In Progress</option>' +
-              '<option value="done" ' + (item.status === 'done' ? 'selected' : '') + '>Done</option>' +
-              '<option value="blocked" ' + (item.status === 'blocked' ? 'selected' : '') + '>Blocked</option>' +
-            '</select>' +
-          '</div>'
+          '</div>';
+      }
+
+      function renderReportsCards() {
+        const container = document.getElementById('reports-cards-container');
+        if (!container) return;
+
+        if (!reportsState.selectedDate) {
+          container.innerHTML = '';
+          return;
+        }
+
+        if (reportsState.loading) {
+          container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">Loading reports...</p>';
+          return;
+        }
+
+        // Build a map of reports by person_id
+        const reportsMap = {};
+        reportsState.reports.forEach(report => {
+          reportsMap[report.person_id] = report;
+        });
+
+        // Get all active people (for missing people cards)
+        const allPeople = reportsState.people;
+
+        // Filter by search if needed
+        let filteredPeople = allPeople;
+        if (reportsState.filters.peopleSearch) {
+          const query = reportsState.filters.peopleSearch.toLowerCase();
+          filteredPeople = allPeople.filter(p =>
+            p.display_name.toLowerCase().includes(query) ||
+            (p.email && p.email.toLowerCase().includes(query))
+          );
+        }
+
+        if (filteredPeople.length === 0) {
+          container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">No people found</p>';
+          return;
+        }
+
+        container.innerHTML = filteredPeople.map(person => {
+          const report = reportsMap[person.id];
+          return renderReportCard(person, report);
+        }).join('');
+
+        // Attach event listeners
+        attachReportCardListeners();
+      }
+
+      function renderReportCard(person, report) {
+        const hasReport = !!report;
+        const projects = hasReport && Array.isArray(report.projects) ? report.projects : [];
+        const projectTags = projects.map(proj =>
+          '<span class="reports-project-tag" style="background-color: ' +
+            (proj.color || '#3498db') + ';">' +
+            escapeHtml(proj.name) +
+          '</span>'
         ).join('');
 
-        container.querySelectorAll('.reports-item-remove').forEach(btn => {
-          btn.onclick = () => {
-            const idx = parseInt(btn.getAttribute('data-item-index'));
-            items.splice(idx, 1);
-            renderReportItems(items);
+        const cardClass = hasReport ? 'reports-card' : 'reports-card reports-card-empty';
+
+        return (
+          '<div class="' + cardClass + '" data-person-id="' + escapeHtml(person.id) + '">' +
+            '<div class="reports-card-header">' +
+              '<div class="reports-card-person">' +
+                '<div class="reports-card-name">' + escapeHtml(person.display_name) + '</div>' +
+                (person.email ? '<div class="reports-card-email">' + escapeHtml(person.email) + '</div>' : '') +
+              '</div>' +
+              '<div class="reports-card-actions">' +
+                (hasReport
+                  ? '<button class="reports-card-action-btn reports-history-btn" data-entry-id="' +
+                    escapeHtml(report.id) + '" title="View history">📜</button>'
+                  : '') +
+                '<button class="reports-card-action-btn reports-edit-btn" data-person-id="' +
+                  escapeHtml(person.id) + '" title="' + (hasReport ? 'Edit' : 'Add') + ' report">✏️</button>' +
+              '</div>' +
+            '</div>' +
+            (hasReport
+              ? '<div class="reports-card-body">' +
+                  '<div class="reports-card-section">' +
+                    '<div class="reports-card-label">Did today</div>' +
+                    '<div class="reports-card-text">' +
+                      (report.did ? escapeHtml(report.did) : '<span style="color: var(--muted);">—</span>') +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="reports-card-section">' +
+                    '<div class="reports-card-label">Next</div>' +
+                    '<div class="reports-card-text">' +
+                      (report.next ? escapeHtml(report.next) : '<span style="color: var(--muted);">—</span>') +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="reports-card-section">' +
+                    '<div class="reports-card-label">Blockers / Needs</div>' +
+                    '<div class="reports-card-text">' +
+                      (report.blockers ? escapeHtml(report.blockers) : '<span style="color: var(--muted);">—</span>') +
+                    '</div>' +
+                  '</div>' +
+                  (projects.length > 0
+                    ? '<div class="reports-card-projects">' + projectTags + '</div>'
+                    : '') +
+                  (report.last_edited_by_name
+                    ? '<div class="reports-card-footer">' +
+                        'Last edited by ' + escapeHtml(report.last_edited_by_name) +
+                        ' · ' + formatDateTime(report.updated_at) +
+                      '</div>'
+                    : '<div class="reports-card-footer">' +
+                        'Updated ' + formatDateTime(report.updated_at) +
+                      '</div>') +
+                '</div>'
+              : '<div class="reports-card-body">' +
+                  '<p style="color: var(--muted); text-align: center; padding: 20px;">No report submitted</p>' +
+                '</div>') +
+          '</div>'
+        );
+      }
+
+      function attachReportCardListeners() {
+        // Edit buttons
+        document.querySelectorAll('.reports-edit-btn').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const personId = btn.getAttribute('data-person-id');
+            const person = reportsState.people.find(p => p.id === personId);
+            if (person) {
+              openReportEditorModal(person);
+            }
+          };
+        });
+
+        // History buttons
+        document.querySelectorAll('.reports-history-btn').forEach(btn => {
+          btn.onclick = async (e) => {
+            e.stopPropagation();
+            const entryId = btn.getAttribute('data-entry-id');
+            await openHistoryModal(entryId);
           };
         });
       }
 
-      async function submitReport(person) {
-        const summary = document.getElementById('report-summary').value;
-        const blockers = document.getElementById('report-blockers').value;
+      async function openReportEditorModal(person) {
+        // Find existing report for this person and date
+        const existingReport = reportsState.reports.find(r => r.person_id === person.id);
 
-        const items = [];
-        document.querySelectorAll('.reports-item-card').forEach(card => {
-          const title = card.querySelector('.item-title').value;
-          const description = card.querySelector('.item-description').value;
-          const status = card.querySelector('.item-status').value;
-          if (title) {
-            items.push({ title, description, status, links: [] });
+        const modal = document.createElement('div');
+        modal.className = 'reports-modal';
+        modal.style.display = 'flex';
+        modal.id = 'reports-editor-modal-temp';
+
+        const did = existingReport?.did || '';
+        const next = existingReport?.next || '';
+        const blockers = existingReport?.blockers || '';
+        const selectedProjects = existingReport?.projects || [];
+        const selectedProjectIds = selectedProjects.map(p => p.id);
+
+        modal.innerHTML =
+          '<div class="reports-modal-content" style="max-width: 700px;">' +
+            '<div class="reports-modal-header">' +
+              '<h3>' + escapeHtml(person.display_name) + ' - ' + reportsState.selectedDate + '</h3>' +
+              '<button class="btn-icon reports-editor-modal-close">&times;</button>' +
+            '</div>' +
+            '<div class="reports-modal-body">' +
+              '<form id="reports-editor-form">' +
+                '<div class="reports-form-group">' +
+                  '<label class="reports-form-label">Did today</label>' +
+                  '<textarea id="editor-did" class="reports-form-textarea" rows="3">' +
+                    escapeHtml(did) +
+                  '</textarea>' +
+                '</div>' +
+                '<div class="reports-form-group">' +
+                  '<label class="reports-form-label">Next</label>' +
+                  '<textarea id="editor-next" class="reports-form-textarea" rows="3">' +
+                    escapeHtml(next) +
+                  '</textarea>' +
+                '</div>' +
+                '<div class="reports-form-group">' +
+                  '<label class="reports-form-label">Blockers / Needs</label>' +
+                  '<textarea id="editor-blockers" class="reports-form-textarea" rows="3">' +
+                    escapeHtml(blockers) +
+                  '</textarea>' +
+                '</div>' +
+                '<div class="reports-form-group">' +
+                  '<label class="reports-form-label">Projects</label>' +
+                  '<div id="editor-projects" class="reports-projects-checkboxes">' +
+                    reportsState.projects.map(proj =>
+                      '<label class="reports-checkbox-label">' +
+                        '<input type="checkbox" value="' + escapeHtml(proj.id) + '" ' +
+                          (selectedProjectIds.includes(proj.id) ? 'checked' : '') + ' />' +
+                        '<span>' + escapeHtml(proj.name) + '</span>' +
+                      '</label>'
+                    ).join('') +
+                  '</div>' +
+                '</div>' +
+                '<div class="reports-form-actions">' +
+                  '<button type="submit" class="btn-primary">Save Report</button>' +
+                  '<button type="button" class="btn-secondary reports-editor-cancel">Cancel</button>' +
+                '</div>' +
+              '</form>' +
+            '</div>' +
+          '</div>';
+
+        document.body.appendChild(modal);
+
+        // Event listeners
+        const form = modal.querySelector('#reports-editor-form');
+        const closeBtn = modal.querySelector('.reports-editor-modal-close');
+        const cancelBtn = modal.querySelector('.reports-editor-cancel');
+
+        const closeModal = () => {
+          modal.remove();
+        };
+
+        closeBtn.onclick = closeModal;
+        cancelBtn.onclick = closeModal;
+        modal.onclick = (e) => {
+          if (e.target === modal) closeModal();
+        };
+
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+
+          const didVal = document.getElementById('editor-did').value.trim();
+          const nextVal = document.getElementById('editor-next').value.trim();
+          const blockersVal = document.getElementById('editor-blockers').value.trim();
+
+          const projectCheckboxes = modal.querySelectorAll('#editor-projects input[type="checkbox"]:checked');
+          const projectIds = Array.from(projectCheckboxes).map(cb => cb.value);
+
+          // TODO: For future UAM, edited_by_person_id would be the authenticated user
+          // For now, we use the person who owns the report as the editor
+          const payload = {
+            person_id: person.id,
+            date: reportsState.selectedDate,
+            did: didVal,
+            next: nextVal,
+            blockers: blockersVal,
+            project_ids: projectIds,
+            edited_by_person_id: person.id, // TODO: Replace with authenticated user ID when UAM is implemented
+          };
+
+          try {
+            const res = await fetch('/daily-reports/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const errData = await res.json();
+              throw new Error(errData.error || 'Failed to save report');
+            }
+
+            closeModal();
+            await loadReportsForDate(reportsState.selectedDate);
+            await loadReportsCalendar();
+          } catch (err) {
+            console.error('[reports] Failed to save report:', err);
+            alert('Failed to save report: ' + err.message);
           }
-        });
+        };
+      }
 
-        if (!summary) {
-          alert('Summary is required');
+      async function openHistoryModal(entryId) {
+        const modal = document.getElementById('reports-history-modal');
+        const content = document.getElementById('reports-history-content');
+
+        if (!modal || !content) return;
+
+        modal.style.display = 'flex';
+        content.innerHTML = '<p style="color: var(--muted);">Loading history...</p>';
+
+        try {
+          const res = await fetch('/daily-reports/revisions/' + encodeURIComponent(entryId));
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+
+          const data = await res.json();
+          const revisions = data.revisions || [];
+
+          if (revisions.length === 0) {
+            content.innerHTML = '<p style="color: var(--muted);">No revision history found</p>';
+            return;
+          }
+
+          content.innerHTML = revisions.map((rev, idx) => {
+            const snapshot = typeof rev.snapshot === 'string' ? JSON.parse(rev.snapshot) : rev.snapshot;
+            return (
+              '<div class="reports-history-item">' +
+                '<div class="reports-history-header">' +
+                  '<strong>Revision ' + (revisions.length - idx) + '</strong>' +
+                  '<span style="color: var(--muted); font-size: 12px;">' +
+                    formatDateTime(rev.edited_at) +
+                    (rev.edited_by_name ? ' by ' + escapeHtml(rev.edited_by_name) : '') +
+                  '</span>' +
+                '</div>' +
+                '<div class="reports-history-body">' +
+                  '<pre class="reports-history-json">' +
+                    escapeHtml(JSON.stringify(snapshot, null, 2)) +
+                  '</pre>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('');
+        } catch (err) {
+          console.error('[reports] Failed to load history:', err);
+          content.innerHTML = '<p style="color: var(--danger);">Failed to load history: ' + escapeHtml(err.message) + '</p>';
+        }
+      }
+
+      async function openPeopleManagementModal() {
+        const modal = document.getElementById('reports-people-modal');
+        const list = document.getElementById('reports-people-list');
+
+        if (!modal || !list) return;
+
+        modal.style.display = 'flex';
+        list.innerHTML = '<p style="color: var(--muted);">Loading...</p>';
+
+        try {
+          const res = await fetch('/daily-reports/people?active=false');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+
+          const data = await res.json();
+          const allPeople = data.people || [];
+
+          if (allPeople.length === 0) {
+            list.innerHTML = '<p style="color: var(--muted);">No people found</p>';
+            return;
+          }
+
+          list.innerHTML = allPeople.map(person =>
+            '<div class="reports-person-mgmt-item">' +
+              '<div>' +
+                '<div class="reports-person-name">' + escapeHtml(person.display_name) + '</div>' +
+                '<div style="font-size: 11px; color: var(--muted);">' +
+                  (person.email ? escapeHtml(person.email) : '—') +
+                '</div>' +
+              '</div>' +
+              '<div class="reports-person-actions">' +
+                '<span class="reports-person-status-badge" style="color: ' +
+                  (person.is_active ? 'var(--success)' : 'var(--danger)') + ';">' +
+                  (person.is_active ? 'Active' : 'Inactive') +
+                '</span>' +
+                '<button class="btn-icon reports-edit-person-btn" data-person-id="' +
+                  escapeHtml(person.id) + '" title="Edit">✏️</button>' +
+                (person.is_active
+                  ? '<button class="btn-icon reports-deactivate-person-btn" data-person-id="' +
+                    escapeHtml(person.id) + '" title="Deactivate">🗑️</button>'
+                  : '') +
+              '</div>' +
+            '</div>'
+          ).join('');
+
+          // Attach event listeners
+          list.querySelectorAll('.reports-edit-person-btn').forEach(btn => {
+            btn.onclick = () => {
+              const personId = btn.getAttribute('data-person-id');
+              const person = allPeople.find(p => p.id === personId);
+              if (person) {
+                openPersonFormModal(person);
+              }
+            };
+          });
+
+          list.querySelectorAll('.reports-deactivate-person-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const personId = btn.getAttribute('data-person-id');
+              if (confirm('Are you sure you want to deactivate this person?')) {
+                await deactivatePerson(personId);
+              }
+            };
+          });
+        } catch (err) {
+          console.error('[reports] Failed to load people:', err);
+          list.innerHTML = '<p style="color: var(--danger);">Failed to load people</p>';
+        }
+      }
+
+      function openPersonFormModal(person = null) {
+        const modal = document.getElementById('reports-person-form-modal');
+        const title = document.getElementById('reports-person-form-title');
+        const form = document.getElementById('reports-person-form');
+
+        if (!modal || !title || !form) return;
+
+        const isEdit = !!person;
+        title.textContent = isEdit ? 'Edit Person' : 'Add Person';
+
+        document.getElementById('person-form-id').value = person?.id || '';
+        document.getElementById('person-form-name').value = person?.display_name || '';
+        document.getElementById('person-form-email').value = person?.email || '';
+        document.getElementById('person-form-phone').value = person?.phone || '';
+
+        modal.style.display = 'flex';
+      }
+
+      async function submitPersonForm() {
+        const personId = document.getElementById('person-form-id').value;
+        const displayName = document.getElementById('person-form-name').value.trim();
+        const email = document.getElementById('person-form-email').value.trim();
+        const phone = document.getElementById('person-form-phone').value.trim();
+
+        if (!displayName) {
+          alert('Display name is required');
           return;
         }
 
         const payload = {
-          person_id: person.id,
-          date: reportsState.selectedDate,
-          report: { summary, blockers, items }
+          display_name: displayName,
+          email: email || null,
+          phone: phone || null,
         };
 
         try {
-          const res = await fetch('/api/reports/daily', {
+          let res;
+          if (personId) {
+            // Update existing person
+            res = await fetch('/daily-reports/people/' + encodeURIComponent(personId), {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          } else {
+            // Create new person
+            res = await fetch('/daily-reports/people', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          }
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Failed to save person');
+          }
+
+          document.getElementById('reports-person-form-modal').style.display = 'none';
+          await loadReportsPeople();
+          await openPeopleManagementModal();
+
+          if (reportsState.selectedDate) {
+            await loadReportsForDate(reportsState.selectedDate);
+          }
+        } catch (err) {
+          console.error('[reports] Failed to save person:', err);
+          alert('Failed to save person: ' + err.message);
+        }
+      }
+
+      async function deactivatePerson(personId) {
+        try {
+          const res = await fetch('/daily-reports/people/' + encodeURIComponent(personId), {
+            method: 'DELETE'
+          });
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Failed to deactivate person');
+          }
+
+          await loadReportsPeople();
+          await openPeopleManagementModal();
+
+          if (reportsState.selectedDate) {
+            await loadReportsForDate(reportsState.selectedDate);
+          }
+        } catch (err) {
+          console.error('[reports] Failed to deactivate person:', err);
+          alert('Failed to deactivate person: ' + err.message);
+        }
+      }
+
+      async function openProjectsManagementModal() {
+        const modal = document.getElementById('reports-projects-modal');
+        const list = document.getElementById('reports-projects-list');
+
+        if (!modal || !list) return;
+
+        modal.style.display = 'flex';
+        list.innerHTML = '<p style="color: var(--muted);">Loading...</p>';
+
+        try {
+          const res = await fetch('/daily-reports/projects?active=false');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+
+          const data = await res.json();
+          const allProjects = data.projects || [];
+
+          if (allProjects.length === 0) {
+            list.innerHTML = '<p style="color: var(--muted);">No projects found</p>';
+            return;
+          }
+
+          list.innerHTML = allProjects.map(proj =>
+            '<div class="reports-project-mgmt-item">' +
+              '<div style="display: flex; align-items: center; gap: 8px;">' +
+                (proj.color
+                  ? '<div class="reports-project-color-box" style="background-color: ' +
+                    escapeHtml(proj.color) + ';"></div>'
+                  : '') +
+                '<div class="reports-project-name">' + escapeHtml(proj.name) + '</div>' +
+              '</div>' +
+              '<div class="reports-project-actions">' +
+                '<span class="reports-project-status-badge" style="color: ' +
+                  (proj.is_active ? 'var(--success)' : 'var(--danger)') + ';">' +
+                  (proj.is_active ? 'Active' : 'Inactive') +
+                '</span>' +
+              '</div>' +
+            '</div>'
+          ).join('');
+        } catch (err) {
+          console.error('[reports] Failed to load projects:', err);
+          list.innerHTML = '<p style="color: var(--danger);">Failed to load projects</p>';
+        }
+      }
+
+      function openProjectFormModal(project = null) {
+        const modal = document.getElementById('reports-project-form-modal');
+        const title = document.getElementById('reports-project-form-title');
+        const form = document.getElementById('reports-project-form');
+
+        if (!modal || !title || !form) return;
+
+        const isEdit = !!project;
+        title.textContent = isEdit ? 'Edit Project' : 'Add Project';
+
+        document.getElementById('project-form-id').value = project?.id || '';
+        document.getElementById('project-form-name').value = project?.name || '';
+        document.getElementById('project-form-color').value = project?.color || '';
+
+        modal.style.display = 'flex';
+      }
+
+      async function submitProjectForm() {
+        const projectId = document.getElementById('project-form-id').value;
+        const name = document.getElementById('project-form-name').value.trim();
+        const color = document.getElementById('project-form-color').value.trim();
+
+        if (!name) {
+          alert('Project name is required');
+          return;
+        }
+
+        const payload = {
+          name: name,
+          color: color || null,
+        };
+
+        try {
+          const res = await fetch('/daily-reports/projects', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
 
-          if (!res.ok) throw new Error('Failed to save report');
-
-          const indicator = document.getElementById('report-saved-indicator');
-          if (indicator) {
-            indicator.style.display = 'block';
-            setTimeout(() => indicator.style.display = 'none', 2000);
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Failed to save project');
           }
 
-          loadReportsCalendar();
+          document.getElementById('reports-project-form-modal').style.display = 'none';
+          await loadReportsProjects();
+          await openProjectsManagementModal();
         } catch (err) {
-          console.error('[reports] Failed to submit report:', err);
-          alert('Failed to save report. Please try again.');
-        }
-      }
-
-      async function loadPeopleManagementList() {
-        const container = document.getElementById('reports-people-management-list');
-        if (!container) return;
-
-        try {
-          const res = await fetch('/api/reports/people');
-          const data = await res.json();
-          const allPeople = data.people || [];
-
-          container.innerHTML = allPeople.map(p =>
-            '<div class="reports-person-item">' +
-              '<div>' +
-                '<div class="reports-person-name">' +
-                  escapeHtml(p.first_name + ' ' + p.last_name) +
-                '</div>' +
-                '<div style="font-size: 11px; color: var(--muted);">' +
-                  escapeHtml(p.email) +
-                '</div>' +
-              '</div>' +
-              '<span style="font-size: 11px; color: ' +
-                (p.active ? 'var(--success)' : 'var(--danger)') + ';">' +
-                (p.active ? 'Active' : 'Inactive') +
-              '</span>' +
-            '</div>'
-          ).join('');
-        } catch (err) {
-          console.error('[reports] Failed to load people management:', err);
+          console.error('[reports] Failed to save project:', err);
+          alert('Failed to save project: ' + err.message);
         }
       }
 
