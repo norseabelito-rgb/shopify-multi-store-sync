@@ -462,6 +462,165 @@ router.post('/push/batch/:storeId', async (req, res) => {
   }
 });
 
+// ==================== JOB-BASED PUSH (WITH PROGRESS TRACKING) ====================
+
+const {
+  createJob,
+  startJob,
+  updateJobProgress,
+  addJobError,
+  completeJob,
+  failJob,
+  getJobSummary,
+} = require('../services/jobsService');
+
+// POST /products/push/job/:storeId - Create a push job for selected SKUs with progress tracking
+router.post('/push/job/:storeId', async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const { skus } = req.body || {};
+
+    if (!skus || !Array.isArray(skus) || skus.length === 0) {
+      return res.status(400).json({ error: 'skus array is required' });
+    }
+
+    console.log(`[products] Creating push job for ${skus.length} products to ${storeId}`);
+
+    // Create job
+    const job = await createJob({
+      type: 'push_selected',
+      storeId,
+      total: skus.length,
+      metadata: { skus },
+    });
+
+    // Start job in background (don't await)
+    runPushJob(job.id, skus, storeId).catch(err => {
+      console.error(`[products] Push job ${job.id} failed:`, err);
+    });
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      message: `Push job created for ${skus.length} products`,
+    });
+  } catch (err) {
+    console.error('[products] POST /push/job/:storeId error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// POST /products/push/job-all/:storeId - Create a push job for ALL products
+router.post('/push/job-all/:storeId', async (req, res) => {
+  try {
+    const { storeId } = req.params;
+
+    // Get all product SKUs
+    const products = await getMasterProducts({ page: 1, limit: 10000 });
+    const skus = products.products.map(p => p.sku);
+
+    if (skus.length === 0) {
+      return res.status(400).json({ error: 'No products found' });
+    }
+
+    console.log(`[products] Creating push-all job for ${skus.length} products to ${storeId}`);
+
+    // Create job
+    const job = await createJob({
+      type: 'push_all',
+      storeId,
+      total: skus.length,
+      metadata: { allProducts: true },
+    });
+
+    // Start job in background
+    runPushJob(job.id, skus, storeId).catch(err => {
+      console.error(`[products] Push-all job ${job.id} failed:`, err);
+    });
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      message: `Push job created for all ${skus.length} products`,
+    });
+  } catch (err) {
+    console.error('[products] POST /push/job-all/:storeId error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+/**
+ * Run a push job in the background
+ * @param {string} jobId - Job ID
+ * @param {Array<string>} skus - SKUs to push
+ * @param {string} storeId - Store ID
+ */
+async function runPushJob(jobId, skus, storeId) {
+  console.log(`[products] Starting push job ${jobId}: ${skus.length} products to ${storeId}`);
+
+  try {
+    await startJob(jobId);
+
+    let success = 0;
+    let failed = 0;
+
+    for (let i = 0; i < skus.length; i++) {
+      const sku = skus[i];
+
+      try {
+        // Update progress with current item
+        await updateJobProgress(jobId, {
+          processed: i,
+          success,
+          failed,
+          currentItem: sku,
+        });
+
+        // Push product
+        const result = await pushProductToStore(sku, storeId);
+
+        if (result.success) {
+          success++;
+          console.log(`[products] Job ${jobId}: ${sku} pushed (${i + 1}/${skus.length})`);
+        } else {
+          failed++;
+          await addJobError(jobId, {
+            item: sku,
+            message: result.error || result.action,
+          });
+          console.log(`[products] Job ${jobId}: ${sku} failed: ${result.error}`);
+        }
+      } catch (err) {
+        failed++;
+        await addJobError(jobId, {
+          item: sku,
+          message: err.message,
+        });
+        console.error(`[products] Job ${jobId}: ${sku} error:`, err.message);
+      }
+
+      // Rate limit delay (except for last item)
+      if (i < skus.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    // Complete job
+    await updateJobProgress(jobId, {
+      processed: skus.length,
+      success,
+      failed,
+      currentItem: null,
+    });
+
+    await completeJob(jobId, 'completed');
+    console.log(`[products] Push job ${jobId} completed: ${success}/${skus.length} success, ${failed} failed`);
+  } catch (err) {
+    console.error(`[products] Push job ${jobId} failed:`, err);
+    await failJob(jobId, err.message);
+  }
+}
+
 // ==================== IMAGES ====================
 
 // POST /products/:sku/images/refresh - Force refresh images from Google Drive

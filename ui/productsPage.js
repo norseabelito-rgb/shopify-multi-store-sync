@@ -956,6 +956,171 @@ function productsPage() {
       padding: 4px 10px;
       font-size: 11px;
     }
+
+    /* Job Progress Panel */
+    .job-progress-panel {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 320px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      display: none;
+    }
+
+    .job-progress-panel.visible {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .job-progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .job-progress-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--foreground);
+    }
+
+    .job-progress-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px;
+    }
+
+    .job-progress-close:hover {
+      color: var(--foreground);
+    }
+
+    .job-progress-bar-container {
+      background: var(--border);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .job-progress-bar {
+      background: var(--accent);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .job-progress-bar.error {
+      background: var(--danger);
+    }
+
+    .job-progress-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .job-progress-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .job-progress-stat.success {
+      color: var(--success);
+    }
+
+    .job-progress-stat.error {
+      color: var(--danger);
+    }
+
+    .job-progress-current {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .job-progress-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .job-progress-status.running {
+      background: rgba(79, 140, 255, 0.2);
+      color: var(--accent);
+    }
+
+    .job-progress-status.completed {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--success);
+    }
+
+    .job-progress-status.failed {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+
+    .job-errors-toggle {
+      font-size: 11px;
+      color: var(--danger);
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .job-errors-toggle:hover {
+      text-decoration: underline;
+    }
+
+    .job-errors-list {
+      display: none;
+      max-height: 120px;
+      overflow-y: auto;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .job-errors-list.visible {
+      display: block;
+    }
+
+    .job-error-item {
+      margin-bottom: 4px;
+      color: var(--danger);
+    }
+
+    .job-error-item:last-child {
+      margin-bottom: 0;
+    }
   </style>
 </head>
 <body>
@@ -1112,6 +1277,28 @@ function productsPage() {
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Job Progress Panel -->
+  <div class="job-progress-panel" id="job-progress-panel">
+    <div class="job-progress-header">
+      <span class="job-progress-title" id="job-progress-title">Push in progres...</span>
+      <button class="job-progress-close" id="job-progress-close">&times;</button>
+    </div>
+    <div class="job-progress-bar-container">
+      <div class="job-progress-bar" id="job-progress-bar"></div>
+    </div>
+    <div class="job-progress-stats">
+      <span class="job-progress-stat"><span id="job-progress-processed">0</span> / <span id="job-progress-total">0</span></span>
+      <span class="job-progress-stat success">✓ <span id="job-progress-success">0</span></span>
+      <span class="job-progress-stat error">✗ <span id="job-progress-failed">0</span></span>
+    </div>
+    <div class="job-progress-current" id="job-progress-current">Se asteapta...</div>
+    <div>
+      <span class="job-progress-status running" id="job-progress-status">In progres</span>
+    </div>
+    <div class="job-errors-toggle" id="job-errors-toggle" style="display: none;">Vezi erori (<span id="job-errors-count">0</span>)</div>
+    <div class="job-errors-list" id="job-errors-list"></div>
+  </div>
+
   <!-- Image Lightbox -->
   <div class="image-lightbox" id="image-lightbox">
     <img src="" alt="Product image" id="lightbox-img">
@@ -1133,6 +1320,10 @@ function productsPage() {
     let currentSku = null;
     let isNewProduct = false;
     let excelContent = null;
+
+    // Job tracking state
+    let currentJobId = null;
+    let jobPollInterval = null;
 
     // Elements
     const tbody = document.getElementById('products-tbody');
@@ -1166,6 +1357,21 @@ function productsPage() {
     const pushProgressText = document.getElementById('push-progress-text');
 
     const toastContainer = document.getElementById('toast-container');
+
+    // Job progress panel elements
+    const jobProgressPanel = document.getElementById('job-progress-panel');
+    const jobProgressTitle = document.getElementById('job-progress-title');
+    const jobProgressBar = document.getElementById('job-progress-bar');
+    const jobProgressProcessed = document.getElementById('job-progress-processed');
+    const jobProgressTotal = document.getElementById('job-progress-total');
+    const jobProgressSuccess = document.getElementById('job-progress-success');
+    const jobProgressFailed = document.getElementById('job-progress-failed');
+    const jobProgressCurrent = document.getElementById('job-progress-current');
+    const jobProgressStatus = document.getElementById('job-progress-status');
+    const jobErrorsToggle = document.getElementById('job-errors-toggle');
+    const jobErrorsCount = document.getElementById('job-errors-count');
+    const jobErrorsList = document.getElementById('job-errors-list');
+    const jobProgressClose = document.getElementById('job-progress-close');
 
     // Utilities
     function showToast(message, type = 'success') {
@@ -1912,6 +2118,120 @@ function productsPage() {
       }
     }
 
+    // Job progress functions
+    function showJobProgress(title) {
+      jobProgressTitle.textContent = title || 'Push in progres...';
+      jobProgressBar.style.width = '0%';
+      jobProgressBar.classList.remove('error');
+      jobProgressProcessed.textContent = '0';
+      jobProgressTotal.textContent = '0';
+      jobProgressSuccess.textContent = '0';
+      jobProgressFailed.textContent = '0';
+      jobProgressCurrent.textContent = 'Se porneste...';
+      jobProgressStatus.textContent = 'In progres';
+      jobProgressStatus.className = 'job-progress-status running';
+      jobErrorsToggle.style.display = 'none';
+      jobErrorsList.classList.remove('visible');
+      jobErrorsList.innerHTML = '';
+      jobProgressPanel.classList.add('visible');
+    }
+
+    function hideJobProgress() {
+      jobProgressPanel.classList.remove('visible');
+      if (jobPollInterval) {
+        clearInterval(jobPollInterval);
+        jobPollInterval = null;
+      }
+      currentJobId = null;
+    }
+
+    function updateJobProgressUI(job) {
+      if (!job) return;
+
+      const progress = job.progress || 0;
+      jobProgressBar.style.width = progress + '%';
+
+      jobProgressProcessed.textContent = job.processed || 0;
+      jobProgressTotal.textContent = job.total || 0;
+      jobProgressSuccess.textContent = job.success || 0;
+      jobProgressFailed.textContent = job.failed || 0;
+
+      if (job.currentItem) {
+        jobProgressCurrent.textContent = 'Procesare: ' + job.currentItem;
+      } else if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+        jobProgressCurrent.textContent = 'Finalizat';
+      }
+
+      // Update status badge
+      if (job.status === 'completed') {
+        jobProgressStatus.textContent = 'Finalizat';
+        jobProgressStatus.className = 'job-progress-status completed';
+        if (job.failed > 0) {
+          jobProgressBar.classList.add('error');
+        }
+      } else if (job.status === 'failed') {
+        jobProgressStatus.textContent = 'Eroare';
+        jobProgressStatus.className = 'job-progress-status failed';
+        jobProgressBar.classList.add('error');
+      } else if (job.status === 'cancelled') {
+        jobProgressStatus.textContent = 'Anulat';
+        jobProgressStatus.className = 'job-progress-status failed';
+      } else {
+        jobProgressStatus.textContent = 'In progres';
+        jobProgressStatus.className = 'job-progress-status running';
+      }
+
+      // Update errors list
+      if (job.errors && job.errors.length > 0) {
+        jobErrorsCount.textContent = job.errors.length;
+        jobErrorsToggle.style.display = 'block';
+        jobErrorsList.innerHTML = job.errors.map(err =>
+          '<div class="job-error-item"><strong>' + escapeHtml(err.item || 'Unknown') + ':</strong> ' + escapeHtml(err.message || 'Eroare necunoscuta') + '</div>'
+        ).join('');
+      }
+    }
+
+    async function pollJobProgress(jobId) {
+      try {
+        const res = await fetch('/jobs/' + jobId);
+        if (!res.ok) {
+          console.error('[job] Poll error:', res.status);
+          return null;
+        }
+        return await res.json();
+      } catch (err) {
+        console.error('[job] Poll failed:', err);
+        return null;
+      }
+    }
+
+    function startJobPolling(jobId, onComplete) {
+      currentJobId = jobId;
+
+      // Poll immediately
+      pollJobProgress(jobId).then(job => {
+        if (job) updateJobProgressUI(job);
+      });
+
+      // Then poll every 1.5 seconds
+      jobPollInterval = setInterval(async () => {
+        const job = await pollJobProgress(jobId);
+        if (!job) return;
+
+        updateJobProgressUI(job);
+
+        // Stop polling when job is done
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(jobPollInterval);
+          jobPollInterval = null;
+
+          if (onComplete) {
+            onComplete(job);
+          }
+        }
+      }, 1500);
+    }
+
     // Bulk push
     function openPushModal() {
       if (selectedSkus.size === 0) return;
@@ -1936,28 +2256,46 @@ function productsPage() {
 
       const skus = Array.from(selectedSkus);
       document.getElementById('btn-push-confirm').disabled = true;
-      pushProgress.style.display = 'block';
 
       try {
-        const res = await fetch('/products/push/batch/' + storeId, {
+        // Create a job for push
+        const res = await fetch('/products/push/job/' + storeId, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ skus, delayMs: 500 }),
+          body: JSON.stringify({ skus }),
         });
 
         const result = await res.json();
 
-        pushProgressBar.style.width = '100%';
-        pushProgressText.textContent = result.success + ' / ' + result.total + ' succes';
-
-        showToast('Push finalizat: ' + result.success + ' succes, ' + result.failed + ' erori');
-
-        setTimeout(() => {
+        if (result.jobId) {
+          // Close push modal and show job progress panel
           closePushModal();
-          selectedSkus.clear();
-          updateBulkActions();
-          loadProducts();
-        }, 1500);
+
+          // Find store name for title
+          const store = stores.find(s => s.store_id === storeId);
+          const storeName = store ? (store.store_name || storeId) : storeId;
+          showJobProgress('Push la ' + storeName + '...');
+
+          // Start polling
+          startJobPolling(result.jobId, (job) => {
+            // On completion
+            if (job.status === 'completed') {
+              showToast('Push finalizat: ' + job.success + ' succes, ' + job.failed + ' erori');
+            } else if (job.status === 'failed') {
+              showToast('Push esuat', 'error');
+            }
+
+            // Refresh table after a short delay
+            setTimeout(() => {
+              selectedSkus.clear();
+              updateBulkActions();
+              loadProducts();
+            }, 1000);
+          });
+        } else {
+          showToast('Eroare la crearea job-ului', 'error');
+          document.getElementById('btn-push-confirm').disabled = false;
+        }
       } catch (err) {
         showToast('Eroare la push: ' + err.message, 'error');
         document.getElementById('btn-push-confirm').disabled = false;
@@ -2069,6 +2407,12 @@ function productsPage() {
 
     // Lightbox close
     document.getElementById('image-lightbox').addEventListener('click', closeLightbox);
+
+    // Job progress panel events
+    jobProgressClose.addEventListener('click', hideJobProgress);
+    jobErrorsToggle.addEventListener('click', () => {
+      jobErrorsList.classList.toggle('visible');
+    });
 
     // Init
     console.log('[products] Initializing Products page');
