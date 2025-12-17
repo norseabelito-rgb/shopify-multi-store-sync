@@ -615,32 +615,111 @@ function calculateSeoStatus(product) {
 }
 
 /**
+ * Compute effective values for a store (master + override merged)
+ * @param {object} master - Master product
+ * @param {object|null} override - Store override (or null)
+ * @returns {object} - Effective values with override flags
+ */
+function computeEffectiveValues(master, override) {
+  const ov = override || {};
+
+  return {
+    title: ov.title_override ?? master.title_default,
+    description: ov.description_override ?? master.description_default,
+    price: ov.price_override ?? master.price_default,
+    compare_at_price: ov.compare_at_price_override ?? master.compare_at_price_default,
+    seo_title: ov.seo_title_override ?? master.seo_title_default,
+    seo_meta: ov.seo_meta_override ?? master.seo_meta_default,
+    // Global fields (no override)
+    cost: master.cost,
+    drive_folder_url: master.drive_folder_url,
+    // Override flags
+    has_title_override: ov.title_override != null,
+    has_description_override: ov.description_override != null,
+    has_price_override: ov.price_override != null,
+    has_compare_at_price_override: ov.compare_at_price_override != null,
+    has_seo_title_override: ov.seo_title_override != null,
+    has_seo_meta_override: ov.seo_meta_override != null,
+    has_any_override: !!(ov.title_override ?? ov.description_override ?? ov.price_override ??
+      ov.compare_at_price_override ?? ov.seo_title_override ?? ov.seo_meta_override),
+  };
+}
+
+/**
  * Get full product detail with all store data for drawer view
+ * Includes: master, overrides per store, effective values per store, images
  * @param {string} sku - Product SKU
+ * @param {object} options - Options
+ * @param {Array} options.stores - List of stores to compute effective values for
+ * @param {boolean} options.includeImages - Whether to fetch images (default true)
  * @returns {Promise<object|null>}
  */
-async function getProductFullDetail(sku) {
+async function getProductFullDetail(sku, options = {}) {
+  const { stores = [], includeImages = true } = options;
+
+  console.log(`[productsService] getProductFullDetail called for SKU: ${sku}`);
+
   const master = await getMasterProductBySku(sku);
-  if (!master) return null;
+  if (!master) {
+    console.log(`[productsService] Product not found: ${sku}`);
+    return null;
+  }
+
+  console.log(`[productsService] Found master product: ${master.sku}, title: ${master.title_default}`);
 
   const overridesArray = await getAllStoreOverrides(sku);
   const syncStatusesArray = await getAllStoreSyncStatuses(sku);
 
+  console.log(`[productsService] Found ${overridesArray.length} overrides, ${syncStatusesArray.length} sync statuses`);
+
+  // Build keyed versions for easy lookup
+  const overridesByStore = overridesArray.reduce((acc, o) => {
+    acc[o.store_id] = o;
+    return acc;
+  }, {});
+
+  const syncStatusesByStore = syncStatusesArray.reduce((acc, s) => {
+    acc[s.store_id] = s;
+    return acc;
+  }, {});
+
+  // Compute effective values for each store
+  const effectiveByStore = {};
+  for (const store of stores) {
+    const storeId = store.store_id || store;
+    const override = overridesByStore[storeId] || null;
+    effectiveByStore[storeId] = computeEffectiveValues(master, override);
+  }
+
+  // Fetch images if requested
+  let images = [];
+  if (includeImages) {
+    try {
+      const { getProductImages } = require('./productsImagesService');
+      images = await getProductImages(sku, master.drive_folder_url);
+      console.log(`[productsService] Fetched ${images.length} images for SKU: ${sku}`);
+    } catch (err) {
+      console.error(`[productsService] Error fetching images for ${sku}:`, err.message);
+      images = [];
+    }
+  }
+
   // Return structure matching what UI expects
-  return {
+  const result = {
     product: master,  // UI expects 'product', not 'master'
     overrides: overridesArray,  // Return as array for UI iteration
     syncStatuses: syncStatusesArray,  // Return as array for UI iteration
-    // Also include keyed versions for easy lookup
-    overridesByStore: overridesArray.reduce((acc, o) => {
-      acc[o.store_id] = o;
-      return acc;
-    }, {}),
-    syncStatusesByStore: syncStatusesArray.reduce((acc, s) => {
-      acc[s.store_id] = s;
-      return acc;
-    }, {}),
+    // Keyed versions for easy lookup
+    overridesByStore,
+    syncStatusesByStore,
+    effectiveByStore,
+    // Images
+    images,
   };
+
+  console.log(`[productsService] Returning full detail for SKU: ${sku}, has ${images.length} images`);
+
+  return result;
 }
 
 /**
