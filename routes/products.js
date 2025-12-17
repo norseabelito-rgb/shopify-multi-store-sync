@@ -47,12 +47,81 @@ const {
 
 const { loadStoresRows } = require('../lib/stores');
 const { productsPage } = require('../ui/productsPage');
+const {
+  getTopSellers,
+  getProductPerformance,
+  backfill2025: backfillProductSales2025,
+} = require('../services/productSalesAggService');
 
 // ==================== UI PAGE ====================
 
 // GET /products/ui - Render the Products UI page
 router.get('/ui', (req, res) => {
   res.send(productsPage());
+});
+
+// ==================== TOP SELLERS / ANALYTICS ====================
+
+// GET /products/top-sellers - Get top selling products with lazy refresh
+// Query params: store_id (default 'ALL'), timeframe ('7d'|'month'|'ytd', default 'month'), limit (default 5)
+router.get('/top-sellers', async (req, res) => {
+  try {
+    const {
+      store_id = 'ALL',
+      timeframe = 'month',
+      limit = 5,
+    } = req.query;
+
+    // Validate timeframe
+    const validTimeframes = ['7d', 'month', 'ytd'];
+    if (!validTimeframes.includes(timeframe)) {
+      return res.status(400).json({
+        error: 'Invalid timeframe',
+        valid_timeframes: validTimeframes,
+      });
+    }
+
+    const result = await getTopSellers(store_id, timeframe, Math.min(Number(limit), 20));
+    res.json(result);
+  } catch (err) {
+    console.error('[products] GET /top-sellers error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// GET /products/performance/:sku - Get detailed performance for a specific product
+router.get('/performance/:sku', async (req, res) => {
+  try {
+    const { sku } = req.params;
+    const { timeframe = 'month' } = req.query;
+
+    const result = await getProductPerformance(sku, timeframe);
+
+    if (result.error) {
+      return res.status(404).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[products] GET /performance/:sku error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// POST /products/sales/backfill-2025 - Backfill product sales aggregation for 2025
+// This is a one-time utility endpoint for initial data load
+router.post('/sales/backfill-2025', async (req, res) => {
+  try {
+    console.log('[products] Starting product sales backfill for 2025...');
+    const result = await backfillProductSales2025();
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    console.error('[products] POST /sales/backfill-2025 error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
 });
 
 // ==================== MASTER PRODUCTS ====================

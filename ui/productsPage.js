@@ -1121,6 +1121,249 @@ function productsPage() {
     .job-error-item:last-child {
       margin-bottom: 0;
     }
+
+    /* Top Sellers Section */
+    .top-sellers-section {
+      background: var(--panel);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+
+    .top-sellers-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .top-sellers-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-sellers-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .timeframe-select {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      font-size: 12px;
+      min-width: 140px;
+    }
+
+    .top-sellers-refresh-hint {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .top-sellers-refresh-hint.loading {
+      color: var(--accent);
+    }
+
+    .top-sellers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .top-seller-card {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .top-seller-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(79, 140, 255, 0.15);
+    }
+
+    .top-seller-rank {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #4f8cff, #6366f1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .top-seller-rank.gold {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    }
+
+    .top-seller-rank.silver {
+      background: linear-gradient(135deg, #9ca3af, #6b7280);
+    }
+
+    .top-seller-rank.bronze {
+      background: linear-gradient(135deg, #d97706, #b45309);
+    }
+
+    .top-seller-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .top-seller-sku {
+      font-size: 11px;
+      color: var(--accent);
+      font-family: monospace;
+      margin-bottom: 8px;
+    }
+
+    .top-seller-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .top-seller-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-seller-stat-value {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .top-seller-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .top-seller-best-store {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .top-sellers-empty {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .top-sellers-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      color: var(--muted);
+    }
+
+    /* Performance Tab Styles */
+    .performance-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .performance-stat-card {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .performance-stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .performance-stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .performance-stores-table {
+      width: 100%;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .performance-stores-table th,
+    .performance-stores-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .performance-stores-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .performance-trend-header {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--muted);
+    }
+
+    .performance-trend-table {
+      width: 100%;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .performance-trend-table th,
+    .performance-trend-table td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .performance-trend-table th {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+    }
   </style>
 </head>
 <body>
@@ -1159,6 +1402,27 @@ function productsPage() {
         <span class="bulk-count"><span id="selected-count">0</span> selectate</span>
         <button class="btn btn-success" id="btn-bulk-push">Push la Shopify</button>
         <button class="btn btn-danger" id="btn-bulk-delete">Sterge</button>
+      </div>
+    </div>
+
+    <!-- Top Sellers Section -->
+    <div class="top-sellers-section" id="top-sellers-section">
+      <div class="top-sellers-header">
+        <h3 class="top-sellers-title">Top produse vandute</h3>
+        <div class="top-sellers-controls">
+          <select class="timeframe-select" id="top-sellers-timeframe">
+            <option value="month">Luna curenta</option>
+            <option value="7d">Ultimele 7 zile</option>
+            <option value="ytd">De la inceputul anului</option>
+          </select>
+          <span class="top-sellers-refresh-hint" id="top-sellers-refresh-hint"></span>
+        </div>
+      </div>
+      <div id="top-sellers-content">
+        <div class="top-sellers-loading">
+          <div class="spinner"></div>
+          <span style="margin-left: 10px;">Se incarca...</span>
+        </div>
       </div>
     </div>
 
@@ -1325,6 +1589,12 @@ function productsPage() {
     let currentJobId = null;
     let jobPollInterval = null;
 
+    // Top sellers state
+    let topSellersData = null;
+    let topSellersTimeframe = 'month';
+    let topSellersPollInterval = null;
+    let openDrawerWithPerformanceTab = false;
+
     // Elements
     const tbody = document.getElementById('products-tbody');
     const tableLoading = document.getElementById('table-loading');
@@ -1373,6 +1643,11 @@ function productsPage() {
     const jobErrorsList = document.getElementById('job-errors-list');
     const jobProgressClose = document.getElementById('job-progress-close');
 
+    // Top sellers elements
+    const topSellersContent = document.getElementById('top-sellers-content');
+    const topSellersTimeframeSelect = document.getElementById('top-sellers-timeframe');
+    const topSellersRefreshHint = document.getElementById('top-sellers-refresh-hint');
+
     // Utilities
     function showToast(message, type = 'success') {
       const toast = document.createElement('div');
@@ -1385,6 +1660,16 @@ function productsPage() {
     function formatPrice(value) {
       if (value == null) return '-';
       return Number(value).toFixed(2) + ' RON';
+    }
+
+    function formatNumber(value) {
+      if (value == null) return '0';
+      return Number(value).toLocaleString('ro-RO');
+    }
+
+    function formatRevenue(value) {
+      if (value == null) return '0 RON';
+      return Number(value).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' RON';
     }
 
     function formatDate(dateStr) {
@@ -1454,6 +1739,197 @@ function productsPage() {
       } catch (err) {
         console.error('Failed to load stores:', err);
       }
+    }
+
+    // Top Sellers
+    async function loadTopSellers() {
+      console.log('[top-sellers] Loading top sellers, timeframe:', topSellersTimeframe, 'store:', storeFilter || 'ALL');
+
+      try {
+        const params = new URLSearchParams({
+          timeframe: topSellersTimeframe,
+          store_id: storeFilter || 'ALL',
+          limit: 5,
+        });
+
+        const res = await fetch('/products/top-sellers?' + params);
+        const data = await res.json();
+
+        topSellersData = data;
+        renderTopSellers(data);
+
+        // Handle lazy refresh polling
+        if (data.refresh_running) {
+          topSellersRefreshHint.textContent = 'Se actualizeaza datele...';
+          topSellersRefreshHint.classList.add('loading');
+
+          // Start polling if not already
+          if (!topSellersPollInterval) {
+            topSellersPollInterval = setInterval(async () => {
+              console.log('[top-sellers] Polling for refresh completion...');
+              const refreshRes = await fetch('/products/top-sellers?' + params);
+              const refreshData = await refreshRes.json();
+
+              if (!refreshData.refresh_running) {
+                // Refresh complete
+                clearInterval(topSellersPollInterval);
+                topSellersPollInterval = null;
+                topSellersData = refreshData;
+                renderTopSellers(refreshData);
+                topSellersRefreshHint.textContent = 'Date actualizate';
+                topSellersRefreshHint.classList.remove('loading');
+                setTimeout(() => { topSellersRefreshHint.textContent = ''; }, 3000);
+              }
+            }, 5000);
+          }
+        } else if (data.refresh_triggered) {
+          topSellersRefreshHint.textContent = 'Actualizare pornita...';
+          topSellersRefreshHint.classList.add('loading');
+        } else {
+          topSellersRefreshHint.textContent = '';
+          topSellersRefreshHint.classList.remove('loading');
+          if (topSellersPollInterval) {
+            clearInterval(topSellersPollInterval);
+            topSellersPollInterval = null;
+          }
+        }
+      } catch (err) {
+        console.error('[top-sellers] Failed to load:', err);
+        topSellersContent.innerHTML = '<div class="top-sellers-empty">Eroare la incarcarea datelor</div>';
+      }
+    }
+
+    function renderTopSellers(data) {
+      if (!data || !data.items || data.items.length === 0) {
+        topSellersContent.innerHTML = '<div class="top-sellers-empty">Nu exista date de vanzari pentru perioada selectata.<br><small>Datele se calculeaza din comenzile existente.</small></div>';
+        return;
+      }
+
+      const getRankClass = (idx) => {
+        if (idx === 0) return 'gold';
+        if (idx === 1) return 'silver';
+        if (idx === 2) return 'bronze';
+        return '';
+      };
+
+      const html = '<div class="top-sellers-grid">' +
+        data.items.map((item, idx) => {
+          const rankClass = getRankClass(idx);
+          const bestStoreHtml = item.best_store_id && (storeFilter === '' || storeFilter === 'ALL')
+            ? '<div class="top-seller-best-store">Best: ' + escapeHtml(item.best_store_id) + '</div>'
+            : '';
+
+          return '<div class="top-seller-card" data-sku="' + escapeHtml(item.sku) + '">' +
+            '<div class="top-seller-rank ' + rankClass + '">' + (idx + 1) + '</div>' +
+            '<div class="top-seller-title" title="' + escapeHtml(item.title) + '">' + escapeHtml(item.title) + '</div>' +
+            '<div class="top-seller-sku">' + escapeHtml(item.sku) + '</div>' +
+            '<div class="top-seller-stats">' +
+              '<div class="top-seller-stat">' +
+                '<span class="top-seller-stat-value">' + formatNumber(item.units_sold) + '</span>' +
+                '<span class="top-seller-stat-label">Unitati</span>' +
+              '</div>' +
+              '<div class="top-seller-stat">' +
+                '<span class="top-seller-stat-value">' + formatRevenue(item.gross_revenue) + '</span>' +
+                '<span class="top-seller-stat-label">Venituri</span>' +
+              '</div>' +
+            '</div>' +
+            bestStoreHtml +
+          '</div>';
+        }).join('') +
+      '</div>';
+
+      topSellersContent.innerHTML = html;
+
+      // Attach click handlers to open drawer with Performance tab
+      topSellersContent.querySelectorAll('.top-seller-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const sku = card.dataset.sku;
+          openDrawerWithPerformanceTab = true;
+          openDrawer(sku);
+        });
+      });
+    }
+
+    async function loadProductPerformance(sku) {
+      console.log('[performance] Loading performance for SKU:', sku);
+      try {
+        const params = new URLSearchParams({ timeframe: topSellersTimeframe });
+        const res = await fetch('/products/performance/' + encodeURIComponent(sku) + '?' + params);
+
+        if (!res.ok) {
+          return null;
+        }
+
+        return await res.json();
+      } catch (err) {
+        console.error('[performance] Failed to load:', err);
+        return null;
+      }
+    }
+
+    function renderPerformanceTab(perfData) {
+      if (!perfData) {
+        return '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Nu exista date</div><div class="empty-text">Nu s-au gasit date de performanta pentru acest produs.</div></div>';
+      }
+
+      let html = '<div class="section-header">Sumar ' + escapeHtml(perfData.timeframe_label) + '</div>';
+
+      // Summary cards
+      html += '<div class="performance-summary">' +
+        '<div class="performance-stat-card">' +
+          '<div class="performance-stat-value">' + formatNumber(perfData.summary.units_sold) + '</div>' +
+          '<div class="performance-stat-label">Unitati vandute</div>' +
+        '</div>' +
+        '<div class="performance-stat-card">' +
+          '<div class="performance-stat-value">' + formatRevenue(perfData.summary.gross_revenue) + '</div>' +
+          '<div class="performance-stat-label">Venituri brute</div>' +
+        '</div>' +
+        '<div class="performance-stat-card">' +
+          '<div class="performance-stat-value">' + formatNumber(perfData.summary.orders_count) + '</div>' +
+          '<div class="performance-stat-label">Comenzi</div>' +
+        '</div>' +
+      '</div>';
+
+      // Breakdown by store
+      if (perfData.by_store && perfData.by_store.length > 0) {
+        html += '<div class="section-header">Per magazin</div>';
+        html += '<table class="performance-stores-table"><thead><tr>' +
+          '<th>Magazin</th><th>Unitati</th><th>Venituri</th><th>Comenzi</th>' +
+        '</tr></thead><tbody>';
+
+        perfData.by_store.forEach(store => {
+          html += '<tr>' +
+            '<td>' + escapeHtml(store.store_id) + '</td>' +
+            '<td>' + formatNumber(store.units_sold) + '</td>' +
+            '<td>' + formatRevenue(store.gross_revenue) + '</td>' +
+            '<td>' + formatNumber(store.orders_count) + '</td>' +
+          '</tr>';
+        });
+
+        html += '</tbody></table>';
+      }
+
+      // Daily trend (last 30 days)
+      if (perfData.daily_trend && perfData.daily_trend.length > 0) {
+        html += '<div class="section-header">Trend zilnic (ultimele 30 zile)</div>';
+        html += '<div class="performance-trend-table"><table><thead><tr>' +
+          '<th>Data</th><th>Unitati</th><th>Venituri</th>' +
+        '</tr></thead><tbody>';
+
+        // Show most recent first
+        [...perfData.daily_trend].reverse().forEach(day => {
+          const dateStr = new Date(day.date).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' });
+          html += '<tr>' +
+            '<td>' + dateStr + '</td>' +
+            '<td>' + formatNumber(day.units_sold) + '</td>' +
+            '<td>' + formatRevenue(day.gross_revenue) + '</td>' +
+          '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+      }
+
+      return html;
     }
 
     async function loadProductDetail(sku) {
@@ -1601,11 +2077,18 @@ function productsPage() {
     let activeStoreTab = 'master'; // Track active tab
 
     function openDrawer(sku) {
-      console.log('[drawer] openDrawer called with SKU:', sku);
+      console.log('[drawer] openDrawer called with SKU:', sku, 'openWithPerformance:', openDrawerWithPerformanceTab);
       currentSku = sku;
       isNewProduct = !sku;
       currentDrawerData = null;
-      activeStoreTab = 'master';
+
+      // Check if we should open to performance tab
+      if (openDrawerWithPerformanceTab && !isNewProduct) {
+        activeStoreTab = 'performance';
+      } else {
+        activeStoreTab = 'master';
+      }
+      openDrawerWithPerformanceTab = false; // Reset flag
 
       drawerTitle.textContent = isNewProduct ? 'Produs Nou' : ('Editare: ' + sku);
       drawerOverlay.classList.add('open');
@@ -1678,20 +2161,27 @@ function productsPage() {
       let tabsHtml = '';
 
       if (!isNewProduct && stores.length > 0) {
+        const masterActive = activeStoreTab === 'master' ? ' active' : '';
+        const perfActive = activeStoreTab === 'performance' ? ' active' : '';
+
         tabsHtml = '<div class="store-tabs">' +
-          '<button class="store-tab active" data-tab="master">Master</button>';
+          '<button class="store-tab' + masterActive + '" data-tab="master">Master</button>';
 
         stores.forEach(store => {
           const storeId = store.store_id;
           const sync = syncStatusesByStore[storeId] || {};
           const hasOverride = !!overridesByStore[storeId];
           const statusIcon = sync.status === 'active' ? '✓' : sync.status === 'draft' ? '○' : sync.status === 'failed' ? '✗' : '–';
-          tabsHtml += '<button class="store-tab" data-tab="' + escapeHtml(storeId) + '">' +
+          const storeActive = activeStoreTab === storeId ? ' active' : '';
+          tabsHtml += '<button class="store-tab' + storeActive + '" data-tab="' + escapeHtml(storeId) + '">' +
             escapeHtml(store.store_name || storeId) +
             ' <span style="opacity: 0.6;">' + statusIcon + '</span>' +
             (hasOverride ? ' <span style="color: var(--accent);">●</span>' : '') +
             '</button>';
         });
+
+        // Add Performance tab at the end
+        tabsHtml += '<button class="store-tab' + perfActive + '" data-tab="performance" style="margin-left: auto; color: var(--accent);">📊 Performance</button>';
         tabsHtml += '</div>';
       }
 
@@ -1851,12 +2341,21 @@ function productsPage() {
         });
       }
 
-      drawerContent.innerHTML = tabsHtml + masterContent + storeContentsHtml;
+      // Build performance tab content placeholder
+      let performanceContent = '';
+      if (!isNewProduct) {
+        const perfActive = activeStoreTab === 'performance' ? ' active' : '';
+        performanceContent = '<div class="store-tab-content' + perfActive + '" data-tab-content="performance">' +
+          '<div class="top-sellers-loading"><div class="spinner"></div><span style="margin-left: 10px;">Se incarca datele de performanta...</span></div>' +
+        '</div>';
+      }
+
+      drawerContent.innerHTML = tabsHtml + masterContent + storeContentsHtml + performanceContent;
       console.log('[drawer] Drawer content rendered successfully');
 
       // Attach tab click handlers
       drawerContent.querySelectorAll('.store-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
+        tab.addEventListener('click', async () => {
           const tabId = tab.dataset.tab;
           activeStoreTab = tabId;
           console.log('[drawer] Tab switched to:', tabId);
@@ -1869,8 +2368,30 @@ function productsPage() {
           drawerContent.querySelectorAll('.store-tab-content').forEach(c => c.classList.remove('active'));
           const content = drawerContent.querySelector('[data-tab-content="' + tabId + '"]');
           if (content) content.classList.add('active');
+
+          // Load performance data when performance tab is clicked
+          if (tabId === 'performance' && currentSku) {
+            const perfContent = drawerContent.querySelector('[data-tab-content="performance"]');
+            if (perfContent && !perfContent.dataset.loaded) {
+              perfContent.innerHTML = '<div class="top-sellers-loading"><div class="spinner"></div><span style="margin-left: 10px;">Se incarca datele de performanta...</span></div>';
+              const perfData = await loadProductPerformance(currentSku);
+              perfContent.innerHTML = renderPerformanceTab(perfData);
+              perfContent.dataset.loaded = 'true';
+            }
+          }
         });
       });
+
+      // If opened with performance tab active, load performance data immediately
+      if (activeStoreTab === 'performance' && currentSku) {
+        const perfContent = drawerContent.querySelector('[data-tab-content="performance"]');
+        if (perfContent) {
+          loadProductPerformance(currentSku).then(perfData => {
+            perfContent.innerHTML = renderPerformanceTab(perfData);
+            perfContent.dataset.loaded = 'true';
+          });
+        }
+      }
     }
 
     // Image functions
@@ -2313,6 +2834,7 @@ function productsPage() {
       storeFilter = storeFilterEl.value;
       currentPage = 1;
       loadProducts();
+      loadTopSellers(); // Reload top sellers when store filter changes
     });
 
     syncFilterEl.addEventListener('change', () => {
@@ -2414,10 +2936,17 @@ function productsPage() {
       jobErrorsList.classList.toggle('visible');
     });
 
+    // Top sellers timeframe change
+    topSellersTimeframeSelect.addEventListener('change', () => {
+      topSellersTimeframe = topSellersTimeframeSelect.value;
+      loadTopSellers();
+    });
+
     // Init
     console.log('[products] Initializing Products page');
     loadStores();
     loadProducts();
+    loadTopSellers();
   </script>
 </body>
 </html>
