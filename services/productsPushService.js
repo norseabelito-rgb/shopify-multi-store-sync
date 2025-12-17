@@ -7,7 +7,9 @@
 //     - Rename existing product SKU to [originalSKU]OLD
 //     - Add tag: "SKU existent la sincronizare, modificat SKU"
 //     - Log collision in products_sku_collisions table
+//   - Images are synced from Google Drive to Shopify (idempotent via fingerprint)
 
+const crypto = require('crypto');
 const { query } = require('../lib/db');
 const {
   getShopifyAccessTokenForStore,
@@ -15,13 +17,160 @@ const {
   shopifyREST,
   createProductInStore,
   updateProductInStore,
+  syncProductImages,
 } = require('../lib/shopify');
 const { loadStoresRows } = require('../lib/stores');
-const { getEffectiveProduct, upsertStoreSyncStatus, logSkuCollision } = require('./productsService');
+const { getEffectiveProduct, upsertStoreSyncStatus, logSkuCollision, getMasterProductBySku } = require('./productsService');
+const { getProductImages } = require('./productsImagesService');
 
 // Constants
 const CASHSYNC_TAG = 'CASHSYNC';
 const COLLISION_TAG = 'SKU existent la sincronizare, modificat SKU';
+
+/**
+ * Compute fingerprint for product images
+ * Uses image IDs and URLs to detect changes
+ * @param {Array} images - Array of image objects with image_id and image_url
+ * @returns {string} - MD5 hash fingerprint
+ */
+function computeImagesFingerprint(images) {
+  if (!images || images.length === 0) {
+    return 'empty';
+  }
+
+  // Sort by image_id for consistent ordering
+  const sorted = [...images].sort((a, b) => (a.image_id || '').localeCompare(b.image_id || ''));
+
+  // Create fingerprint from image IDs and URLs
+  const data = sorted.map(img => `${img.image_id || ''}:${img.image_url || ''}`).join('|');
+
+  return crypto.createHash('md5').update(data).digest('hex');
+}
+
+/**
+ * Get current image sync status for a product/store
+ * @param {string} sku - Product SKU
+ * @param {string} storeId - Store ID
+ * @returns {Promise<object|null>} - Sync status or null
+ */
+async function getImageSyncStatus(sku, storeId) {
+  const result = await query(
+    `SELECT images_synced_at, images_count, images_fingerprint
+     FROM products_store_sync
+     WHERE sku = $1 AND store_id = $2`,
+    [sku, storeId]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Update image sync status in DB
+ * @param {string} sku - Product SKU
+ * @param {string} storeId - Store ID
+ * @param {object} data - Sync data
+ */
+async function updateImageSyncStatus(sku, storeId, { imagesCount, fingerprint }) {
+  await query(
+    `UPDATE products_store_sync
+     SET images_synced_at = NOW(),
+         images_count = $3,
+         images_fingerprint = $4,
+         updated_at = NOW()
+     WHERE sku = $1 AND store_id = $2`,
+    [sku, storeId, imagesCount, fingerprint]
+  );
+}
+
+/**
+ * Sync product images to Shopify
+ * Idempotent: skips if fingerprint unchanged
+ * @param {string} sku - Product SKU
+ * @param {string} storeId - Store ID
+ * @param {string} shopifyProductId - Shopify product ID
+ * @param {object} store - Store object
+ * @param {string} accessToken - Shopify access token
+ * @param {object} options - Sync options
+ * @returns {Promise<object>} - Sync result
+ */
+async function syncProductImagesToShopify(sku, storeId, shopifyProductId, store, accessToken, options = {}) {
+  const { forceSync = false } = options;
+
+  console.log(`[push] Starting image sync for ${sku} -> ${storeId}`);
+
+  try {
+    // Get product master to get drive_folder_url
+    const masterProduct = await getMasterProductBySku(sku);
+    if (!masterProduct || !masterProduct.drive_folder_url) {
+      console.log(`[push] No Drive folder configured for ${sku}, skipping image sync`);
+      return { success: true, skipped: true, reason: 'no_drive_folder' };
+    }
+
+    // Get images from DB/Drive cache
+    const images = await getProductImages(sku, masterProduct.drive_folder_url);
+    console.log(`[push] Found ${images.length} images for ${sku} from Drive`);
+
+    if (images.length === 0) {
+      console.log(`[push] No images found for ${sku}, skipping image sync`);
+      return { success: true, skipped: true, reason: 'no_images' };
+    }
+
+    // Compute new fingerprint
+    const newFingerprint = computeImagesFingerprint(images);
+
+    // Check if fingerprint changed (unless force sync)
+    if (!forceSync) {
+      const syncStatus = await getImageSyncStatus(sku, storeId);
+      if (syncStatus && syncStatus.images_fingerprint === newFingerprint) {
+        console.log(`[push] Image fingerprint unchanged for ${sku}, skipping sync`);
+        return {
+          success: true,
+          skipped: true,
+          reason: 'fingerprint_unchanged',
+          imagesCount: syncStatus.images_count,
+        };
+      }
+    }
+
+    // Prepare images for Shopify upload
+    const shopifyImages = images.map((img, idx) => ({
+      src: img.image_url,
+      position: idx + 1,
+      alt: img.image_name || `${sku} image ${idx + 1}`,
+    }));
+
+    // Upload images to Shopify
+    console.log(`[push] Uploading ${shopifyImages.length} images to Shopify for ${sku}`);
+    const syncResult = await syncProductImages(
+      store.shopify_domain,
+      accessToken,
+      shopifyProductId,
+      shopifyImages,
+      { forceReplace: true }
+    );
+
+    // Update sync status in DB
+    await updateImageSyncStatus(sku, storeId, {
+      imagesCount: syncResult.uploaded,
+      fingerprint: newFingerprint,
+    });
+
+    console.log(`[push] Image sync complete for ${sku}: uploaded ${syncResult.uploaded} images`);
+
+    return {
+      success: true,
+      skipped: false,
+      uploaded: syncResult.uploaded,
+      deleted: syncResult.deleted,
+      fingerprint: newFingerprint,
+    };
+  } catch (err) {
+    console.error(`[push] Image sync failed for ${sku}:`, err.message);
+    return {
+      success: false,
+      error: err.message,
+    };
+  }
+}
 
 /**
  * Get store by ID from Google Sheets
@@ -211,12 +360,13 @@ function buildProductPayload(effectiveProduct, imageUrls = []) {
  * @param {string} sku - Product SKU (primary key)
  * @param {string} storeId - Target store ID
  * @param {object} options - Push options
- * @param {Array<string>} options.imageUrls - Optional image URLs
+ * @param {Array<string>} options.imageUrls - Optional image URLs (deprecated, use Drive sync)
  * @param {boolean} options.forceUpdate - If true, update even if product exists with CASHSYNC
+ * @param {boolean} options.forceImageSync - If true, sync images even if fingerprint unchanged
  * @returns {Promise<object>} Push result
  */
 async function pushProductToStore(sku, storeId, options = {}) {
-  const { imageUrls = [], forceUpdate = false } = options;
+  const { imageUrls = [], forceUpdate = false, forceImageSync = false } = options;
 
   console.log(`[push] Pushing product ${sku} to store ${storeId}`);
 
@@ -402,6 +552,33 @@ async function pushProductToStore(sku, storeId, options = {}) {
         action: 'create_failed',
         error: err.message,
       };
+    }
+  }
+
+  // Sync images to Shopify if product upsert was successful
+  if (result.success && result.shopifyProductId) {
+    console.log(`[push] Product upsert successful, syncing images for ${sku}`);
+
+    const imageSyncResult = await syncProductImagesToShopify(
+      sku,
+      storeId,
+      result.shopifyProductId,
+      store,
+      accessToken,
+      { forceSync: forceImageSync }
+    );
+
+    result.imageSync = imageSyncResult;
+
+    if (imageSyncResult.success) {
+      if (imageSyncResult.skipped) {
+        console.log(`[push] Image sync skipped for ${sku}: ${imageSyncResult.reason}`);
+      } else {
+        console.log(`[push] Image sync complete for ${sku}: uploaded ${imageSyncResult.uploaded} images`);
+      }
+    } else {
+      console.error(`[push] Image sync failed for ${sku}: ${imageSyncResult.error}`);
+      // Note: We don't fail the whole push if just image sync fails
     }
   }
 
