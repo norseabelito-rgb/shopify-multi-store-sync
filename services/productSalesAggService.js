@@ -364,6 +364,8 @@ async function getTopSellers(storeId = 'ALL', timeframe = 'month', limit = 5) {
   const { from_date, to_date, label } = getDateRange(timeframe);
 
   // Check for staleness and trigger background refresh if needed
+  // NOTE: We do NOT acquire locks here - backgroundRefreshJob handles its own locking
+  // Advisory locks are connection-specific, so acquiring here would block the background job
   let refreshTriggered = false;
   let refreshRunning = false;
   let lastAggDate = null;
@@ -375,23 +377,16 @@ async function getTopSellers(storeId = 'ALL', timeframe = 'month', limit = 5) {
     if (!maxAggDate || maxAggDate < today) {
       console.log(`[product-sales] Stale data detected: max_agg_date=${maxAggDate}, today=${today}`);
 
-      const lockAcquired = await tryAcquireRefreshLock(storeId);
+      // Trigger background refresh - it will acquire its own lock
+      refreshTriggered = true;
+      refreshRunning = true;
 
-      if (lockAcquired) {
-        refreshTriggered = true;
-        refreshRunning = true;
+      setImmediate(() => {
+        backgroundRefreshJob(storeId, today, maxAggDate)
+          .catch(err => console.error(`[product-sales] Background refresh error:`, err));
+      });
 
-        // Trigger background refresh without awaiting
-        setImmediate(() => {
-          backgroundRefreshJob(storeId, today, maxAggDate)
-            .catch(err => console.error(`[product-sales] Background refresh error:`, err));
-        });
-
-        console.log(`[product-sales] Background refresh triggered: ${maxAggDate || 'null'} → ${today}`);
-      } else {
-        refreshRunning = true;
-        console.log(`[product-sales] Refresh already running, skipping trigger`);
-      }
+      console.log(`[product-sales] Background refresh triggered: ${maxAggDate || 'null'} → ${today}`);
     } else {
       console.log(`[product-sales] Data is up-to-date: max_agg_date=${maxAggDate}, today=${today}`);
     }
