@@ -831,6 +831,131 @@ function productsPage() {
     .back-link:hover {
       color: var(--accent);
     }
+
+    /* Image Gallery */
+    .image-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .image-gallery-item {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.6);
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .image-gallery-item:hover {
+      transform: scale(1.05);
+      border-color: var(--accent);
+    }
+
+    .image-gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-gallery-item .image-index {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .image-gallery-empty {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(15, 23, 42, 0.4);
+      border-radius: 8px;
+      border: 1px dashed var(--border);
+    }
+
+    .image-gallery-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--muted);
+    }
+
+    .image-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.95);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    .image-lightbox.open {
+      display: flex;
+    }
+
+    .image-lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    /* Reset button for overrides */
+    .field-reset-btn {
+      padding: 2px 8px;
+      font-size: 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      margin-left: 8px;
+    }
+
+    .field-reset-btn:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .field-label-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .field-label-row .form-label {
+      margin-bottom: 0;
+    }
+
+    /* Effective value preview */
+    .effective-preview {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: rgba(79, 140, 255, 0.1);
+      border-radius: 4px;
+      border-left: 2px solid var(--accent);
+    }
+
+    /* Image refresh button */
+    .btn-refresh-images {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -987,6 +1112,11 @@ function productsPage() {
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Image Lightbox -->
+  <div class="image-lightbox" id="image-lightbox">
+    <img src="" alt="Product image" id="lightbox-img">
+  </div>
+
   <script>
     // State
     let products = [];
@@ -1121,11 +1251,28 @@ function productsPage() {
     }
 
     async function loadProductDetail(sku) {
+      console.log('[drawer] loadProductDetail called for SKU:', sku);
       try {
-        const res = await fetch('/products/' + encodeURIComponent(sku) + '/full');
-        return await res.json();
+        const url = '/products/' + encodeURIComponent(sku) + '/full';
+        console.log('[drawer] Fetching:', url);
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          console.error('[drawer] API error:', res.status, res.statusText);
+          return null;
+        }
+
+        const data = await res.json();
+        console.log('[drawer] API response received:', {
+          sku: data.product?.sku,
+          title: data.product?.title_default,
+          imagesCount: data.images?.length || 0,
+          overridesCount: data.overrides?.length || 0,
+          syncStatusesCount: data.syncStatuses?.length || 0
+        });
+        return data;
       } catch (err) {
-        console.error('Failed to load product:', err);
+        console.error('[drawer] Failed to load product:', err);
         return null;
       }
     }
@@ -1248,28 +1395,35 @@ function productsPage() {
     let activeStoreTab = 'master'; // Track active tab
 
     function openDrawer(sku) {
+      console.log('[drawer] openDrawer called with SKU:', sku);
       currentSku = sku;
       isNewProduct = !sku;
       currentDrawerData = null;
       activeStoreTab = 'master';
 
-      drawerTitle.textContent = isNewProduct ? 'Produs Nou' : 'Editare Produs';
+      drawerTitle.textContent = isNewProduct ? 'Produs Nou' : ('Editare: ' + sku);
       drawerOverlay.classList.add('open');
       drawer.classList.add('open');
 
       if (isNewProduct) {
+        console.log('[drawer] Creating new product form');
         renderDrawerForm({});
       } else {
         // Show loading skeleton
+        console.log('[drawer] Loading product detail for:', sku);
         renderDrawerSkeleton();
         loadProductDetail(sku).then(detail => {
-          if (detail) {
+          console.log('[drawer] loadProductDetail returned:', detail ? 'data' : 'null');
+          if (detail && detail.product) {
             currentDrawerData = detail;
+            console.log('[drawer] Rendering drawer form with product:', detail.product.sku);
             renderDrawerForm(detail);
           } else {
+            console.error('[drawer] Product not found or invalid response for SKU:', sku);
             drawerContent.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Produs negasit</div><div class="empty-text">SKU: ' + escapeHtml(sku) + '</div></div>';
           }
         }).catch(err => {
+          console.error('[drawer] Error loading product:', err);
           drawerContent.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">Eroare la incarcare</div><div class="empty-text">' + escapeHtml(err.message) + '</div></div>';
         });
       }
@@ -1300,15 +1454,22 @@ function productsPage() {
     }
 
     function renderDrawerForm(detail) {
+      console.log('[drawer] renderDrawerForm called');
       const product = detail.product || {};
       const overrides = detail.overrides || [];
       const syncStatuses = detail.syncStatuses || [];
       const overridesByStore = detail.overridesByStore || {};
       const syncStatusesByStore = detail.syncStatusesByStore || {};
+      const images = detail.images || [];
+
+      console.log('[drawer] Rendering form for:', {
+        sku: product.sku,
+        storesCount: stores.length,
+        imagesCount: images.length
+      });
 
       // Build store tabs
       let tabsHtml = '';
-      let tabContentsHtml = '';
 
       if (!isNewProduct && stores.length > 0) {
         tabsHtml = '<div class="store-tabs">' +
@@ -1328,9 +1489,36 @@ function productsPage() {
         tabsHtml += '</div>';
       }
 
+      // Build image gallery HTML
+      let imagesHtml = '';
+      if (!isNewProduct) {
+        imagesHtml = '<div class="section-header" style="display: flex; align-items: center; justify-content: space-between;">' +
+          '<span>Imagini Produs</span>' +
+          '<button class="btn btn-refresh-images" onclick="refreshImages()">Reincarca</button>' +
+        '</div>';
+
+        if (images.length > 0) {
+          imagesHtml += '<div class="image-gallery">';
+          images.forEach((img, idx) => {
+            const thumbUrl = img.thumbnail_url || img.image_url;
+            const fullUrl = img.image_url;
+            imagesHtml += '<div class="image-gallery-item" onclick="openLightbox(\\'' + escapeHtml(fullUrl) + '\\')">' +
+              '<span class="image-index">' + (idx + 1) + '</span>' +
+              '<img src="' + escapeHtml(thumbUrl) + '" alt="' + escapeHtml(img.image_name || 'Image ' + (idx + 1)) + '" loading="lazy" onerror="this.src=\\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23334155%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%239ca3af%22 font-size=%2212%22>Eroare</text></svg>\\'">' +
+            '</div>';
+          });
+          imagesHtml += '</div>';
+        } else if (product.drive_folder_url) {
+          imagesHtml += '<div class="image-gallery-empty">Nu s-au gasit imagini in folderul Drive.<br><small>Apasa "Reincarca" pentru a verifica din nou.</small></div>';
+        } else {
+          imagesHtml += '<div class="image-gallery-empty">Nu exista folder Drive configurat.<br><small>Adauga URL-ul folderului in campul "Google Drive Folder URL".</small></div>';
+        }
+      }
+
       // Master tab content
       const masterContent = '' +
         '<div class="store-tab-content active" data-tab-content="master">' +
+          imagesHtml +
           '<div class="section-header">Date Master (Globale)</div>' +
           '<div class="form-group">' +
             '<label class="form-label">SKU (unic, nemodificabil)</label>' +
@@ -1361,12 +1549,12 @@ function productsPage() {
           '</div>' +
           '<div class="form-row">' +
             '<div class="form-group">' +
-              '<label class="form-label">SEO Title</label>' +
+              '<label class="form-label">SEO Title (Global)</label>' +
               '<input type="text" class="form-input" id="field-seo-title" value="' + escapeHtml(product.seo_title_default || '') + '" maxlength="70">' +
               '<div class="form-hint">Max 70 caractere (' + (product.seo_title_default || '').length + '/70)</div>' +
             '</div>' +
             '<div class="form-group">' +
-              '<label class="form-label">SEO Meta</label>' +
+              '<label class="form-label">SEO Meta (Global)</label>' +
               '<input type="text" class="form-input" id="field-seo-meta" value="' + escapeHtml(product.seo_meta_default || '') + '" maxlength="160">' +
               '<div class="form-hint">Max 160 caractere (' + (product.seo_meta_default || '').length + '/160)</div>' +
             '</div>' +
@@ -1374,6 +1562,7 @@ function productsPage() {
           '<div class="form-group">' +
             '<label class="form-label">Google Drive Folder URL</label>' +
             '<input type="text" class="form-input" id="field-drive-url" value="' + escapeHtml(product.drive_folder_url || '') + '">' +
+            '<div class="form-hint">URL-ul folderului Drive care contine imaginile produsului</div>' +
           '</div>' +
         '</div>';
 
@@ -1387,14 +1576,23 @@ function productsPage() {
           const status = sync.status || 'not_pushed';
           const lastPushed = sync.last_pushed_at ? formatDate(sync.last_pushed_at) : 'Niciodata';
 
-          const getIndicator = (field) => {
-            const isOverridden = override[field + '_override'] != null;
-            return '<span class="field-override-indicator ' + (isOverridden ? 'overridden' : 'inherited') + '">' +
-              (isOverridden ? 'Modificat' : 'Mostenit') + '</span>';
+          const getIndicatorAndReset = (field, displayName) => {
+            const isOverridden = override[field + '_override'] != null && override[field + '_override'] !== '';
+            return '<div class="field-label-row">' +
+              '<label class="form-label">' + displayName + '</label>' +
+              '<span class="field-override-indicator ' + (isOverridden ? 'overridden' : 'inherited') + '">' +
+                (isOverridden ? 'Override activ' : 'Mostenit din Master') +
+              '</span>' +
+              (isOverridden ? '<button type="button" class="field-reset-btn" onclick="resetOverrideField(\\'' + escapeHtml(storeId) + '\\', \\'' + field + '_override\\')">Reset</button>' : '') +
+            '</div>';
           };
 
-          const getEffectiveValue = (field, defaultField) => {
-            return override[field + '_override'] != null ? override[field + '_override'] : (product[defaultField] || '');
+          const getEffectivePreview = (fieldOverride, fieldDefault, isNumeric) => {
+            const hasOverride = override[fieldOverride] != null && override[fieldOverride] !== '';
+            const effectiveValue = hasOverride ? override[fieldOverride] : product[fieldDefault];
+            if (!effectiveValue && effectiveValue !== 0) return '';
+            const displayValue = isNumeric ? formatPrice(effectiveValue) : escapeHtml(String(effectiveValue).substring(0, 100)) + (String(effectiveValue).length > 100 ? '...' : '');
+            return '<div class="effective-preview">Valoare efectiva: ' + displayValue + '</div>';
           };
 
           storeContentsHtml += '' +
@@ -1407,36 +1605,39 @@ function productsPage() {
                 '</div>' +
                 '<div class="sync-status-row">' +
                   '<span>Ultima sincronizare: ' + lastPushed + '</span>' +
-                  '<button class="btn btn-success" style="padding: 4px 12px; font-size: 11px;" onclick="pushSingleProduct(\\'' + escapeHtml(currentSku) + '\\', \\'' + escapeHtml(storeId) + '\\')">Push</button>' +
+                  '<button class="btn btn-success" style="padding: 4px 12px; font-size: 11px;" onclick="pushSingleProduct(\\'' + escapeHtml(currentSku) + '\\', \\'' + escapeHtml(storeId) + '\\')">Push la Shopify</button>' +
                 '</div>' +
                 (sync.last_push_error ? '<div style="color: var(--danger); font-size: 11px; margin-top: 8px;">Eroare: ' + escapeHtml(sync.last_push_error) + '</div>' : '') +
               '</div>' +
-              '<div class="form-hint" style="margin-bottom: 16px;">Lasa gol pentru a mosteni valoarea din Master. Completeaza pentru a suprascrie doar pentru acest magazin.</div>' +
+              '<div class="form-hint" style="margin-bottom: 16px; padding: 10px; background: rgba(79, 140, 255, 0.1); border-radius: 6px;">Lasa campul gol pentru a mosteni valoarea din Master. Completeaza doar daca vrei sa suprascrii pentru acest magazin.</div>' +
               '<div class="form-group">' +
-                '<label class="form-label">Titlu ' + getIndicator('title') + '</label>' +
+                getIndicatorAndReset('title', 'Titlu') +
                 '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="title_override" value="' + escapeHtml(override.title_override || '') + '" placeholder="' + escapeHtml(product.title_default || 'Mostenit din Master') + '">' +
+                getEffectivePreview('title_override', 'title_default', false) +
               '</div>' +
               '<div class="form-group">' +
-                '<label class="form-label">Descriere (HTML) ' + getIndicator('description') + '</label>' +
+                getIndicatorAndReset('description', 'Descriere (HTML)') +
                 '<textarea class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="description_override" style="min-height: 100px;" placeholder="Mostenit din Master">' + escapeHtml(override.description_override || '') + '</textarea>' +
+                (override.description_override ? '<div class="form-label" style="margin-top: 8px;">Preview Override:</div><div class="description-preview">' + override.description_override + '</div>' : '') +
               '</div>' +
               '<div class="form-row">' +
                 '<div class="form-group">' +
-                  '<label class="form-label">Pret (RON) ' + getIndicator('price') + '</label>' +
+                  getIndicatorAndReset('price', 'Pret (RON)') +
                   '<input type="number" step="0.01" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="price_override" value="' + (override.price_override || '') + '" placeholder="' + (product.price_default || 'Mostenit') + '">' +
+                  getEffectivePreview('price_override', 'price_default', true) +
                 '</div>' +
                 '<div class="form-group">' +
-                  '<label class="form-label">Pret vechi ' + getIndicator('compare_at_price') + '</label>' +
+                  getIndicatorAndReset('compare_at_price', 'Pret vechi') +
                   '<input type="number" step="0.01" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="compare_at_price_override" value="' + (override.compare_at_price_override || '') + '" placeholder="' + (product.compare_at_price_default || 'Mostenit') + '">' +
                 '</div>' +
               '</div>' +
               '<div class="form-row">' +
                 '<div class="form-group">' +
-                  '<label class="form-label">SEO Title ' + getIndicator('seo_title') + '</label>' +
+                  getIndicatorAndReset('seo_title', 'SEO Title') +
                   '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="seo_title_override" value="' + escapeHtml(override.seo_title_override || '') + '" maxlength="70" placeholder="' + escapeHtml(product.seo_title_default || 'Mostenit') + '">' +
                 '</div>' +
                 '<div class="form-group">' +
-                  '<label class="form-label">SEO Meta ' + getIndicator('seo_meta') + '</label>' +
+                  getIndicatorAndReset('seo_meta', 'SEO Meta') +
                   '<input type="text" class="form-input store-override-field" data-store="' + escapeHtml(storeId) + '" data-field="seo_meta_override" value="' + escapeHtml(override.seo_meta_override || '') + '" maxlength="160" placeholder="' + escapeHtml(product.seo_meta_default || 'Mostenit') + '">' +
                 '</div>' +
               '</div>' +
@@ -1445,12 +1646,14 @@ function productsPage() {
       }
 
       drawerContent.innerHTML = tabsHtml + masterContent + storeContentsHtml;
+      console.log('[drawer] Drawer content rendered successfully');
 
       // Attach tab click handlers
       drawerContent.querySelectorAll('.store-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           const tabId = tab.dataset.tab;
           activeStoreTab = tabId;
+          console.log('[drawer] Tab switched to:', tabId);
 
           // Update active tab button
           drawerContent.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
@@ -1462,6 +1665,54 @@ function productsPage() {
           if (content) content.classList.add('active');
         });
       });
+    }
+
+    // Image functions
+    function openLightbox(imageUrl) {
+      console.log('[drawer] Opening lightbox for:', imageUrl);
+      const lightbox = document.getElementById('image-lightbox');
+      const img = document.getElementById('lightbox-img');
+      img.src = imageUrl;
+      lightbox.classList.add('open');
+    }
+
+    function closeLightbox() {
+      const lightbox = document.getElementById('image-lightbox');
+      lightbox.classList.remove('open');
+    }
+
+    async function refreshImages() {
+      if (!currentSku) return;
+      console.log('[drawer] Refreshing images for:', currentSku);
+      showToast('Se reincarca imaginile...');
+
+      try {
+        const res = await fetch('/products/' + encodeURIComponent(currentSku) + '/images/refresh', {
+          method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('Imagini reincarcate: ' + (data.images?.length || 0) + ' gasite');
+          // Reload the drawer to show new images
+          openDrawer(currentSku);
+        } else {
+          showToast(data.error || 'Eroare la reincarcare', 'error');
+        }
+      } catch (err) {
+        console.error('[drawer] Error refreshing images:', err);
+        showToast('Eroare la reincarcare: ' + err.message, 'error');
+      }
+    }
+
+    // Reset override field function
+    function resetOverrideField(storeId, fieldName) {
+      console.log('[drawer] Resetting override field:', storeId, fieldName);
+      const field = document.querySelector('.store-override-field[data-store="' + storeId + '"][data-field="' + fieldName + '"]');
+      if (field) {
+        field.value = '';
+        showToast('Camp resetat. Salveaza pentru a aplica.');
+      }
     }
 
     async function saveCurrentProduct() {
@@ -1816,7 +2067,11 @@ function productsPage() {
       };
     }
 
+    // Lightbox close
+    document.getElementById('image-lightbox').addEventListener('click', closeLightbox);
+
     // Init
+    console.log('[products] Initializing Products page');
     loadStores();
     loadProducts();
   </script>

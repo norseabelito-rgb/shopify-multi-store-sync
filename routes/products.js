@@ -128,15 +128,30 @@ router.get('/:sku', async (req, res) => {
   }
 });
 
-// GET /products/:sku/full - Get full product detail with overrides and sync status
+// GET /products/:sku/full - Get full product detail with overrides, sync status, and images
+// This is the main endpoint for the product drawer
 router.get('/:sku/full', async (req, res) => {
   try {
     const { sku } = req.params;
-    const detail = await getProductFullDetail(sku);
+    const { includeImages = 'true' } = req.query;
+
+    console.log(`[products] GET /:sku/full called for SKU: ${sku}`);
+
+    // Load stores to compute effective values
+    const stores = await loadStoresRows();
+    console.log(`[products] Loaded ${stores.length} stores for effective values`);
+
+    const detail = await getProductFullDetail(sku, {
+      stores,
+      includeImages: includeImages !== 'false',
+    });
 
     if (!detail) {
+      console.log(`[products] Product not found: ${sku}`);
       return res.status(404).json({ error: `Produs negăsit: ${sku}` });
     }
+
+    console.log(`[products] Returning full detail for ${sku}: ${detail.images?.length || 0} images, ${Object.keys(detail.effectiveByStore || {}).length} effective stores`);
 
     res.json(detail);
   } catch (err) {
@@ -443,6 +458,36 @@ router.post('/push/batch/:storeId', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[products] POST /push/batch/:storeId error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// ==================== IMAGES ====================
+
+// POST /products/:sku/images/refresh - Force refresh images from Google Drive
+router.post('/:sku/images/refresh', async (req, res) => {
+  try {
+    const { sku } = req.params;
+
+    console.log(`[products] POST /:sku/images/refresh called for SKU: ${sku}`);
+
+    // Get product to get drive_folder_url
+    const product = await getMasterProductBySku(sku);
+    if (!product) {
+      return res.status(404).json({ error: `Produs negăsit: ${sku}` });
+    }
+
+    if (!product.drive_folder_url) {
+      return res.status(400).json({ error: 'Produsul nu are un folder Drive configurat' });
+    }
+
+    const { refreshProductImages } = require('../services/productsImagesService');
+    const images = await refreshProductImages(sku, product.drive_folder_url);
+
+    console.log(`[products] Refreshed ${images.length} images for SKU: ${sku}`);
+    res.json({ success: true, images });
+  } catch (err) {
+    console.error('[products] POST /:sku/images/refresh error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });
