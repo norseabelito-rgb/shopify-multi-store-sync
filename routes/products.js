@@ -20,6 +20,7 @@ const {
   getProductFullDetail,
   getStoreSyncStatus,
   getAllStoreSyncStatuses,
+  getAllMatchingSkus,
 } = require('../services/productsService');
 
 const {
@@ -176,6 +177,24 @@ router.get('/table', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[products] GET /table error:', err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// GET /products/skus - Get all SKUs matching filters (for bulk select all)
+router.get('/skus', async (req, res) => {
+  try {
+    const { search, storeId, syncStatus } = req.query;
+
+    const result = await getAllMatchingSkus({
+      search,
+      storeId,
+      syncStatus,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('[products] GET /skus error:', err);
     res.status(500).json({ error: err.message || String(err) });
   }
 });

@@ -785,6 +785,55 @@ async function getSkuCollisions(storeId) {
   return result.rows;
 }
 
+/**
+ * Get all SKUs matching the current filters (for bulk select all)
+ * Returns just the SKUs without pagination - useful for "Select all X products" feature
+ *
+ * @param {object} options - Filter options (same as getProductsForTable but no pagination)
+ * @returns {Promise<{skus: string[], total: number}>}
+ */
+async function getAllMatchingSkus(options = {}) {
+  const {
+    search = '',
+    storeId = null,
+    syncStatus = null,
+  } = options;
+
+  const conditions = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (search.trim()) {
+    conditions.push(`(LOWER(m.sku) LIKE $${paramIndex} OR LOWER(m.title_default) LIKE $${paramIndex})`);
+    params.push(`%${search.trim().toLowerCase()}%`);
+    paramIndex++;
+  }
+
+  // If syncStatus filter is provided and storeId is set, filter by sync status
+  if (syncStatus && storeId) {
+    if (syncStatus === 'not_pushed') {
+      conditions.push(`NOT EXISTS (SELECT 1 FROM products_store_sync ss WHERE ss.sku = m.sku AND ss.store_id = $${paramIndex})`);
+      params.push(storeId);
+      paramIndex++;
+    } else {
+      conditions.push(`EXISTS (SELECT 1 FROM products_store_sync ss WHERE ss.sku = m.sku AND ss.store_id = $${paramIndex} AND ss.status = $${paramIndex + 1})`);
+      params.push(storeId);
+      params.push(syncStatus);
+      paramIndex += 2;
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const sql = `SELECT m.sku FROM products_master m ${whereClause} ORDER BY m.sku`;
+  const result = await query(sql, params);
+
+  return {
+    skus: result.rows.map(r => r.sku),
+    total: result.rows.length,
+  };
+}
+
 module.exports = {
   // Master products
   getMasterProducts,
@@ -809,6 +858,7 @@ module.exports = {
   getProductFullDetail,
   getProductStats,
   calculateSeoStatus,
+  getAllMatchingSkus,
   // SKU collision
   logSkuCollision,
   getSkuCollisions,

@@ -181,6 +181,43 @@ function productsPage() {
       white-space: nowrap;
     }
 
+    .select-all-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(79, 140, 255, 0.15), rgba(99, 102, 241, 0.1));
+      border: 1px solid rgba(79, 140, 255, 0.25);
+      font-size: 13px;
+    }
+
+    .select-all-banner.visible {
+      display: flex;
+    }
+
+    .select-all-banner .banner-text {
+      color: var(--text);
+    }
+
+    .select-all-banner .banner-link {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 500;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .select-all-banner .banner-link:hover {
+      color: #6fa3ff;
+    }
+
+    .select-all-banner .banner-check {
+      color: var(--success);
+      font-weight: 500;
+    }
+
     /* Store Tabs in Drawer */
     .store-tabs {
       display: flex;
@@ -1431,6 +1468,13 @@ function productsPage() {
         <div class="spinner"></div>
       </div>
 
+      <div class="select-all-banner" id="select-all-banner">
+        <span class="banner-text" id="banner-text">Toate cele 50 de produse de pe aceasta pagina sunt selectate.</span>
+        <span class="banner-link" id="banner-select-all">Selecteaza toate cele <span id="banner-total">0</span> produse</span>
+        <span class="banner-check" id="banner-all-selected" style="display: none;">✓ Toate cele <span id="banner-all-count">0</span> produse sunt selectate.</span>
+        <span class="banner-link" id="banner-clear" style="display: none;">Sterge selectia</span>
+      </div>
+
       <div class="table-scroll">
         <table>
           <thead>
@@ -1581,6 +1625,7 @@ function productsPage() {
     let storeFilter = '';
     let syncFilter = '';
     let selectedSkus = new Set();
+    let allMatchingSelected = false; // true when user clicked "select all X products"
     let currentSku = null;
     let isNewProduct = false;
     let excelContent = null;
@@ -1647,6 +1692,15 @@ function productsPage() {
     const topSellersContent = document.getElementById('top-sellers-content');
     const topSellersTimeframeSelect = document.getElementById('top-sellers-timeframe');
     const topSellersRefreshHint = document.getElementById('top-sellers-refresh-hint');
+
+    // Select all banner elements
+    const selectAllBanner = document.getElementById('select-all-banner');
+    const bannerText = document.getElementById('banner-text');
+    const bannerSelectAll = document.getElementById('banner-select-all');
+    const bannerTotal = document.getElementById('banner-total');
+    const bannerAllSelected = document.getElementById('banner-all-selected');
+    const bannerAllCount = document.getElementById('banner-all-count');
+    const bannerClear = document.getElementById('banner-clear');
 
     // Utilities
     function showToast(message, type = 'success') {
@@ -2064,7 +2118,35 @@ function productsPage() {
     function updateBulkActions() {
       selectedCountEl.textContent = selectedSkus.size;
       bulkActions.classList.toggle('visible', selectedSkus.size > 0);
-      selectAllCheckbox.checked = selectedSkus.size > 0 && selectedSkus.size === products.length;
+
+      // Check if all items on current page are selected
+      const allPageSelected = products.length > 0 && products.every(p => selectedSkus.has(p.sku));
+      selectAllCheckbox.checked = allPageSelected;
+
+      // Show banner if all on page are selected AND there are more products to select
+      const showBanner = allPageSelected && totalProducts > products.length;
+      selectAllBanner.classList.toggle('visible', showBanner);
+
+      if (showBanner) {
+        // Update banner content based on state
+        bannerTotal.textContent = totalProducts;
+        bannerAllCount.textContent = totalProducts;
+
+        if (allMatchingSelected) {
+          // Show "all selected" state
+          bannerText.style.display = 'none';
+          bannerSelectAll.style.display = 'none';
+          bannerAllSelected.style.display = 'inline';
+          bannerClear.style.display = 'inline';
+        } else {
+          // Show "select all" prompt
+          bannerText.textContent = 'Toate cele ' + products.length + ' produse de pe aceasta pagina sunt selectate.';
+          bannerText.style.display = 'inline';
+          bannerSelectAll.style.display = 'inline';
+          bannerAllSelected.style.display = 'none';
+          bannerClear.style.display = 'none';
+        }
+      }
     }
 
     function escapeHtml(str) {
@@ -2827,12 +2909,14 @@ function productsPage() {
     searchInput.addEventListener('input', debounce(() => {
       searchQuery = searchInput.value.trim();
       currentPage = 1;
+      allMatchingSelected = false; // Reset bulk selection on filter change
       loadProducts();
     }, 300));
 
     storeFilterEl.addEventListener('change', () => {
       storeFilter = storeFilterEl.value;
       currentPage = 1;
+      allMatchingSelected = false; // Reset bulk selection on filter change
       loadProducts();
       loadTopSellers(); // Reload top sellers when store filter changes
     });
@@ -2840,6 +2924,7 @@ function productsPage() {
     syncFilterEl.addEventListener('change', () => {
       syncFilter = syncFilterEl.value;
       currentPage = 1;
+      allMatchingSelected = false; // Reset bulk selection on filter change
       loadProducts();
     });
 
@@ -2847,7 +2932,9 @@ function productsPage() {
       if (selectAllCheckbox.checked) {
         products.forEach(p => selectedSkus.add(p.sku));
       } else {
-        products.forEach(p => selectedSkus.delete(p.sku));
+        // When unchecking, clear all selections (including bulk selected)
+        selectedSkus.clear();
+        allMatchingSelected = false;
       }
       updateBulkActions();
       renderTable();
@@ -2887,9 +2974,42 @@ function productsPage() {
         }
       }
       selectedSkus.clear();
+      allMatchingSelected = false;
       updateBulkActions();
       loadProducts();
       showToast('Produse sterse');
+    });
+
+    // Select all banner events
+    bannerSelectAll.addEventListener('click', async () => {
+      try {
+        bannerSelectAll.textContent = 'Se incarca...';
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('search', searchQuery);
+        if (storeFilter) params.set('storeId', storeFilter);
+        if (syncFilter) params.set('syncStatus', syncFilter);
+
+        const res = await fetch('/products/skus?' + params);
+        const data = await res.json();
+
+        if (data.skus && data.skus.length > 0) {
+          data.skus.forEach(sku => selectedSkus.add(sku));
+          allMatchingSelected = true;
+          updateBulkActions();
+          renderTable();
+          showToast('Toate cele ' + data.skus.length + ' produse au fost selectate');
+        }
+      } catch (err) {
+        console.error('Failed to select all:', err);
+        showToast('Eroare la selectarea produselor', 'error');
+      }
+    });
+
+    bannerClear.addEventListener('click', () => {
+      selectedSkus.clear();
+      allMatchingSelected = false;
+      updateBulkActions();
+      renderTable();
     });
 
     // Drawer events
