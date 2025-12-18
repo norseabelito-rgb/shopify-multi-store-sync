@@ -241,7 +241,7 @@ async function recoverStaleJobs() {
     const pushJobsResult = await query(
       `UPDATE products_push_jobs
        SET status = 'failed',
-           error_log = COALESCE(error_log, '[]'::jsonb) || '[{"error": "Job marked as failed due to server restart"}]'::jsonb,
+           error_message = COALESCE(error_message, '') || ' [Server restart: job marked as failed]',
            finished_at = NOW(),
            updated_at = NOW()
        WHERE status = 'running'
@@ -387,6 +387,9 @@ process.on('unhandledRejection', (reason, promise) => {
     }, config.HEALTH_CHECK_INTERVAL_MS);
 
   } catch (err) {
+    console.error('=== STARTUP FAILED ===');
+    console.error('Error:', err.message);
+    console.error('Stack:', err.stack);
     logger.error('Startup failed', { error: err.message, stack: err.stack });
     process.exit(1);
   }
