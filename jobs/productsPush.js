@@ -6,11 +6,16 @@ const { query } = require('../lib/db');
 const { loadStoresRows } = require('../lib/stores');
 const { getMasterProducts } = require('../services/productsService');
 const { pushProductToStore } = require('../services/productsPushService');
+const config = require('../config');
+const { createLogger } = require('../lib/logger');
 
-// Configuration
-const BATCH_SIZE = 10; // Products to push before progress update
-const RATE_LIMIT_DELAY_MS = 500; // Delay between pushes
-const MAX_RETRIES = 2; // Max retries per product on failure
+const logger = createLogger('push-job');
+
+// Configuration from centralized config
+const BATCH_SIZE = config.JOB_BATCH_SIZE;
+const RATE_LIMIT_DELAY_MS = config.JOB_RATE_LIMIT_DELAY_MS;
+const MAX_RETRIES = config.JOB_MAX_RETRIES;
+const CANCELLATION_CHECK_INTERVAL = config.JOB_CANCELLATION_CHECK_INTERVAL;
 
 /**
  * Create a new push job in the database
@@ -27,7 +32,7 @@ async function createPushJob(storeId, skus, createdBy = 'system') {
     [storeId, skus.length, JSON.stringify(skus), createdBy]
   );
 
-  console.log(`[push-job] Created job ${result.rows[0].id} for ${skus.length} products to ${storeId}`);
+  logger.info(`Created job ${result.rows[0].id} for ${skus.length} products to ${storeId}`);
   return result.rows[0];
 }
 
@@ -170,7 +175,7 @@ async function executePushJob(jobId, options = {}) {
     started_at: new Date().toISOString(),
   });
 
-  console.log(`[push-job] Starting job ${jobId}: ${job.total_products} products to ${job.store_id}`);
+  logger.info(`Starting job ${jobId}: ${job.total_products} products to ${job.store_id}`);
 
   const skus = JSON.parse(job.sku_list);
   const results = {
@@ -183,15 +188,19 @@ async function executePushJob(jobId, options = {}) {
   };
 
   let processed = 0;
+  let isCancelled = false;
 
   for (let i = 0; i < skus.length; i++) {
     const sku = skus[i];
 
-    // Check if job was cancelled
-    const currentJob = await getJob(jobId);
-    if (currentJob.status === 'cancelled') {
-      console.log(`[push-job] Job ${jobId} was cancelled, stopping at ${processed}/${skus.length}`);
-      break;
+    // Check if job was cancelled every CANCELLATION_CHECK_INTERVAL items (fixes N+1 query issue)
+    if (i % CANCELLATION_CHECK_INTERVAL === 0) {
+      const currentJob = await getJob(jobId);
+      if (currentJob.status === 'cancelled') {
+        logger.info(`Job ${jobId} was cancelled, stopping at ${processed}/${skus.length}`);
+        isCancelled = true;
+        break;
+      }
     }
 
     let retries = 0;
@@ -210,7 +219,7 @@ async function executePushJob(jobId, options = {}) {
         } else {
           if (retries < MAX_RETRIES) {
             retries++;
-            console.log(`[push-job] Retry ${retries}/${MAX_RETRIES} for ${sku}: ${result.error}`);
+            logger.warn(`Retry ${retries}/${MAX_RETRIES} for ${sku}: ${result.error}`);
             await sleep(RATE_LIMIT_DELAY_MS * 2);
           } else {
             results.failed++;
@@ -220,7 +229,7 @@ async function executePushJob(jobId, options = {}) {
       } catch (err) {
         if (retries < MAX_RETRIES) {
           retries++;
-          console.log(`[push-job] Retry ${retries}/${MAX_RETRIES} for ${sku}: ${err.message}`);
+          logger.warn(`Retry ${retries}/${MAX_RETRIES} for ${sku}: ${err.message}`);
           await sleep(RATE_LIMIT_DELAY_MS * 2);
         } else {
           results.failed++;
