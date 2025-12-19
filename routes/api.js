@@ -6,6 +6,13 @@ const { getLatestCustomers, searchCustomers, getCustomersCount } = require('../s
 const { getCustomerDetail: getCustomerDetailFromDB } = require('../services/customersDetailService');
 const { backfillAllStores: backfillCustomersAllStores, incrementalSyncAllStores: incrementalSyncCustomersAllStores } = require('../jobs/customersSync');
 const { runBackfillJob: runCustomerIdBackfill, getBackfillStatus: getCustomerIdBackfillStatus } = require('../services/ordersCustomerIdBackfill');
+const {
+  triggerOrdersRefreshIfStale,
+  triggerCustomersRefreshIfStale,
+  getOrdersSyncStatus,
+  getCustomersSyncStatus,
+  getDataFreshnessStatus,
+} = require('../services/dataFreshnessService');
 
 // routes/api.js
 const express = require('express');
@@ -27,8 +34,8 @@ const {
   diffProduct,
   determinePlannedActionForRow,
 } = require('../lib/mapping');
-const { fetchOrders } = require('../services/ordersService');
-const { fetchCustomers, getCustomerDetail } = require('../services/customersService');
+// NOTE: ordersService.js and customersService.js are API-first (deprecated)
+// We now use DB-first services: ordersIndexService, customersIndexService
 const { query } = require('../lib/db');
 const {
   normalizeOrderDetail,
@@ -336,11 +343,21 @@ router.get('/orders', async (req, res) => {
     const sort_by = req.query.sort_by || 'created_at';
     const sort_dir = req.query.sort_dir || 'desc';
 
+    // Auto-refresh: trigger background sync if data is older than 60 minutes
+    // This runs in background and doesn't block the response
+    const refreshStatus = await triggerOrdersRefreshIfStale(storeIdFilter);
+    if (refreshStatus.triggered) {
+      console.log(`[orders] Auto-refresh triggered: ${refreshStatus.reason} (${refreshStatus.ageMinutes} min old)`);
+    }
+
     const orders = q
       ? await searchOrders({ store_id: storeIdFilter, q, limit, sort_by, sort_dir })
       : await getLatestOrders({ store_id: storeIdFilter, limit, sort_by, sort_dir });
 
     const totalTodayOrders = await getTodayOrdersCount({ store_id: storeIdFilter });
+
+    // Get sync status for response metadata
+    const syncStatus = await getOrdersSyncStatus(storeIdFilter);
 
     res.json({
       orders,
@@ -354,6 +371,11 @@ router.get('/orders', async (req, res) => {
       prevPageInfo: null,
       totalTodayOrders,
       source: 'POSTGRES_INDEX',
+      // Data freshness info
+      lastSync: syncStatus.lastSync,
+      dataAgeMinutes: syncStatus.ageMinutes,
+      isStale: syncStatus.isStale,
+      refreshTriggered: refreshStatus.triggered,
     });
   } catch (err) {
     console.error('/orders error', err);
@@ -431,6 +453,13 @@ router.get('/customers', async (req, res) => {
     const sort_by = req.query.sort_by || 'updated_at';
     const sort_dir = req.query.sort_dir || 'desc';
 
+    // Auto-refresh: trigger background sync if data is older than 60 minutes
+    // This runs in background and doesn't block the response
+    const refreshStatus = await triggerCustomersRefreshIfStale(storeIdFilter);
+    if (refreshStatus.triggered) {
+      console.log(`[customers] Auto-refresh triggered: ${refreshStatus.reason} (${refreshStatus.ageMinutes} min old)`);
+    }
+
     console.log('[customers][DB]', {
       store: storeIdFilter,
       search: searchQuery,
@@ -447,6 +476,9 @@ router.get('/customers', async (req, res) => {
     // Get total count
     const totalCustomers = await getCustomersCount({ q: searchQuery, store_id: storeIdFilter });
 
+    // Get sync status for response metadata
+    const syncStatus = await getCustomersSyncStatus(storeIdFilter);
+
     console.log('[customers][DB] returned', customers.length, 'customers, total:', totalCustomers);
 
     res.json({
@@ -454,6 +486,11 @@ router.get('/customers', async (req, res) => {
       count: customers.length,
       totalCustomers,
       source: 'POSTGRES_INDEX',
+      // Data freshness info
+      lastSync: syncStatus.lastSync,
+      dataAgeMinutes: syncStatus.ageMinutes,
+      isStale: syncStatus.isStale,
+      refreshTriggered: refreshStatus.triggered,
     });
   } catch (err) {
     console.error('/customers error', err);
@@ -1099,6 +1136,36 @@ router.post('/tasks/verify', requireTasksSecret, async (req, res) => {
     res.status(500).json({
       ok: false,
       error: err.message || String(err),
+    });
+  }
+});
+
+// ==================== DATA FRESHNESS ENDPOINT ====================
+// GET /data-freshness - Check sync status for orders and customers
+router.get('/data-freshness', async (req, res) => {
+  try {
+    const storeId = req.query.store_id || 'all';
+    const status = await getDataFreshnessStatus(storeId);
+
+    res.json({
+      store_id: storeId,
+      orders: {
+        lastSync: status.orders.lastSync,
+        ageMinutes: status.orders.ageMinutes,
+        isStale: status.orders.isStale,
+      },
+      customers: {
+        lastSync: status.customers.lastSync,
+        ageMinutes: status.customers.ageMinutes,
+        isStale: status.customers.isStale,
+      },
+      staleThresholdMinutes: 60,
+    });
+  } catch (err) {
+    console.error('[data-freshness] Error:', err);
+    res.status(500).json({
+      error: 'Failed to get data freshness status',
+      message: err.message || String(err),
     });
   }
 });
