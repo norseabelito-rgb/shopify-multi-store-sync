@@ -13,26 +13,28 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Trigger incremental customers sync
         run: |
           # Retry logic for network issues and Railway cold starts
-          MAX_RETRIES=3
-          RETRY_DELAY=5
+          MAX_RETRIES=4
+          RETRY_DELAY=10
 
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i of $MAX_RETRIES..."
+            echo "URL: ${{ secrets.CUSTOMERS_SYNC_URL }}"
 
             HTTP_CODE=$(curl --write-out '%{http_code}' --silent --output /tmp/response.json \
-              --max-time 30 \
+              --max-time 60 \
+              --connect-timeout 30 \
               -X POST "${{ secrets.CUSTOMERS_SYNC_URL }}" \
               -H "x-tasks-secret: ${{ secrets.TASKS_SECRET }}" \
               -H "content-type: application/json" \
               --data '{}')
 
             echo "HTTP Status: $HTTP_CODE"
-            cat /tmp/response.json
+            cat /tmp/response.json 2>/dev/null || echo "(no response body)"
             echo ""
 
             # 202 Accepted = success (job started in background)
@@ -41,11 +43,31 @@ jobs:
               exit 0
             fi
 
+            # 000 = connection failed (server not responding)
+            if [ "$HTTP_CODE" -eq 000 ]; then
+              echo "⚠ Connection failed (server may be starting), retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+              continue
+            fi
+
             # 502/503/504 = Railway cold start or temporary issue, retry
             if [ "$HTTP_CODE" -eq 502 ] || [ "$HTTP_CODE" -eq 503 ] || [ "$HTTP_CODE" -eq 504 ]; then
               echo "⚠ Server unavailable (HTTP $HTTP_CODE), retrying in ${RETRY_DELAY}s..."
               sleep $RETRY_DELAY
               continue
+            fi
+
+            # 401 = Unauthorized (TASKS_SECRET mismatch)
+            if [ "$HTTP_CODE" -eq 401 ]; then
+              echo "✗ Unauthorized - check TASKS_SECRET matches between GitHub and Railway"
+              exit 1
+            fi
+
+            # 404 = Endpoint not found (check URL path)
+            if [ "$HTTP_CODE" -eq 404 ]; then
+              echo "✗ Endpoint not found - check CUSTOMERS_SYNC_URL is correct"
+              echo "Expected format: https://your-app.railway.app/api/tasks/customers/sync"
+              exit 1
             fi
 
             # Other errors = fail immediately
